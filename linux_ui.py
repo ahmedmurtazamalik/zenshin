@@ -49,3 +49,20 @@ def matching(root, role, name):
             if node.get_role_name() == role and node.get_name() == name]
 
 
+def card(doc, question):
+    # The expanded request card is separate from the ordinary message composer.
+    forms = matching(doc, "entry", "Or write your own response")
+    for entry in forms:
+        parent = entry.get_parent()
+        if matching(parent, "static", question) and matching(parent, "push button", "Send"):
+            return parent, True
+    closed = []
+    for button in matching(doc, "push button", "Answer question"):
+        parent = button.get_parent()
+        if matching(parent, "static", question):
+            closed.append(parent)
+    if len(closed) > 1:
+        raise RuntimeError("Several pending cards have the same question; answer them manually")
+    return (closed[0], False) if closed else (None, False)
+
+
