@@ -12,3 +12,7 @@ def thread(thread_id="selected", text="May I submit this application?"):
         {"type": "agentMessage", "id": "message-1", "text": text}]}]}
 
 
+class PreviewTests(unittest.TestCase):
+    def setUp(self):
+        self.rule = {"request": "May I submit this application?", "response": "Approved."}
+
