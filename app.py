@@ -170,3 +170,17 @@ def poll(app):
     app["previews"] = previews
 
 
+def questions(thread):
+    requests = []
+    for turn in thread.get("turns", []):
+        for item in turn.get("items", []):
+            prompts = item.get("questions") or []
+            # The verified desktop form handles one question per request.
+            if item["type"] == "agentMessage" and len(prompts) == 1:
+                question = prompts[0]
+                requests.append({"thread_id": thread["id"], "turn_id": turn["id"],
+                                 "item_id": item["id"], "text": question["title"],
+                                 "options": question.get("options") or []})
+    return requests
+
+
