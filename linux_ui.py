@@ -14,3 +14,16 @@ def atspi():
     return Atspi
 
 
+def nodes(node, stop_at_documents=False):
+    if node is None:
+        return
+    # Navigation contains other conversations, never permission controls.
+    if node.get_role_name() == "landmark" and node.get_name() in {"Home", "App navigation"}:
+        return
+    yield node
+    if stop_at_documents and node.get_role_name() == "document web":
+        return
+    for index in range(max(0, node.get_child_count())):
+        yield from nodes(node.get_child_at_index(index), stop_at_documents)
+
+
