@@ -53,3 +53,34 @@ def close_connection(connection):
     connection["errors"].close()
 
 
+def rpc(connection, method, params):
+    # This build intentionally cannot send turns, resume chats, or approvals.
+    if method not in {"initialize", "thread/list", "thread/read"}:
+        raise ValueError("Unsupported read-only operation")
+    connection["next_id"] += 1
+    request_id = connection["next_id"]
+    process = connection["process"]
+    process.stdin.write((json.dumps({"id": request_id, "method": method,
+                                    "params": params}) + "\n").encode())
+    process.stdin.flush()
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        if b"\n" not in connection["buffer"]:
+            if not select.select([process.stdout], [], [], 0.2)[0]:
+                continue
+            chunk = os.read(process.stdout.fileno(), 65536)
+            if not chunk:
+                connection["errors"].seek(0)
+                detail = connection["errors"].read().decode(errors="replace")[-1500:]
+                raise RuntimeError("Codex App Server exited. " + detail.strip())
+            connection["buffer"] += chunk
+            continue
+        line, connection["buffer"] = connection["buffer"].split(b"\n", 1)
+        message = json.loads(line)
+        if message.get("id") == request_id and "method" not in message:
+            if "error" in message:
+                raise RuntimeError(message["error"]["message"])
+            return message["result"]
+    raise RuntimeError("Codex App Server did not respond within 10 seconds")
+
+
