@@ -268,3 +268,13 @@ def poll_desktop(app):
                              "status": "Message preview — no live single-question card; no response sent"})
 
 
+def snapshot(app):
+    return {"connected": app["connection"] is not None, "running": app["running"],
+            "mode": app["state"].get("mode", "preview"),
+            "targets": app["state"]["targets"], "rules": app["state"]["rules"],
+            "activity": app["state"]["activity"], "previews": app["previews"],
+            "unconfirmed": sum(attempt["status"] not in {"sent", "reviewed"}
+                               for attempt in app["state"]["attempts"].values()),
+            "error": app["error"]}
+
+
