@@ -2,6 +2,8 @@
 
 A local Linux app for reducing repeated Codex permission interruptions. It reads chat identity and history through Codex App Server and can answer **single-question cards in the Codex desktop app** through normal Linux accessibility controls.
 
+[Watch the captioned video walkthrough](demo/approval-helper-demo.mp4). [Transcript and chapter guide](demo/README.md). The walkthrough shows real app screens using separate demo settings; no new approval is sent during recording.
+
 ## Run
 
 ```sh
