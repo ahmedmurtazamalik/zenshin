@@ -165,6 +165,10 @@
     renderEntries('activity', [...state.activity].reverse(), 'No activity yet.');
     showError(state.error);
   }
+  async function loadChats(append = false) {
+    const result = await request('threads', {cursor: append ? cursor : null});
+    chats = append ? [...chats, ...result.data] : result.data; cursor = result.nextCursor; drawChats();
+  }
 </script>
 </body>
 </html>
