@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Approval Helper</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #20312f; background: #f3f5f2; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 1120px; margin: auto; padding: 36px 24px; }
+    header, .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    header { justify-content: space-between; margin-bottom: 24px; }
+    h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -.8px; }
+    h2 { font-size: 18px; margin: 0 0 12px; }
+    p { line-height: 1.5; margin: 6px 0 16px; }
+    .muted { color: #5d716b; font-size: 14px; }
+    .badge { border: 1px solid #c6d3ce; padding: 8px 12px; border-radius: 24px; background: white; font-size: 14px; }
+    .notice { background: #e5eee8; border-left: 4px solid #486e59; padding: 16px 20px; margin-bottom: 22px; line-height: 1.5; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    section { background: white; border: 1px solid #dce3de; border-radius: 12px; padding: 22px; margin-bottom: 20px; }
+    button { font: inherit; border: 1px solid #b9c9c1; background: white; color: #20312f; border-radius: 7px; padding: 9px 14px; cursor: pointer; }
+    button.primary { background: #315e48; border-color: #315e48; color: white; }
+    button:disabled { opacity: .5; cursor: default; }
+    button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px solid #79a28b; outline-offset: 2px; }
+    .toolbar { margin: 12px 0; }
+    #threads { max-height: 340px; overflow: auto; margin-top: 16px; }
+    .chat { display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #e8ede9; cursor: pointer; }
+    .chat input { margin-top: 5px; }
+    small { display: block; color: #687c73; overflow-wrap: anywhere; margin-top: 4px; }
+    textarea { width: 100%; min-height: 72px; padding: 10px; border: 1px solid #c5d2ca; border-radius: 6px; font: inherit; resize: vertical; }
+    select { font: inherit; padding: 9px; border: 1px solid #c5d2ca; border-radius: 6px; background: white; }
+    input[type=text] { font: inherit; padding: 9px; border: 1px solid #c5d2ca; border-radius: 6px; min-width: 0; flex: 1; }
+    .rule { border-top: 1px solid #e8ede9; padding: 16px 0; }
+    .rule label { display: block; font-size: 14px; margin-bottom: 8px; }
+    .rule button { margin-top: 4px; font-size: 13px; }
+    #error { color: #96392d; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .entry { border-top: 1px solid #e8ede9; padding: 16px 0; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 14px; line-height: 1.5; max-height: 220px; overflow: auto; background: #f6f8f5; padding: 12px; border-radius: 6px; }
+    .response { color: #315e48; }
+    details { margin-top: 10px; }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } main { padding: 24px 16px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>Codex Approval Helper</h1><span class="muted">Your selected chats. Your saved rules.</span></div>
+    <span class="badge" id="status">Paused · disconnected</span>
+  </header>
+  <div class="notice"><strong id="mode-title">Read-only preview</strong><br>
+    <span id="mode-description">Reads saved chat messages and proposes responses without sending them.</span></div>
+  <div class="grid">
+    <section>
+      <h2>1. Select chats</h2>
+      <p class="muted">Connect through your installed Codex CLI and existing local account.</p>
+      <div class="toolbar"><button id="connect">Connect to Codex</button><button id="refresh" disabled>Refresh chats</button></div>
+      <p class="muted" id="selection">No chats selected.</p>
+      <div id="threads"><p class="muted">Connect to discover existing chats.</p></div>
+      <button id="more" hidden>Load more chats</button>
+      <details><summary class="muted">Chat missing from the list?</summary>
+        <p class="muted">Add it by its Codex thread ID. Its actual title will be read from Codex.</p>
+        <div class="toolbar"><input id="target-id" type="text" aria-label="Codex thread ID"><button id="find-target">Add chat by ID</button></div>
+      </details>
+      <details><summary class="muted">Connection availability</summary>
+        <p class="muted">App Server: chat identity and saved messages.<br>Linux desktop: single-question cards and offered choices; custom answers require working accessibility text input.<br>Browser chat, dot, and tool approval dialogs: access not verified.</p>
+      </details>
+    </section>
+    <section>
+      <h2>2. Define rules</h2>
+      <p class="muted">Paste the complete question and your authorized response. Matching ignores whitespace but requires all wording to match. Offered choices submit directly. Other responses use the custom-answer field when desktop text input is available; failed input pauses monitoring.</p>
+      <div id="rules"></div>
+      <button id="add">Add rule</button>
+    </section>
+  </div>
+  <section>
+    <h2>3. Monitoring</h2>
+    <label for="mode">Response mode</label>
+    <select id="mode"><option value="preview">Read-only preview</option><option value="desktop">Answer matching desktop questions</option></select>
+    <p class="muted">Keep the selected chat open in Codex for desktop responses. Checks every 5 seconds while this window is open. Starts paused after every restart. Saving changes pauses monitoring. Pause stops future responses after the current check.</p>
+    <div class="toolbar"><button id="save">Save settings</button><button class="primary" id="start" disabled>Start monitoring</button><button id="pause" disabled>Pause</button><span class="muted" id="saved"></span></div>
+    <p id="error" role="alert" hidden></p>
+    <div id="review-panel" hidden><p class="muted">Resolve unconfirmed questions in Codex first. Marking them reviewed allows future monitoring but never retries those requests.</p><button id="review">I reviewed the unconfirmed requests</button></div>
+    <div id="previews"><p class="muted">No messages checked yet.</p></div>
+  </section>
+  <section>
+    <h2>Recent activity</h2>
+    <p class="muted">Local history of previews and desktop response attempts. Unconfirmed attempts pause monitoring and are never sent again automatically, including after restart.</p>
+    <div id="activity"></div>
+  </section>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  let state, chats = [], selected = new Map(), cursor = null, busy = false, pauseRequested = false;
+</script>
+</body>
+</html>
