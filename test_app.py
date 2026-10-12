@@ -57,3 +57,6 @@ class PreviewTests(unittest.TestCase):
             app.validate_settings({"targets": [], "rules": [self.rule, {
                 "request": "May I submit\nthis application?", "response": "No."}]})
 
+    def test_connection_rejects_mutating_operations(self):
+        with self.assertRaises(ValueError):
+            app.rpc({}, "turn/start", {})
