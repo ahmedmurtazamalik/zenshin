@@ -38,3 +38,18 @@ def save_state(path, state):
             os.unlink(temporary)
 
 
+def close_connection(connection):
+    if not connection:
+        return
+    process = connection["process"]
+    process.terminate()
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+    process.stdin.close()
+    process.stdout.close()
+    connection["errors"].close()
+
+
