@@ -44,3 +44,8 @@ def document(name):
     return matches[0] if matches else None
 
 
+def matching(root, role, name):
+    return [node for node in nodes(root)
+            if node.get_role_name() == role and node.get_name() == name]
+
+
