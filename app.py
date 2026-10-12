@@ -84,3 +84,24 @@ def rpc(connection, method, params):
     raise RuntimeError("Codex App Server did not respond within 10 seconds")
 
 
+def connect():
+    errors = tempfile.TemporaryFile()
+    try:
+        process = subprocess.Popen(["codex", "app-server"], stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=errors)
+    except OSError:
+        errors.close()
+        raise
+    connection = {"process": process, "errors": errors, "next_id": 0, "buffer": b""}
+    try:
+        rpc(connection, "initialize", {"clientInfo": {
+            "name": "codex_approval_helper", "title": "Codex Approval Helper",
+            "version": "0.1.0"}})
+        process.stdin.write(b'{"method":"initialized","params":{}}\n')
+        process.stdin.flush()
+        return connection
+    except Exception:
+        close_connection(connection)
+        raise
+
+
