@@ -188,3 +188,21 @@ class DesktopTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "unconfirmed attempt"):
                     app.verify_desktop_targets(monitor)
 
+    def test_unmatched_request_and_pause_do_not_send(self):
+        state = app.load_state(Path("/nonexistent-approval-helper-test-state"))
+        state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+                     rules=[{"request": "A different request?", "response": "Yes"}])
+        data = thread()
+        data["name"] = "Test chat"
+        data["turns"][0]["items"][0]["questions"] = [
+            {"title": "Complete test?", "options": ["Yes", "No"]}]
+        monitor = {"state": state, "running": True, "connection": None, "previews": []}
+        with patch.object(app, "rpc", return_value={"thread": data}) as read, \
+             patch.object(linux_ui, "pending", return_value=True), \
+             patch.object(linux_ui, "answer") as send:
+            app.poll(monitor)
+            send.assert_not_called()
+            monitor["running"] = False
+            read.reset_mock()
+            app.poll(monitor)
+            read.assert_not_called()
