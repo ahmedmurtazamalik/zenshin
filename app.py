@@ -278,3 +278,125 @@ def snapshot(app):
             "error": app["error"]}
 
 
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--state", type=Path, default=ROOT / ".local" / "state.json")
+    args = parser.parse_args()
+    app = {"path": args.state, "state": load_state(args.state), "running": False,
+           "connection": None, "previews": [], "error": ""}
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_args):
+            pass
+
+        def reply(self, value, status=200):
+            body = json.dumps(value).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def valid_host(self):
+            return self.headers.get("Host") in {
+                f"127.0.0.1:{args.port}", f"localhost:{args.port}"}
+
+        def do_GET(self):
+            if not self.valid_host():
+                return self.reply({"error": "Invalid host"}, 403)
+            if self.path == "/api/state":
+                return self.reply(snapshot(app))
+            if self.path != "/":
+                return self.reply({"error": "Not found"}, 404)
+            body = (ROOT / "index.html").read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self):
+            origin = self.headers.get("Origin")
+            if (not self.valid_host() or self.headers.get("Content-Type") != "application/json"
+                    or origin not in {None, f"http://127.0.0.1:{args.port}",
+                                      f"http://localhost:{args.port}"}):
+                return self.reply({"error": "Use the local control window"}, 403)
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+                if not 0 < size <= 1_000_000:
+                    raise ValueError("Invalid request size")
+                data = json.loads(self.rfile.read(size))
+                if self.path == "/api/connect":
+                    app["running"] = False
+                    close_connection(app["connection"])
+                    app["connection"] = None
+                    app["connection"] = connect()
+                elif self.path == "/api/threads":
+                    if not app["connection"]:
+                        raise ValueError("Connect to Codex first")
+                    return self.reply(rpc(app["connection"], "thread/list", {
+                        "limit": 50, "cursor": data.get("cursor"),
+                        "sortKey": "updated_at"}))
+                elif self.path == "/api/target":
+                    if not app["connection"]:
+                        raise ValueError("Connect to Codex first")
+                    thread = rpc(app["connection"], "thread/read", {
+                        "threadId": data["id"], "includeTurns": False})["thread"]
+                    if not thread.get("name"):
+                        raise ValueError("Give this chat a unique title in Codex first")
+                    return self.reply({"id": thread["id"], "name": thread["name"]})
+                elif self.path == "/api/settings":
+                    targets, rules = validate_settings(data)
+                    mode = data.get("mode", "preview")
+                    if mode not in {"preview", "desktop"}:
+                        raise ValueError("Choose preview or desktop mode")
+                    state = {**app["state"], "targets": targets, "rules": rules, "mode": mode}
+                    save_state(app["path"], state)
+                    app["state"] = state
+                    app["running"] = False
+                    app["previews"] = []
+                elif self.path == "/api/start":
+                    if not app["connection"] or not app["state"]["targets"]:
+                        raise ValueError("Connect and save at least one selected chat first")
+                    if app["state"].get("mode") == "desktop":
+                        verify_desktop_targets(app)
+                    app["running"] = True
+                elif self.path == "/api/pause":
+                    app["running"] = False
+                elif self.path == "/api/review":
+                    app["running"] = False
+                    for attempt in app["state"]["attempts"].values():
+                        if attempt["status"] not in {"sent", "reviewed"}:
+                            attempt["status"] = "reviewed"
+                    save_state(app["path"], app["state"])
+                elif self.path == "/api/poll":
+                    poll(app)
+                else:
+                    return self.reply({"error": "Not found"}, 404)
+                app["error"] = ""
+                self.reply(snapshot(app))
+            except (ValueError, KeyError, TypeError) as error:
+                self.reply({"error": str(error)}, 400)
+            except (OSError, RuntimeError) as error:
+                app["running"] = False
+                close_connection(app["connection"])
+                app["connection"] = None
+                app["error"] = str(error)
+                self.reply(snapshot(app), 503)
+
+    server = HTTPServer(("127.0.0.1", args.port), Handler)
+    print(f"Codex Approval Helper: http://127.0.0.1:{args.port}", flush=True)
+    print("Starts paused. Keep the control window open to monitor.", flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+        close_connection(app["connection"])
+
+
+if __name__ == "__main__":
+    main()
