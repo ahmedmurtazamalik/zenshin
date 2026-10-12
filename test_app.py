@@ -206,3 +206,7 @@ class DesktopTests(unittest.TestCase):
             read.reset_mock()
             app.poll(monitor)
             read.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()
