@@ -129,3 +129,21 @@ def validate_settings(data):
     return targets, rules
 
 
+def preview_latest(thread, rules):
+    turns = thread.get("turns", [])
+    if not turns:
+        return None
+    turn = turns[-1]
+    messages = [item for item in turn.get("items", [])
+                if item["type"] == "agentMessage" and item.get("text")]
+    if not messages:
+        return None
+    message = messages[-1]
+    response = next((rule["response"] for rule in rules
+                     if normalize(rule["request"]) == normalize(message["text"])), None)
+    # A persisted message is not proof of a live pending approval.
+    return {"thread_id": thread["id"], "turn_id": turn["id"], "item_id": message["id"],
+            "text": message["text"], "response": response,
+            "status": "Rule matched — preview only" if response else "No exact rule match"}
+
+
