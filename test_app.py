@@ -106,3 +106,28 @@ class DesktopTests(unittest.TestCase):
             activate.assert_not_called()
             api.EditableText.set_text_contents.assert_not_called()
 
+    def test_offered_choice_submits_once_and_confirms_new_answer_echo(self):
+        before, after, root = object(), object(), object()
+        option = Mock()
+        option.get_state_set.return_value.contains.return_value = True
+        submitted = False
+
+        def press(_option):
+            nonlocal submitted
+            submitted = True
+
+        def matches(node, role, name):
+            if role == "radio button":
+                return [option]
+            # Before submission the choice text is inside the form. Afterward
+            # the same text is echoed in a new user message, with no pending card.
+            return [object()]
+
+        with patch.object(linux_ui, "document", side_effect=lambda _name: after if submitted else before), \
+             patch.object(linux_ui, "card", side_effect=lambda *_args: (None, False) if submitted else (root, True)), \
+             patch.object(linux_ui, "matching", side_effect=matches), \
+             patch.object(linux_ui, "atspi"), \
+             patch.object(linux_ui, "press", side_effect=press) as activate:
+            linux_ui.answer("Test chat", "Complete test?", "Yes")
+            activate.assert_called_once_with(option)
+
