@@ -1,0 +1,54 @@
+1
+00:00:00,000 --> 00:00:08,000
+Codex Approval Helper
+A walkthrough of the features that work today. Real app screenshots, paced with captions. No new approval is sent in this recording.
+
+2
+00:00:08,000 --> 00:00:16,000
+1 / Launch the local app
+Run python3 app.py and open http://127.0.0.1:8765. The helper starts paused. This recording uses port 8766 and separate demo settings.
+
+3
+00:00:16,000 --> 00:00:23,000
+2 / Connect to Codex
+Click Connect to Codex. Your installed CLI supplies chat identity and saved history. Allow the chat list a moment to load.
+
+4
+00:00:23,000 --> 00:00:33,000
+3 / Select a chat and define a rule
+Select only the chat you want monitored. Enter the complete question and the offered response you authorize, then Save settings.
+
+5
+00:00:33,000 --> 00:00:41,000
+Optional / Add a missing chat by ID
+Expand Chat missing from the list? Paste its Codex thread ID and click Add chat by ID. The helper reads the actual title from Codex.
+
+6
+00:00:41,000 --> 00:00:51,000
+4 / Start with read-only preview
+Choose Read-only preview, then Start monitoring. The latest saved message appears. No exact match means no proposed response; preview never sends anything.
+
+7
+00:00:51,000 --> 00:00:58,000
+5 / Pause before changing behavior
+Click Pause. Future checks stop after the current check. Saving settings also pauses monitoring. Pause does not stop Codex work already underway.
+
+8
+00:00:58,000 --> 00:01:08,000
+6 / Enable desktop offered-choice responses
+Choose Answer matching desktop questions and save. Keep the selected chat open in one Codex window, with a unique title. Use an exact offered choice.
+
+9
+00:01:08,000 --> 00:01:18,000
+7 / Monitor live question cards
+Click Start monitoring. A matching live single-question card receives its offered answer once. Here the test is already complete, so the helper sends no response.
+
+10
+00:01:18,000 --> 00:01:26,000
+8 / Leave monitoring paused when finished
+Click Pause. Attempts are recorded before sending and are never retried automatically. Unconfirmed delivery pauses monitoring for manual review.
+
+11
+00:01:26,000 --> 00:01:38,000
+Current limits
+Verified: desktop offered choices, previews, saved rules, Pause and duplicate prevention. Custom text is blocked on this Wayland session. Browser, dot, multi-question and tool-dialog paths remain unfinished.
