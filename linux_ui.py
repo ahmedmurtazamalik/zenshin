@@ -27,3 +27,20 @@ def nodes(node, stop_at_documents=False):
         yield from nodes(node.get_child_at_index(index), stop_at_documents)
 
 
+def document(name):
+    api = atspi()
+    desktop = api.get_desktop(0)
+    matches = []
+    for index in range(desktop.get_child_count()):
+        application = desktop.get_child_at_index(index)
+        if application is None or application.get_name() != "Codex":
+            continue
+        # Chromium's cached tree can contain null children; read fresh controls.
+        application.set_cache_mask(api.Cache.NONE)
+        matches.extend(node for node in nodes(application, stop_at_documents=True)
+                       if node.get_role_name() == "document web" and node.get_name() == name)
+    if len(matches) > 1:
+        raise RuntimeError("This chat is open in multiple desktop windows; leave only one open")
+    return matches[0] if matches else None
+
+
