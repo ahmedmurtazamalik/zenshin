@@ -184,3 +184,28 @@ def questions(thread):
     return requests
 
 
+def verify_desktop_targets(app):
+    # Desktop documents expose a title, not a thread URL. Require that title to
+    # identify exactly one persisted chat before binding it to a selected ID.
+    threads = []
+    cursor = None
+    while True:
+        result = rpc(app["connection"], "thread/list", {"limit": 100, "cursor": cursor})
+        threads.extend(result["data"])
+        cursor = result.get("nextCursor")
+        if not cursor:
+            break
+    for target in app["state"]["targets"]:
+        matches = [thread["id"] for thread in threads
+                   if thread.get("name") == target["name"]]
+        # Newly created desktop chats can be readable by ID before thread/list
+        # includes them. Validate their identity directly as well.
+        thread = rpc(app["connection"], "thread/read", {
+            "threadId": target["id"], "includeTurns": False})["thread"]
+        if thread.get("name") != target["name"] or any(identity != target["id"] for identity in matches):
+            raise ValueError("Desktop mode needs a unique chat title; rename duplicate chats first")
+        if any(attempt["thread_id"] == target["id"] and attempt["status"] not in {"sent", "reviewed"}
+               for attempt in app["state"]["attempts"].values()):
+            raise ValueError("This chat has an unconfirmed attempt; resolve its question manually")
+
+
