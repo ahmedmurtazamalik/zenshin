@@ -31,3 +31,24 @@ class PreviewTests(unittest.TestCase):
         data["turns"].append({"id": "turn-3", "items": []})
         self.assertIsNone(app.preview_latest(data, [self.rule]))
 
+    def test_monitor_reads_only_selected_chat_and_preserves_history_after_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state = app.load_state(path)
+            state.update(targets=[{"id": "selected", "name": "Job search"}], rules=[self.rule])
+            monitor = {"path": path, "state": state, "running": True,
+                       "connection": None, "previews": []}
+            with patch.object(app, "rpc", return_value={"thread": thread()}) as read:
+                app.poll(monitor)
+                read.assert_called_once_with(None, "thread/read",
+                                             {"threadId": "selected", "includeTurns": True})
+                monitor["state"] = app.load_state(path)
+                app.poll(monitor)
+                self.assertEqual(len(monitor["state"]["activity"]), 1)
+                self.assertEqual(monitor["state"]["rules"], [self.rule])
+                self.assertEqual(monitor["state"]["targets"][0]["id"], "selected")
+                monitor["running"] = False
+                read.reset_mock()
+                app.poll(monitor)
+                read.assert_not_called()
+
