@@ -175,6 +175,17 @@
     renderState(await request('settings', {targets: [...selected.values()], rules, mode: $('mode').value}));
     $('saved').textContent = 'Settings saved.';
   }
+  async function action(work) {
+    if (busy) return;
+    busy = true;
+    try { showError(''); await work(); } catch (error) { showError(error.message); } finally {
+      busy = false;
+      if (pauseRequested) {
+        pauseRequested = false;
+        action(async () => renderState(await request('pause')));
+      }
+    }
+  }
 </script>
 </body>
 </html>
