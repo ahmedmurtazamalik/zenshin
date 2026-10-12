@@ -25,3 +25,16 @@ def load_state(path):
     return state
 
 
+def save_state(path, state):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Replace atomically so an interrupted save doesn't lose settings/history.
+    fd, temporary = tempfile.mkstemp(dir=path.parent)
+    try:
+        with os.fdopen(fd, "w") as file:
+            json.dump(state, file, indent=2)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
