@@ -169,6 +169,12 @@
     const result = await request('threads', {cursor: append ? cursor : null});
     chats = append ? [...chats, ...result.data] : result.data; cursor = result.nextCursor; drawChats();
   }
+  async function save() {
+    const rules = [...$('rules').children].map(row => ({request: row.querySelector('[data-field="request"]').value,
+      response: row.querySelector('[data-field="response"]').value}));
+    renderState(await request('settings', {targets: [...selected.values()], rules, mode: $('mode').value}));
+    $('saved').textContent = 'Settings saved.';
+  }
 </script>
 </body>
 </html>
