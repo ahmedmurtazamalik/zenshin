@@ -139,3 +139,29 @@ class DesktopTests(unittest.TestCase):
             app.verify_desktop_targets(monitor)
             self.assertEqual(read.call_args.args[1], "thread/read")
 
+    def test_delivery_is_recorded_before_sending_and_not_repeated_after_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state = app.load_state(path)
+            state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+                         rules=[{"request": "Complete test?", "response": "Yes"}])
+            data = thread(text="Complete test?")
+            data["name"] = "Test chat"
+            data["turns"][0]["items"][0]["questions"] = [
+                {"title": "Complete test?", "options": ["Yes", "No"]}]
+            monitor = {"state": state, "path": path, "running": True,
+                       "connection": None, "previews": []}
+
+            def answer(*_args):
+                saved = app.load_state(path)
+                self.assertEqual(saved["attempts"]["selected:message-1"]["status"], "sending")
+
+            with patch.object(app, "rpc", return_value={"thread": data}), \
+                 patch.object(linux_ui, "pending", return_value=True), \
+                 patch.object(linux_ui, "answer", side_effect=answer) as send:
+                app.poll(monitor)
+                monitor["state"] = app.load_state(path)
+                app.poll(monitor)
+                send.assert_called_once_with("Test chat", "Complete test?", "Yes")
+                self.assertEqual(monitor["state"]["attempts"]["selected:message-1"]["status"], "sent")
+
