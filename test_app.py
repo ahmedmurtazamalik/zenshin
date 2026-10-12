@@ -60,3 +60,49 @@ class PreviewTests(unittest.TestCase):
     def test_connection_rejects_mutating_operations(self):
         with self.assertRaises(ValueError):
             app.rpc({}, "turn/start", {})
+
+
+class DesktopTests(unittest.TestCase):
+    def test_custom_answer_is_read_back_before_send_and_preserves_existing_draft(self):
+        doc, root = object(), object()
+        entry, send = Mock(), Mock()
+        api = Mock()
+        draft = ""
+        submitted = False
+
+        def write(_entry, text):
+            nonlocal draft
+            draft = text
+            return True
+
+        def press(_button):
+            nonlocal submitted
+            submitted = True
+
+        def matches(node, role, name):
+            if role == "entry":
+                return [entry]
+            if role == "push button":
+                return [send]
+            if role == "static" and submitted and node is doc:
+                return [object()]
+            return []
+
+        api.Text.get_text.side_effect = lambda *_args: draft
+        api.EditableText.set_text_contents.side_effect = write
+        with patch.object(linux_ui, "document", return_value=doc), \
+             patch.object(linux_ui, "card", side_effect=lambda *_args: (None, False) if submitted else (root, True)), \
+             patch.object(linux_ui, "matching", side_effect=matches), \
+             patch.object(linux_ui, "atspi", return_value=api), \
+             patch.object(linux_ui, "press", side_effect=press) as activate:
+            linux_ui.answer("Test chat", "Complete test?", "Custom answer")
+            activate.assert_called_once_with(send)
+            submitted = False
+            draft = "User's unfinished answer"
+            activate.reset_mock()
+            api.EditableText.set_text_contents.reset_mock()
+            with self.assertRaisesRegex(RuntimeError, "already contains a draft"):
+                linux_ui.answer("Test chat", "Complete test?", "Custom answer")
+            activate.assert_not_called()
+            api.EditableText.set_text_contents.assert_not_called()
+
