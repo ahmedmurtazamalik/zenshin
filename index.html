@@ -186,6 +186,29 @@
       }
     }
   }
+  $('connect').onclick = () => action(async () => { renderState(await request('connect')); await loadChats(); });
+  $('refresh').onclick = () => action(() => loadChats());
+  $('more').onclick = () => action(() => loadChats(true));
+  $('find-target').onclick = () => action(async () => {
+    const target = await request('target', {id: $('target-id').value.trim()});
+    selected.set(target.id, target); drawChats(); $('target-id').value = '';
+  });
+  $('add').onclick = () => addRule();
+  $('save').onclick = () => action(save);
+  $('start').onclick = () => action(async () => { await save(); renderState(await request('start')); renderState(await request('poll')); });
+  $('pause').onclick = () => {
+    if (busy) { pauseRequested = true; $('status').textContent = 'Pausing after current check…'; }
+    else action(async () => renderState(await request('pause')));
+  };
+  $('review').onclick = () => action(async () => renderState(await request('review')));
+  action(async () => {
+    const response = await fetch('/api/state');
+    if (!response.ok) throw new Error('Could not read local settings');
+    const result = await response.json();
+    selected = new Map(result.targets.map(target => [target.id, target]));
+    drawChats(); result.rules.forEach(addRule); $('mode').value = result.mode; renderState(result);
+  });
+  setInterval(() => { if (state?.running && !busy) action(async () => renderState(await request('poll'))); }, 5000);
 </script>
 </body>
 </html>
