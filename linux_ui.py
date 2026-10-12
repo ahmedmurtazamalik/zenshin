@@ -73,3 +73,12 @@ def pending(name, question):
     return card(doc, question)[0] is not None
 
 
+def press(button):
+    for index in range(button.get_n_actions()):
+        if button.get_action_name(index) in {"press", "click", "check", "open", "select"}:
+            if button.do_action(index):
+                return
+            break
+    raise RuntimeError("The desktop control did not accept the action")
+
+
