@@ -52,3 +52,8 @@ class PreviewTests(unittest.TestCase):
                 app.poll(monitor)
                 read.assert_not_called()
 
+    def test_conflicting_rules_are_rejected(self):
+        with self.assertRaises(ValueError):
+            app.validate_settings({"targets": [], "rules": [self.rule, {
+                "request": "May I submit\nthis application?", "response": "No."}]})
+
