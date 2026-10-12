@@ -66,3 +66,10 @@ def card(doc, question):
     return (closed[0], False) if closed else (None, False)
 
 
+def pending(name, question):
+    doc = document(name)
+    if doc is None:
+        return False
+    return card(doc, question)[0] is not None
+
+
