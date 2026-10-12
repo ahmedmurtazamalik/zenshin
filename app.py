@@ -105,3 +105,7 @@ def connect():
         raise
 
 
+def normalize(text):
+    return " ".join(text.split())
+
+
