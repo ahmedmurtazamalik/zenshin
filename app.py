@@ -109,3 +109,23 @@ def normalize(text):
     return " ".join(text.split())
 
 
+def validate_settings(data):
+    targets, rules = data["targets"], data["rules"]
+    if not isinstance(targets, list) or not isinstance(rules, list):
+        raise ValueError("Targets and rules must be lists")
+    for target in targets:
+        if not isinstance(target["id"], str) or not target["id"].strip():
+            raise ValueError("Select a chat with a valid ID")
+        if not isinstance(target["name"], str):
+            raise ValueError("Chat names must be text")
+    requests = []
+    for rule in rules:
+        if not all(isinstance(rule[key], str) and rule[key].strip()
+                   for key in ("request", "response")):
+            raise ValueError("Each rule needs a complete request and response")
+        requests.append(normalize(rule["request"]))
+    if len(set(requests)) != len(requests):
+        raise ValueError("Use only one response per exact request")
+    return targets, rules
+
+
