@@ -150,6 +150,21 @@
       $(id).append(row);
     }
   }
+  function renderState(result) {
+    state = result;
+    $('status').textContent = `${state.running ? 'Monitoring' : 'Paused'} · ${state.connected ? 'connected' : 'disconnected'}`;
+    $('mode-title').textContent = state.mode === 'desktop' ? 'Desktop responses enabled for saved rules' : 'Read-only preview';
+    $('mode-description').textContent = state.mode === 'desktop'
+      ? 'Answers only live, matching question cards in the selected Codex chat. Unmatched requests remain pending; uncertain delivery pauses monitoring.'
+      : 'Reads saved chat messages and proposes responses without sending them. A historical message is not proof of a pending request.';
+    $('refresh').disabled = !state.connected;
+    $('start').disabled = !state.connected || state.running;
+    $('pause').disabled = !state.running;
+    $('review-panel').hidden = !state.unconfirmed;
+    renderEntries('previews', state.previews, 'No messages checked yet.');
+    renderEntries('activity', [...state.activity].reverse(), 'No activity yet.');
+    showError(state.error);
+  }
 </script>
 </body>
 </html>
