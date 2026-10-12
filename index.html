@@ -108,6 +108,24 @@
     }
     return result;
   }
+  function drawChats() {
+    $('threads').replaceChildren();
+    const available = new Map([...selected, ...chats.map(chat => [chat.id, chat])]);
+    if (!available.size) $('threads').append(element('p', 'No local chats found.', 'muted'));
+    for (const chat of available.values()) {
+      const row = element('label', undefined, 'chat');
+      const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = selected.has(chat.id);
+      const name = chat.name || chat.preview?.slice(0, 100) || chat.id;
+      const description = element('span', name); description.append(element('small', chat.id));
+      checkbox.onchange = () => {
+        if (checkbox.checked) selected.set(chat.id, {id: chat.id, name}); else selected.delete(chat.id);
+        $('selection').textContent = `${selected.size} chat(s) selected. Save to apply.`;
+      };
+      row.append(checkbox, description); $('threads').append(row);
+    }
+    $('selection').textContent = `${selected.size} chat(s) selected.`;
+    $('more').hidden = !cursor;
+  }
 </script>
 </body>
 </html>
