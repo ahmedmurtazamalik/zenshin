@@ -165,3 +165,26 @@ class DesktopTests(unittest.TestCase):
                 send.assert_called_once_with("Test chat", "Complete test?", "Yes")
                 self.assertEqual(monitor["state"]["attempts"]["selected:message-1"]["status"], "sent")
 
+    def test_uncertain_delivery_pauses_and_blocks_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state = app.load_state(path)
+            state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+                         rules=[{"request": "Complete test?", "response": "Yes"}])
+            data = thread()
+            data["name"] = "Test chat"
+            data["turns"][0]["items"][0]["questions"] = [
+                {"title": "Complete test?", "options": ["Yes", "No"]}]
+            monitor = {"state": state, "path": path, "running": True,
+                       "connection": None, "previews": []}
+            with patch.object(app, "rpc", return_value={"thread": data}), \
+                 patch.object(linux_ui, "pending", return_value=True), \
+                 patch.object(linux_ui, "answer", side_effect=RuntimeError("Lost confirmation")):
+                with self.assertRaises(RuntimeError):
+                    app.poll(monitor)
+            self.assertFalse(monitor["running"])
+            monitor["state"] = app.load_state(path)
+            with patch.object(app, "rpc", side_effect=[{"data": [data]}, {"thread": data}]):
+                with self.assertRaisesRegex(ValueError, "unconfirmed attempt"):
+                    app.verify_desktop_targets(monitor)
+
