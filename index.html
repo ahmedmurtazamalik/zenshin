@@ -136,6 +136,20 @@
     const remove = element('button', 'Remove rule'); remove.onclick = () => row.remove();
     row.append(remove); $('rules').append(row);
   }
+  function renderEntries(id, entries, empty) {
+    $(id).replaceChildren();
+    if (!entries.length) $(id).append(element('p', empty, 'muted'));
+    for (const entry of entries) {
+      const row = element('article', undefined, 'entry');
+      row.append(element('strong', entry.name), element('small', entry.status));
+      if (entry.time) row.append(element('small', new Date(entry.time * 1000).toLocaleString()));
+      row.append(element('pre', entry.text));
+      if (entry.response) row.append(element('p', 'Proposed response: ' + entry.response, 'response'));
+      if (entry.options?.length) row.append(element('p', 'Available choices: ' + entry.options.join(' / '), 'muted'));
+      if (entry.error) row.append(element('p', entry.error, 'muted'));
+      $(id).append(row);
+    }
+  }
 </script>
 </body>
 </html>
