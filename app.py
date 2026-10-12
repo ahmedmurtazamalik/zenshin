@@ -147,3 +147,26 @@ def preview_latest(thread, rules):
             "status": "Rule matched — preview only" if response else "No exact rule match"}
 
 
+def poll(app):
+    if not app["running"]:
+        return
+    if app["state"].get("mode") == "desktop":
+        return poll_desktop(app)
+    previews = []
+    for target in app["state"]["targets"]:
+        thread = rpc(app["connection"], "thread/read",
+                     {"threadId": target["id"], "includeTurns": True})["thread"]
+        preview = preview_latest(thread, app["state"]["rules"])
+        if not preview:
+            continue
+        preview["name"] = target["name"]
+        previews.append(preview)
+        fingerprint = hashlib.sha256(json.dumps(preview, sort_keys=True).encode()).hexdigest()
+        if fingerprint not in app["state"]["seen"]:
+            app["state"]["seen"].append(fingerprint)
+            app["state"]["activity"].append({"time": int(time.time()), **preview})
+            app["state"]["activity"] = app["state"]["activity"][-100:]
+            save_state(app["path"], app["state"])
+    app["previews"] = previews
+
+
