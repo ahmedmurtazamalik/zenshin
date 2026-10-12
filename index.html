@@ -126,6 +126,16 @@
     $('selection').textContent = `${selected.size} chat(s) selected.`;
     $('more').hidden = !cursor;
   }
+  function addRule(rule = {request: '', response: ''}) {
+    const row = element('div', undefined, 'rule');
+    for (const [key, title] of [['request', 'Complete request'], ['response', 'Proposed response']]) {
+      const label = element('label', title);
+      const input = document.createElement('textarea'); input.value = rule[key]; input.dataset.field = key;
+      label.append(input); row.append(label);
+    }
+    const remove = element('button', 'Remove rule'); remove.onclick = () => row.remove();
+    row.append(remove); $('rules').append(row);
+  }
 </script>
 </body>
 </html>
