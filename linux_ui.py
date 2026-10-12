@@ -82,3 +82,15 @@ def press(button):
     raise RuntimeError("The desktop control did not accept the action")
 
 
+def entry_text(entry):
+    text = atspi().Text.get_text(entry, 0, -1)
+    if "\ufffc" not in text:
+        return text
+    # Chromium contenteditable exposes paragraphs as embedded objects. Its
+    # placeholder is a section; actual text is rendered separately.
+    return "".join(node.get_name() for node in nodes(entry)
+                   if node.get_role_name() == "static"
+                   and not (node.get_name() == entry.get_name()
+                            and node.get_parent().get_role_name() == "section"))
+
+
