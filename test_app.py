@@ -131,3 +131,11 @@ class DesktopTests(unittest.TestCase):
             linux_ui.answer("Test chat", "Complete test?", "Yes")
             activate.assert_called_once_with(option)
 
+    def test_readable_chat_omitted_from_inventory_can_be_bound_by_id(self):
+        state = {"targets": [{"id": "selected", "name": "Test chat"}], "attempts": {}}
+        monitor = {"state": state, "connection": None}
+        with patch.object(app, "rpc", side_effect=[{"data": []}, {
+                "thread": {"id": "selected", "name": "Test chat"}}]) as read:
+            app.verify_desktop_targets(monitor)
+            self.assertEqual(read.call_args.args[1], "thread/read")
+
