@@ -209,3 +209,62 @@ def verify_desktop_targets(app):
             raise ValueError("This chat has an unconfirmed attempt; resolve its question manually")
 
 
+def poll_desktop(app):
+    import linux_ui
+
+    previews = []
+    app["previews"] = previews
+    for target in app["state"]["targets"]:
+        thread = rpc(app["connection"], "thread/read", {
+            "threadId": target["id"], "includeTurns": True})["thread"]
+        if thread.get("name") != target["name"]:
+            app["running"] = False
+            raise RuntimeError("The selected chat was renamed; select and save it again")
+        for request in reversed(questions(thread)):
+            try:
+                is_pending = linux_ui.pending(target["name"], request["text"])
+            except Exception as error:
+                app["running"] = False
+                raise RuntimeError("Desktop access failed: " + str(error)) from error
+            if not is_pending:
+                continue
+            response = next((rule["response"] for rule in app["state"]["rules"]
+                             if normalize(rule["request"]) == normalize(request["text"])), None)
+            choice = next((option for option in request["options"]
+                           if response is not None and normalize(option) == normalize(response)), response)
+            preview = {**request, "name": target["name"], "response": choice,
+                       "status": "Pending — no matching rule"}
+            previews.append(preview)
+            if choice is None:
+                continue
+            key = request["thread_id"] + ":" + request["item_id"]
+            if key in app["state"]["attempts"]:
+                preview["status"] = "Already attempted — no second response"
+                continue
+            attempt = {**preview, "time": int(time.time()), "status": "sending"}
+            # Commit before any UI action, including opening the answer form.
+            app["state"]["attempts"][key] = attempt
+            save_state(app["path"], app["state"])
+            try:
+                linux_ui.answer(target["name"], request["text"], choice)
+            except Exception as error:
+                attempt["status"] = "uncertain"
+                attempt["error"] = str(error)
+                app["running"] = False
+                preview["status"] = "Unconfirmed — paused; inspect the chat manually"
+            else:
+                attempt["status"] = "sent"
+                preview["status"] = "Response delivered"
+            app["state"]["activity"].append(dict(attempt))
+            app["state"]["activity"] = app["state"]["activity"][-100:]
+            save_state(app["path"], app["state"])
+            if attempt["status"] == "uncertain":
+                raise RuntimeError("Desktop delivery was not confirmed: " + attempt["error"])
+            # One response per check lets a queued Pause take effect before the next.
+            return
+        latest = preview_latest(thread, app["state"]["rules"])
+        if latest and not any(entry["thread_id"] == target["id"] for entry in previews):
+            previews.append({**latest, "name": target["name"],
+                             "status": "Message preview — no live single-question card; no response sent"})
+
+
