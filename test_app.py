@@ -23,3 +23,11 @@ class PreviewTests(unittest.TestCase):
                      "May I submit this application? Also accept these terms?"]:
             self.assertIsNone(app.preview_latest(thread(text=text), [self.rule])["response"])
 
+    def test_uses_latest_turn_instead_of_old_matching_request(self):
+        data = thread()
+        data["turns"].append({"id": "turn-2", "items": [
+            {"type": "agentMessage", "id": "message-2", "text": "Application submitted."}]})
+        self.assertIsNone(app.preview_latest(data, [self.rule])["response"])
+        data["turns"].append({"id": "turn-3", "items": []})
+        self.assertIsNone(app.preview_latest(data, [self.rule]))
+
