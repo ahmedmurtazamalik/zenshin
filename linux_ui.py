@@ -94,3 +94,62 @@ def entry_text(entry):
                             and node.get_parent().get_role_name() == "section"))
 
 
+def answer(name, question, response):
+    doc = document(name)
+    root, expanded = card(doc, question)
+    if root is None:
+        raise RuntimeError("The selected question is no longer pending in the visible chat")
+    if not expanded:
+        buttons = matching(root, "push button", "Answer question")
+        if len(buttons) != 1:
+            raise RuntimeError("Cannot identify the question's answer button")
+        press(buttons[0])
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        doc = document(name)
+        root, expanded = card(doc, question)
+        if expanded:
+            break
+        time.sleep(0.1)
+    if not expanded:
+        raise RuntimeError("The question form did not open")
+    # Offered choices submit immediately; custom text uses the separate Send.
+    doc = document(name)
+    root, expanded = card(doc, question)
+    options = matching(root, "radio button", response)
+    api = atspi()
+    if not expanded:
+        raise RuntimeError("The question changed before submission")
+    prior_echoes = len(matching(doc, "static", response)) - len(matching(root, "static", response))
+    if len(options) == 1:
+        if not options[0].get_state_set().contains(api.StateType.ENABLED):
+            raise RuntimeError("The offered response is disabled")
+        press(options[0])
+    else:
+        entries = matching(root, "entry", "Or write your own response")
+        if len(entries) != 1 or entry_text(entries[0]).strip():
+            raise RuntimeError("The custom answer already contains a draft; answer it manually")
+        if not api.EditableText.set_text_contents(entries[0], response):
+            raise RuntimeError("Desktop text input is unavailable; answer this request manually")
+        # Read back the live form immediately before sending. Never use global
+        # keyboard input or overwrite an existing user draft.
+        doc = document(name)
+        root, expanded = card(doc, question)
+        entries = matching(root, "entry", "Or write your own response")
+        buttons = matching(root, "push button", "Send")
+        if (not expanded or len(entries) != 1 or len(buttons) != 1
+                or entry_text(entries[0]) != response
+                or not buttons[0].get_state_set().contains(api.StateType.ENABLED)):
+            raise RuntimeError("The custom answer changed before Send; inspect its draft manually")
+        press(buttons[0])
+    # A closed card alone could mean navigation or dismissal. Require an echoed
+    # answer in the same chat as well before reporting delivery.
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        doc = document(name)
+        if doc is None:
+            raise RuntimeError("The chat changed during delivery; verify it manually")
+        if card(doc, question)[0] is None and len(matching(doc, "static", response)) > prior_echoes:
+            return
+        time.sleep(0.2)
+    raise RuntimeError("Delivery was not confirmed; inspect the chat before taking further action")
