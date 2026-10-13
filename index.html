@@ -4,8 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Codex Approval Helper</title>
+  <script>document.documentElement.dataset.theme = localStorage.getItem('helper-theme') || 'midnight';</script>
   <style>
-    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #e4e4e7; background: #141416; font-size: 14px; --line: #2b2b30; --muted: #94949f; --accent: #e8bb7d; }
+    @font-face { font-family: 'Space Grotesk'; src: url('/assets/space-grotesk.ttf') format('truetype'); font-weight: 300 700; font-display: swap; }
+    :root { color-scheme: dark; font-family: 'Space Grotesk', sans-serif; color: var(--text); background: var(--bg); font-size: 14px; --bg: #141416; --surface: #171719; --field: #1b1b1f; --button: #222226; --hover: #303035; --selected: #29272a; --text: #e4e4e7; --line: #36363e; --muted: #a3a3af; --accent: #e8bb7d; --primary: #e4e4e7; --primary-text: #18181b; --error-bg: #402324; --error-text: #f1b2b2; --review: #332b22; }
+    :root[data-theme=paper] { color-scheme: light; --bg: #f5f1e9; --surface: #ede8de; --field: #fffcf5; --button: #e7e0d4; --hover: #dcd3c3; --selected: #e6d9c1; --text: #29271f; --line: #cbc3b5; --muted: #6d675c; --accent: #855819; --primary: #29271f; --primary-text: #fffaf0; --error-bg: #f7dedb; --error-text: #8b2929; --review: #eee0c7; }
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
     body { margin: 0; }
@@ -13,7 +16,7 @@
     header { height: 76px; border-bottom: 1px solid var(--line); padding: 0 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
     .brand { display: flex; align-items: center; gap: 14px; }
     .mark { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid #55515a; border-radius: 8px; color: var(--accent); font: 20px ui-monospace, monospace; }
-    h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -.3px; }
+    h1 { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: -.3px; }
     .brand small { margin-top: 3px; font-size: 11px; }
     h2 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -.2px; }
     p { line-height: 1.6; margin: 8px 0 16px; }
@@ -23,19 +26,19 @@
     .badge::before { content: ""; width: 6px; height: 6px; background: #71717a; border-radius: 50%; }
     .badge.running::before { background: #b8d7aa; box-shadow: 0 0 0 3px #b8d7aa12; }
     .workspace { display: grid; grid-template-columns: 292px minmax(0, 1fr); }
-    aside { padding: 28px 20px; border-right: 1px solid var(--line); background: #171719; }
+    aside { padding: 28px 20px; border-right: 1px solid var(--line); background: var(--surface); }
     .section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 18px; }
-    .eyebrow { font: 10px ui-monospace, monospace; color: #74747e; text-transform: uppercase; letter-spacing: 1.2px; }
+    .eyebrow { font: 10px ui-monospace, monospace; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; }
     .content { padding: 32px 40px; min-width: 0; }
     .page-heading { margin-bottom: 28px; }
-    .page-heading h2 { font-size: 25px; letter-spacing: -.8px; font-weight: 500; margin-top: 9px; }
+    .page-heading h2 { font-size: 30px; letter-spacing: -1.2px; font-weight: 500; margin-top: 9px; }
     .page-heading p { color: var(--muted); margin: 8px 0 0; font-size: 13px; }
     section { padding: 26px 0; border-top: 1px solid var(--line); }
     button, input, textarea, select { font: inherit; }
-    button { border: 1px solid #3a3a41; color: #d4d4d8; background: #222226; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 12px; white-space: nowrap; transition: background .15s, border-color .15s; }
-    button:hover:not(:disabled) { background: #303035; border-color: #606068; }
-    button.primary { background: #e4e4e7; border-color: #e4e4e7; color: #18181b; font-weight: 600; }
-    button.primary:hover:not(:disabled) { background: white; }
+    button { border: 1px solid var(--line); color: var(--text); background: var(--button); border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 12px; white-space: nowrap; transition: background .15s, border-color .15s; }
+    button:hover:not(:disabled) { background: var(--hover); border-color: #606068; }
+    button.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-text); font-weight: 600; }
+    button.primary:hover:not(:disabled) { filter: brightness(1.15); }
     button:disabled { opacity: .35; cursor: default; }
     button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
     .quiet { background: transparent; border-color: transparent; color: var(--muted); }
@@ -43,17 +46,17 @@
     aside .toolbar { margin-bottom: 18px; }
     #connect { flex: 1; }
     #selection { font: 11px ui-monospace, monospace; margin: 14px 0; }
-    input[type=text], textarea, select { border: 1px solid #36363e; background: #1b1b1f; color: #e4e4e7; border-radius: 6px; padding: 10px 12px; min-width: 0; }
+    input[type=text], textarea, select { border: 1px solid var(--line); background: var(--field); color: var(--text); border-radius: 6px; padding: 10px 12px; min-width: 0; }
     input[type=text] { width: 100%; }
     input::placeholder, textarea::placeholder { color: #686872; }
-    #chat-search { font-size: 12px; background: #141416; }
+    #chat-search { font-size: 12px; background: var(--bg); }
     #threads { max-height: 460px; overflow-y: auto; margin: 0 -8px 18px; scrollbar-width: thin; }
     .chat { display: flex; align-items: flex-start; gap: 10px; padding: 11px 8px; border-radius: 5px; cursor: pointer; }
-    .chat:hover { background: #232327; }
-    .chat:has(input:checked) { background: #29272a; }
+    .chat:hover { background: var(--hover); }
+    .chat:has(input:checked) { background: var(--selected); }
     input[type=checkbox] { accent-color: var(--accent); width: 13px; height: 13px; margin: 3px 0 0; flex-shrink: 0; }
     .chat span { min-width: 0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
-    .chat small { font: 10px ui-monospace, monospace; margin-top: 4px; color: #70707b; }
+    .chat small { font: 10px ui-monospace, monospace; margin-top: 4px; color: var(--muted); }
     details { margin-top: 18px; }
     summary { color: var(--muted); cursor: pointer; font-size: 12px; }
     details p { font-size: 12px; }
@@ -66,36 +69,48 @@
     .rule { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
     .rule label { display: block; color: var(--muted); }
     .rule textarea { display: block; margin-top: 8px; }
-    .rule button { justify-self: start; grid-column: 1 / -1; background: transparent; border-color: transparent; padding: 0; color: #a99794; }
-    .notice { border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; background: #19191c; margin-bottom: 20px; }
+    .rule button { justify-self: start; grid-column: 1 / -1; background: transparent; border-color: transparent; padding: 0; color: var(--muted); }
+    .notice { border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; background: var(--surface); margin-bottom: 20px; }
     .notice-symbol { color: var(--accent); font: 16px ui-monospace, monospace; padding-top: 2px; }
     .notice strong { font-size: 12px; font-weight: 500; }
     #mode-description { display: block; color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 4px; }
-    .empty { border: 1px dashed #323239; border-radius: 6px; padding: 28px 20px; text-align: center; color: #797984; font-size: 12px; margin: 0; }
+    .empty { border: 1px dashed var(--line); border-radius: 6px; padding: 28px 20px; text-align: center; color: var(--muted); font-size: 12px; margin: 0; }
     .entry { padding: 18px 0; border-bottom: 1px solid var(--line); }
     .entry:last-child { border-bottom: 0; }
     .entry-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
     .entry strong { font-size: 13px; font-weight: 500; }
     .entry small { font-size: 11px; margin-top: 5px; }
-    pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; max-height: 220px; overflow: auto; padding: 14px 16px; background: #1c1c20; border-left: 2px solid #44434b; margin: 14px 0 10px; }
-    .response { color: #d5c1a4; font-size: 13px; margin-bottom: 6px; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; max-height: 220px; overflow: auto; padding: 14px 16px; background: var(--field); border-left: 2px solid #44434b; margin: 14px 0 10px; }
+    .response { color: var(--accent); font-size: 13px; margin-bottom: 6px; }
     .entry p { margin: 6px 0; }
-    .control-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 2; background: #19191cf5; border-top: 1px solid #38383f; backdrop-filter: blur(12px); }
+    .control-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 2; background: var(--surface); border-top: 1px solid var(--line); backdrop-filter: blur(12px); }
     .control-inner { max-width: 1440px; margin: auto; min-height: 76px; padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
-    .control-label { color: #b1b1bb; font: 11px ui-monospace, monospace; }
+    .control-label { color: var(--muted); font: 11px ui-monospace, monospace; }
     #saved { font-size: 11px; color: var(--accent); }
-    #error { background: #402324; border: 1px solid #704044; color: #f1b2b2; border-radius: 6px; padding: 12px 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
-    #review-panel { padding: 16px; background: #332b22; border: 1px solid #5e4d37; border-radius: 6px; margin-bottom: 20px; }
+    #error { background: var(--error-bg); border: 1px solid #704044; color: var(--error-text); border-radius: 6px; padding: 12px 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    #review-panel { padding: 16px; background: var(--review); border: 1px solid #5e4d37; border-radius: 6px; margin-bottom: 20px; }
     @media (min-width: 1440px) { main { border-left: 1px solid var(--line); border-right: 1px solid var(--line); } }
     @media (max-width: 900px) { .workspace { grid-template-columns: 240px minmax(0, 1fr); } .content { padding: 28px 24px; } header { padding: 0 24px; } .field-row { align-items: flex-start; flex-direction: column; gap: 8px; } }
     @media (max-width: 620px) { header { height: 68px; padding: 0 16px; } .brand { gap: 10px; } .brand small { display: none; } .brand .mark { width: 28px; height: 28px; flex-shrink: 0; } h1 { font-size: 12px; max-width: 130px; } .badge { font-size: 10px; } .workspace { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid var(--line); padding: 22px 20px; } #threads { max-height: 220px; } .content { padding: 26px 20px; } .rule { grid-template-columns: 1fr; } .control-inner { padding: 14px 16px; gap: 8px; flex-wrap: wrap; } .control-label { flex-basis: 100%; } .control-inner .toolbar { width: 100%; } #saved { flex-basis: 100%; } #pause:disabled { display: none; } main { padding-bottom: 150px; } }
+      .header-tools { display: flex; align-items: center; gap: 18px; }
+    #theme { padding: 6px 10px; font-size: 11px; }
+    #progress { position: relative; padding: 12px 32px; background: var(--surface); color: var(--accent); border-top: 1px solid var(--line); font-size: 12px; display: flex; align-items: center; gap: 10px; }
+    #progress::after { content: ''; position: absolute; top: 0; left: 0; width: 25%; height: 2px; background: var(--accent); animation: sweep 1.8s ease-in-out infinite; }
+    .spinner, button[data-loading]::before { content: ''; display: inline-block; width: 13px; height: 13px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0; }
+    button[data-loading] { opacity: 1; display: inline-flex; align-items: center; gap: 8px; }
+    .skeleton { height: 44px; border-radius: 5px; margin: 10px 0; background: linear-gradient(90deg, var(--field), var(--hover), var(--field)); background-size: 200% 100%; animation: shimmer 1.5s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes sweep { 0% { left: 0; } 50% { left: 75%; } 100% { left: 0; } }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+    @media (max-width: 620px) { header { height: auto; min-height: 84px; padding-top: 12px; padding-bottom: 12px; } .header-tools { flex-direction: column; align-items: flex-end; gap: 8px; } #progress { padding: 12px 16px; } }
   </style>
 </head>
 <body>
 <main>
   <header>
     <div class="brand"><div class="mark" aria-hidden="true">↳</div><div><h1>Codex Approval Helper</h1><small>Local control · Linux desktop</small></div></div>
-    <span class="badge" id="status">Paused · disconnected</span>
+    <div class="header-tools"><span class="badge" id="status">Paused · disconnected</span><select id="theme" aria-label="Color theme"><option value="midnight">Midnight</option><option value="paper">Paper</option></select></div>
   </header>
   <div class="workspace">
     <aside aria-label="Chat selection">
@@ -143,10 +158,12 @@
       </section>
     </div>
   </div>
-  <div class="control-bar"><div class="control-inner"><span class="control-label" id="next-step">Connect to Codex to begin</span><div class="toolbar"><span id="saved" role="status"></span><button id="save">Save changes</button><button class="primary" id="start" disabled>Start monitoring</button><button id="pause" disabled>Pause</button></div></div></div>
+  <div class="control-bar"><div id="progress" role="status" hidden><span class="spinner" aria-hidden="true"></span><span id="progress-text"></span></div><div class="control-inner"><span class="control-label" id="next-step">Connect to Codex to begin</span><div class="toolbar"><span id="saved" role="status"></span><button id="save">Save changes</button><button class="primary" id="start" disabled>Start monitoring</button><button id="pause" disabled>Pause</button></div></div></div>
 </main>
 <script>
   const $ = id => document.getElementById(id);
+  $('theme').value = document.documentElement.dataset.theme;
+  $('theme').onchange = () => { document.documentElement.dataset.theme = $('theme').value; localStorage.setItem('helper-theme', $('theme').value); };
   let state, chats = [], selected = new Map(), cursor = null, busy = false, pauseRequested = false;
   function element(tag, text, className) {
     const node = document.createElement(tag);
@@ -247,8 +264,13 @@
     showError(state.error);
   }
   async function loadChats(append = false) {
-    const result = await request('threads', {cursor: append ? cursor : null});
-    chats = append ? [...chats, ...result.data] : result.data; cursor = result.nextCursor; drawChats();
+    $('progress-text').textContent = 'Loading your Codex chats…';
+    $('threads').setAttribute('aria-busy', 'true');
+    if (!append) $('threads').replaceChildren(...Array.from({length: 4}, () => element('div', undefined, 'skeleton')));
+    try {
+      const result = await request('threads', {cursor: append ? cursor : null});
+      chats = append ? [...chats, ...result.data] : result.data; cursor = result.nextCursor;
+    } finally { $('threads').setAttribute('aria-busy', 'false'); drawChats(); }
   }
   async function save() {
     const rules = [...$('rules').children].map(row => ({request: row.querySelector('[data-field="request"]').value,
@@ -257,30 +279,34 @@
       decision_method: $('decision-method').value, instructions: $('instructions').value}));
     $('saved').textContent = 'Settings saved.';
   }
-  async function action(work) {
+  async function action(work, control, message = 'Checking selected chats · AI analysis may take a moment…') {
     if (busy) return;
     busy = true;
+    $('progress-text').textContent = message; $('progress').hidden = false;
+    if (control) $(control).setAttribute('data-loading', 'true');
     for (const id of ['connect', 'refresh', 'more', 'find-target', 'save', 'start']) $(id).disabled = true;
     document.querySelector('main').setAttribute('aria-busy', 'true');
     try { showError(''); await work(); } catch (error) { showError(error.message); } finally {
       busy = false;
+      $('progress').hidden = true;
+      if (control) $(control).removeAttribute('data-loading');
       document.querySelector('main').setAttribute('aria-busy', 'false');
       for (const id of ['connect', 'more', 'find-target', 'save']) $(id).disabled = false;
       $('refresh').disabled = !state?.connected;
       updateSelection();
       if (pauseRequested) {
         pauseRequested = false;
-        action(async () => renderState(await request('pause')));
+        action(async () => renderState(await request('pause')), 'pause', 'Pausing monitoring…');
       }
     }
   }
-  $('connect').onclick = () => action(async () => { renderState(await request('connect')); await loadChats(); });
-  $('refresh').onclick = () => action(() => loadChats());
-  $('more').onclick = () => action(() => loadChats(true));
+  $('connect').onclick = () => action(async () => { renderState(await request('connect')); await loadChats(); }, 'connect', 'Connecting to Codex…');
+  $('refresh').onclick = () => action(() => loadChats(), 'refresh', 'Refreshing chats…');
+  $('more').onclick = () => action(() => loadChats(true), 'more', 'Loading more chats…');
   $('find-target').onclick = () => action(async () => {
     const target = await request('target', {id: $('target-id').value.trim()});
     selected.set(target.id, target); drawChats(); markChanged(); $('target-id').value = '';
-  });
+  }, 'find-target', 'Finding this chat…');
   $('chat-search').oninput = drawChats;
   $('add').onclick = () => { addRule(); markChanged(); };
   for (const id of ['instructions', 'rules']) $(id).addEventListener('input', markChanged);
@@ -290,13 +316,13 @@
     $('exact-fields').hidden = $('decision-method').value === 'ai';
   }
   $('decision-method').onchange = () => { showAuthorization(); $('mode').value = 'preview'; markChanged(); };
-  $('save').onclick = () => action(save);
-  $('start').onclick = () => action(async () => { await save(); renderState(await request('start')); renderState(await request('poll')); });
+  $('save').onclick = () => action(save, 'save', 'Saving your settings…');
+  $('start').onclick = () => action(async () => { await save(); renderState(await request('start')); $('progress-text').textContent = 'Checking selected chats · AI analysis may take a moment…'; renderState(await request('poll')); }, 'start', 'Starting monitoring…');
   $('pause').onclick = () => {
     if (busy) { pauseRequested = true; $('status').textContent = 'Pausing after current check…'; }
-    else action(async () => renderState(await request('pause')));
+    else action(async () => renderState(await request('pause')), 'pause', 'Pausing monitoring…');
   };
-  $('review').onclick = () => action(async () => renderState(await request('review')));
+  $('review').onclick = () => action(async () => renderState(await request('review')), 'review', 'Marking requests reviewed…');
   action(async () => {
     const response = await fetch('/api/state');
     if (!response.ok) throw new Error('Could not read local settings');
@@ -306,7 +332,7 @@
     $('decision-method').value = result.decision_method;
     $('instructions').value = result.instructions; showAuthorization(); renderState(result);
     if (result.connected) await loadChats();
-  });
+  }, null, 'Loading your saved settings…');
   setInterval(() => { if (state?.running && !busy) action(async () => renderState(await request('poll'))); }, 5000);
 </script>
 </body>
