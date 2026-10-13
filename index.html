@@ -68,6 +68,14 @@
     label { font-size: 12px; }
     select, option { font-family: var(--theme-font); }
     select { font-size: 12px; max-width: 100%; }
+    select, select::picker(select) { appearance: base-select; }
+    select::picker(select) { font-family: var(--theme-font); font-size: inherit; color: var(--text); background: var(--field); border: 1px solid var(--line); border-radius: inherit; padding: 4px; margin-top: 4px; box-shadow: 0 8px 24px #0003; }
+    select option { font: inherit; padding: 9px 12px; border-radius: 3px; background: transparent; }
+    select option:checked { background: var(--selected); }
+    select option:hover, select option:focus-visible { background: var(--hover); outline: 1px solid var(--accent); outline-offset: -1px; }
+    select option::checkmark { color: var(--accent); }
+    select::picker-icon { color: var(--muted); }
+
     textarea { width: 100%; min-height: 92px; resize: vertical; line-height: 1.7; font-size: 13px; }
     #instructions { min-height: 180px; margin-top: 10px; padding: 16px; }
     .help { margin-top: 10px; max-width: 620px; }
