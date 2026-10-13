@@ -1,6 +1,6 @@
 # Codex Approval Helper
 
-A local Linux app for reducing repeated Codex permission interruptions. It reads chat identity and history through Codex App Server and can answer **single-question cards in the Codex desktop app** through normal Linux accessibility controls.
+A local Linux app for reducing repeated Codex permission interruptions. It reads chat identity and history through Codex App Server and can answer **question forms and ordinary continuation requests in the Codex desktop app** through normal Linux accessibility controls.
 
 [Watch the captioned video walkthrough](demo/approval-helper-demo.mp4). [Transcript and chapter guide](demo/README.md). The walkthrough shows real app screens using separate demo settings; no new approval is sent during recording.
 
@@ -10,12 +10,12 @@ A local Linux app for reducing repeated Codex permission interruptions. It reads
 python3 app.py
 ```
 
-Open http://127.0.0.1:8765. Requires Python 3 and a signed-in `codex` CLI. Desktop mode also requires the system Python `gi` package and AT-SPI; both were already installed on the tested machine. No pip packages or frontend build are needed. Run outside a filesystem sandbox that prevents Codex from initializing its own runtime or accessing the desktop accessibility bus.
+Open http://127.0.0.1:8765. Requires Python 3 and a signed-in `codex` CLI. Desktop mode also requires the system Python `gi` package and AT-SPI. On GNOME Wayland, keyboard fallback also uses a temporary Mutter RemoteDesktop session; these were already installed on the tested machine. No pip packages or frontend build are needed. Run outside a filesystem sandbox that prevents Codex from initializing its own runtime or accessing the desktop accessibility bus.
 
 1. Connect to Codex and select chats. If a new chat is missing, add its thread ID; the app reads its actual title.
 2. Give selected chats unique titles, and keep the chat you want answered open in a Codex window. Multiple visible copies are rejected.
 3. Choose **AI analysis with Codex CLI** and write standing instructions describing what the helper may approve or continue. Alternatively, keep **Exact question rules** for the existing deterministic behavior.
-4. Choose **Read-only preview** first, or **Answer matching desktop questions** to enable scoped responses, then Start monitoring.
+4. Choose **Read-only preview** first, or **Answer authorized desktop requests** to enable scoped responses, then Start monitoring.
 
 The app starts paused after restart. Saving changes pauses monitoring. Keep the control window open for its five-second polling. Pause stops future checks after the current check. One response is handled per check. It does not stop Codex work or undo actions.
 
@@ -29,15 +29,15 @@ Start in **Read-only preview** to inspect decisions. For example: “Continue fo
 
 An unchanged request, recent context, and instruction set reuse a saved decision, including after restart. New context or changed instructions trigger a new analysis. Calls consume Codex model usage and require working CLI authentication and model access; they are not local/offline inference. Analysis runs without blocking the HTTP server, times out after 60 seconds, and is canceled by Pause or changed settings. Invalid results and CLI failures pause monitoring without sending.
 
-In AI desktop mode, only `approve` or `continue` can send, and the response must match an offered choice on a live single-question card. The live chat/card is checked again after analysis through the normal polling and delivery path. Missing information, uncovered requests, ordinary conversational replies, and custom-text suggestions remain visible without automatic delivery. The attempt journal and delivery confirmation still apply. AI interpretation can be wrong: use clear, narrow standing instructions and inspect preview decisions before enabling desktop responses.
+In AI desktop mode, only `approve` or `continue` can send. Offered answers use their live controls; other authorized responses use guarded text input. Every question in a multi-question form must have an authorized answer before any answer is entered. The attempt journal and delivery confirmation apply to the whole form. AI interpretation can be wrong: use narrow standing instructions and inspect preview decisions before enabling desktop responses.
 
 Preview mode reads the latest assistant message without sending anything. Historical messages are not proof of a pending request.
 
-Desktop mode requires both a recorded structured question in the selected thread and its matching live question card in that chat's accessible desktop document. It matches the full question, normalizing whitespace only. Unmatched questions remain pending. When no live single-question card is found, the latest message is displayed as a preview without sending anything.
+Desktop mode checks structured questions from the newest turn against the live question form. Exact rules match the complete question, normalizing whitespace. Offered choices advance to the next question or submit the last answer immediately; the helper never clicks Send afterward. Custom answers preserve existing drafts, enter text, read it back, then use Next or Send.
 
-In the tested Codex version, activating an offered choice submits it immediately. The helper activates that choice once and confirms that the card disappears and a new answer is echoed in the same chat. It does not click Send afterward.
+Ordinary replies require the newest recorded assistant message to be visible, Codex to have stopped, no pending question form, and an empty composer. The helper reads the response back before Send and confirms a new echoed reply. Messages that cannot be matched to visible controls remain previews.
 
-Custom responses have a guarded implementation: preserve existing drafts, fill the custom-answer field through its accessibility editing interface, read it back, and activate Send only if the live question and response still match. Failed editing pauses monitoring. On this machine, Chromium's contenteditable fields report embedded objects and reject AT-SPI edits; synthetic AT-SPI keyboard events do not insert text in the Wayland session. Custom delivery therefore remains unverified and blocked here. A GNOME RemoteDesktop keyboard-input test requires approval after automatic approval review rejected creating that session. No compositor-control session was created.
+Chromium on this Wayland machine rejects accessibility text editing. After explicit user approval, a GNOME RemoteDesktop keyboard fallback was verified. It creates a temporary session, focuses the selected empty field, checks focus while typing, and stops the session afterward. Keyboard fallback supports single-line responses. Input or confirmation failures preserve the draft and pause monitoring; the helper never retries an uncertain attempt.
 
 Settings, the latest 100 activity entries, preview fingerprints, and a permanent response-attempt journal are stored in `.local/state.json`. Attempts are saved atomically **before** UI actions. An interrupted or unconfirmed attempt pauses monitoring and blocks that chat after restart. Inspect and resolve the request in Codex, then use **I reviewed the unconfirmed requests**. Reviewed requests still cannot be sent again automatically; future requests can be monitored.
 
@@ -51,7 +51,7 @@ The default AT-SPI cache initially returned null window children. Reading the fr
 
 Newly created desktop chats may be readable by ID before the standard inventory includes them; the app supports adding such chats directly.
 
-**Still unimplemented:** browser-chat and dot connections, ordinary free-text conversational replies, multi-question forms, and command/file/other tool approval dialogs. Custom-response logic exists but live delivery is blocked as described above. Only the helper's localhost page is available through the browser-control tool; no signed-in browser/dot request or supported shared App Server event connection was available. Each needs an observed request and delivery surface before implementation. This is a working first desktop connection, not completion of all three methods in PLAN.md.
+**Remaining:** command/file/other tool approval dialogs. A separate read-only App Server does not own the desktop client's live approval requests, and no supported shared event connection was available. These dialogs are not answered. Browser-chat and dot support were explicitly removed from scope by the user.
 
 No credentials are extracted, internal approvals fabricated, or managed restrictions changed. Protocol reference: [official Codex App Server documentation](https://learn.chatgpt.com/docs/app-server).
 
@@ -61,4 +61,6 @@ No credentials are extracted, internal approvals fabricated, or managed restrict
 python3 -m unittest -v
 ```
 
-The 15 tests cover exact matching, target selection, Pause, persistence, attempts recorded before delivery, duplicate prevention, uncertainty, omitted chat inventory entries, custom draft preservation, AI decision reuse, context input, missing-information decisions, unsupported choices, invalid model output, and cancellation. On 13 October 2026, two real CLI classification checks returned `continue` with the offered option for an authorized formatting request and `needs_input` with no response for a salary question. A full browser-to-CLI preview check correctly returned `no_response` for the controlled chat's completed action, displayed its reason, reused one persisted result across polls, and paused successfully. No new live AI-driven desktop approval was sent. The earlier desktop test used a real Codex question; unit tests do not send approvals.
+The 17 tests cover matching, target identity, Pause, persistence, draft preservation, AI classification handling, attempts saved before delivery, duplicate prevention, uncertain delivery, multi-question authorization, and ordinary reply journaling. The suite runs in about 0.03 seconds.
+
+On 13 October 2026, authorized live tests in “Approval Helper controlled test” confirmed an AI-selected offered answer, a custom free-text answer using GNOME input, a complete two-question form under one attempt, and an AI-selected ordinary composer reply. These used isolated journals in `/tmp`; the user's monitoring settings were preserved. The existing demo video predates AI mode and these additional desktop paths.
