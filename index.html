@@ -67,10 +67,20 @@
       </details>
     </section>
     <section>
-      <h2>2. Define rules</h2>
+      <h2>2. Define authorization</h2>
+      <label for="decision-method">Decision method</label>
+      <select id="decision-method"><option value="ai">AI analysis with Codex CLI</option><option value="exact">Exact question rules</option></select>
+      <div id="ai-fields" hidden>
+        <p class="muted">Codex analyzes the latest 8 conversational messages and the request against your instructions. Each unchanged request, context, and instruction set is analyzed once. Calls use your CLI account and consume model usage.</p>
+        <label for="instructions">Standing instructions</label>
+        <textarea id="instructions" placeholder="Continue the current task when the next step is already within my instructions. Ask me for missing personal information or a new decision."></textarea>
+        <p class="muted">Start in preview to inspect decisions and reasons. Desktop AI responses currently support offered choices on single-question cards. Ordinary messages are analyzed but not automatically answered.</p>
+      </div>
+      <div id="exact-fields">
       <p class="muted">Paste the complete question and your authorized response. Matching ignores whitespace but requires all wording to match. Offered choices submit directly. Other responses use the custom-answer field when desktop text input is available; failed input pauses monitoring.</p>
       <div id="rules"></div>
       <button id="add">Add rule</button>
+      </div>
     </section>
   </div>
   <section>
@@ -145,6 +155,7 @@
       if (entry.time) row.append(element('small', new Date(entry.time * 1000).toLocaleString()));
       row.append(element('pre', entry.text));
       if (entry.response) row.append(element('p', 'Proposed response: ' + entry.response, 'response'));
+      if (entry.reason) row.append(element('p', 'Reason: ' + entry.reason, 'muted'));
       if (entry.options?.length) row.append(element('p', 'Available choices: ' + entry.options.join(' / '), 'muted'));
       if (entry.error) row.append(element('p', entry.error, 'muted'));
       $(id).append(row);
@@ -153,7 +164,8 @@
   function renderState(result) {
     state = result;
     $('status').textContent = `${state.running ? 'Monitoring' : 'Paused'} · ${state.connected ? 'connected' : 'disconnected'}`;
-    $('mode-title').textContent = state.mode === 'desktop' ? 'Desktop responses enabled for saved rules' : 'Read-only preview';
+    $('mode-title').textContent = (state.decision_method === 'ai' ? 'AI analysis · ' : '') +
+      (state.mode === 'desktop' ? 'Desktop responses enabled' : 'Read-only preview');
     $('mode-description').textContent = state.mode === 'desktop'
       ? 'Answers only live, matching question cards in the selected Codex chat. Unmatched requests remain pending; uncertain delivery pauses monitoring.'
       : 'Reads saved chat messages and proposes responses without sending them. A historical message is not proof of a pending request.';
@@ -172,7 +184,8 @@
   async function save() {
     const rules = [...$('rules').children].map(row => ({request: row.querySelector('[data-field="request"]').value,
       response: row.querySelector('[data-field="response"]').value}));
-    renderState(await request('settings', {targets: [...selected.values()], rules, mode: $('mode').value}));
+    renderState(await request('settings', {targets: [...selected.values()], rules, mode: $('mode').value,
+      decision_method: $('decision-method').value, instructions: $('instructions').value}));
     $('saved').textContent = 'Settings saved.';
   }
   async function action(work) {
@@ -194,6 +207,11 @@
     selected.set(target.id, target); drawChats(); $('target-id').value = '';
   });
   $('add').onclick = () => addRule();
+  function showAuthorization() {
+    $('ai-fields').hidden = $('decision-method').value !== 'ai';
+    $('exact-fields').hidden = $('decision-method').value === 'ai';
+  }
+  $('decision-method').onchange = () => { showAuthorization(); $('mode').value = 'preview'; };
   $('save').onclick = () => action(save);
   $('start').onclick = () => action(async () => { await save(); renderState(await request('start')); renderState(await request('poll')); });
   $('pause').onclick = () => {
@@ -206,7 +224,9 @@
     if (!response.ok) throw new Error('Could not read local settings');
     const result = await response.json();
     selected = new Map(result.targets.map(target => [target.id, target]));
-    drawChats(); result.rules.forEach(addRule); $('mode').value = result.mode; renderState(result);
+    drawChats(); result.rules.forEach(addRule); $('mode').value = result.mode;
+    $('decision-method').value = result.decision_method;
+    $('instructions').value = result.instructions; showAuthorization(); renderState(result);
   });
   setInterval(() => { if (state?.running && !busy) action(async () => renderState(await request('poll'))); }, 5000);
 </script>
