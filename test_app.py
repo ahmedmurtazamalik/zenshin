@@ -68,6 +68,9 @@ class DesktopTests(unittest.TestCase):
         pending = patch.object(linux_ui, "conversation_pending", return_value=False)
         pending.start()
         self.addCleanup(pending.stop)
+        cards = patch.object(linux_ui, "approval_cards", return_value=[])
+        cards.start()
+        self.addCleanup(cards.stop)
 
     def test_custom_answer_is_read_back_before_send_and_preserves_existing_draft(self):
         doc, root = object(), object()
@@ -257,12 +260,75 @@ class DesktopTests(unittest.TestCase):
                 app.poll(monitor)
                 send.assert_called_once_with("Test chat", "Continue?", "Yes")
 
+    def test_approval_card_allows_once_and_persists_before_action(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state = app.load_state(path)
+            text = "Run local receipt command?\npython3 receipt.py"
+            state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+                         rules=[{"request": text, "response": "Allow once"}])
+            data = thread()
+            data["name"] = "Test chat"
+            monitor = {"state": state, "path": path, "running": True, "connection": None, "previews": []}
+            def approve(*args):
+                saved = app.load_state(path)
+                self.assertEqual(next(iter(saved["attempts"].values()))["status"], "sending")
+            with patch.object(app, "rpc", return_value={"thread": data}), \
+                 patch.object(linux_ui, "approval_cards", return_value=[{"text": text, "options": ["Allow once"]}]), \
+                 patch.object(linux_ui, "approve", side_effect=approve) as send:
+                state["rules"][0]["response"] = "Always allow"
+                app.poll(monitor)
+                send.assert_not_called()
+                state["rules"][0]["response"] = "Allow once"
+                app.poll(monitor)
+                monitor["state"] = app.load_state(path)
+                app.poll(monitor)
+                send.assert_called_once_with("Test chat", text, "Allow once")
+
+    def test_approval_detection_reads_card_context_and_excludes_chat_composer(self):
+        def node(role, name, children=()):
+            result = Mock()
+            result.get_role_name.return_value = role
+            result.get_name.return_value = name
+            result.get_child_count.return_value = len(children)
+            result.get_child_at_index.side_effect = lambda index: children[index]
+            for child in children:
+                child.get_parent.return_value = result
+            return result
+        allow = node("push button", "Allow once")
+        form = node("form", "", [node("push button", "Deny"), allow])
+        context = node("alert", "", [node("static", "Run command?"), node("static", "python3 receipt.py")])
+        card = node("section", "", [context, form])
+        doc = node("document web", "Test chat", [card])
+        with patch.object(linux_ui, "document", return_value=doc):
+            self.assertEqual(linux_ui.approval_forms("Test chat"), [
+                {"text": "Run command?\npython3 receipt.py", "button": allow}])
+            node("section", "", [context, form, node("entry", "Work with Codex")])
+            self.assertEqual(linux_ui.approval_forms("Test chat"), [])
+
+    def test_approval_rechecks_card_and_requires_same_chat_confirmation(self):
+        button = Mock()
+        with patch.object(linux_ui, "approval_forms", return_value=[]) as forms, \
+             patch.object(linux_ui, "press") as send, \
+             patch.object(linux_ui, "atspi"):
+            with self.assertRaisesRegex(RuntimeError, "changed"):
+                linux_ui.approve("Test chat", "Command A", "Allow once")
+            send.assert_not_called()
+            forms.return_value = [{"text": "Command A", "button": button}]
+            with patch.object(linux_ui, "document", return_value=None):
+                with self.assertRaisesRegex(RuntimeError, "chat changed"):
+                    linux_ui.approve("Test chat", "Command A", "Allow once")
+            send.assert_called_once_with(button)
+
 
 class AIDecisionTests(unittest.TestCase):
     def setUp(self):
         pending = patch.object(linux_ui, "conversation_pending", return_value=False)
         pending.start()
         self.addCleanup(pending.stop)
+        cards = patch.object(linux_ui, "approval_cards", return_value=[])
+        cards.start()
+        self.addCleanup(cards.stop)
 
     def monitor(self, path):
         state = app.load_state(path)
