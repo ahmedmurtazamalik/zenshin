@@ -51,7 +51,11 @@ The default AT-SPI cache initially returned null window children. Reading the fr
 
 Newly created desktop chats may be readable by ID before the standard inventory includes them; the app supports adding such chats directly.
 
-**Remaining:** command/file/other tool approval dialogs. A separate read-only App Server does not own the desktop client's live approval requests, and no supported shared event connection was available. These dialogs are not answered. Browser-chat and dot support were explicitly removed from scope by the user.
+**Approval-dialog implementation:** Desktop mode now detects the installed app's approval cards by their alert header and Deny/Allow once controls. It supplies all accessible card text and the one-time option to the existing AI classifier, or matches that complete text against an exact rule. Only the exact response `Allow once` can activate the card; persistent permission grants are excluded. The attempt is saved first, the card is re-read before clicking, and disappearance in the same chat confirms the UI response. This confirms the approval response, not successful execution of the command or tool. Normal chat replies are blocked while an approval card is visible.
+
+**Remaining verification:** This path is implemented and unit-tested against the installed UI structure, but has not received a real pending command/file/tool card on this machine. The controlled command test auto-ran under auto-review; with Ask for approval selected, escalation was disabled. An in-workspace file test ran directly; an external-workspace file test was rejected without a dialog. A separate read-only App Server still does not own the desktop client's requests. A real pending card is needed for end-to-end verification. Different labels or card structures are left untouched. Browser-chat and dot support were explicitly removed from scope by the user.
+
+Read-only preview continues to show recorded messages; approval cards are read in desktop mode. To inspect a live card without authorizing it, use desktop AI mode with standing instructions such as “Do not approve anything; leave every request for me.”
 
 No credentials are extracted, internal approvals fabricated, or managed restrictions changed. Protocol reference: [official Codex App Server documentation](https://learn.chatgpt.com/docs/app-server).
 
@@ -61,6 +65,6 @@ No credentials are extracted, internal approvals fabricated, or managed restrict
 python3 -m unittest -v
 ```
 
-The 17 tests cover matching, target identity, Pause, persistence, draft preservation, AI classification handling, attempts saved before delivery, duplicate prevention, uncertain delivery, multi-question authorization, and ordinary reply journaling. The suite runs in about 0.03 seconds.
+The 20 tests cover matching, target identity, Pause, persistence, draft preservation, AI classification handling, attempts saved before delivery, duplicate prevention, uncertain delivery, multi-question authorization, ordinary reply journaling, one-time approval restrictions, pre-action persistence, and changed-card/navigation failures. The suite runs in about 0.03 seconds.
 
 On 13 October 2026, authorized live tests in “Approval Helper controlled test” confirmed an AI-selected offered answer, a custom free-text answer using GNOME input, a complete two-question form under one attempt, and an AI-selected ordinary composer reply. These used isolated journals in `/tmp`; the user's monitoring settings were preserved. The existing demo video predates AI mode and these additional desktop paths.
