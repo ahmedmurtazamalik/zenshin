@@ -424,12 +424,12 @@ class ServerTests(unittest.TestCase):
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             try:
                 self.assertTrue(select.select([process.stdout], [], [], 5)[0], "Server did not start")
-                self.assertIn(b"Codex Approval Helper", process.stdout.readline())
+                self.assertIn(b"Onward", process.stdout.readline())
                 with socket.create_connection(("127.0.0.1", port), timeout=5):
                     time.sleep(0.05)
                     with urlopen(f"http://127.0.0.1:{port}/", timeout=5) as response:
                         self.assertEqual(response.status, 200)
-                        self.assertIn(b"Codex Approval Helper", response.read())
+                        self.assertIn(b"Onward", response.read())
             finally:
                 process.terminate()
                 process.communicate(timeout=5)

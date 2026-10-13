@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Codex Approval Helper</title>
+  <title>Onward · Keep your agents moving</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/onward.svg">
   <script>document.documentElement.dataset.theme = localStorage.getItem('helper-theme') || 'midnight';</script>
   <style>
     @font-face { font-family: 'Space Grotesk'; src: url('/assets/space-grotesk.ttf') format('truetype'); font-weight: 300 700; font-display: swap; }
@@ -19,7 +20,7 @@
     main { max-width: 1440px; min-height: 100vh; margin: auto; padding-bottom: 84px; }
     header { height: 76px; border-bottom: 1px solid var(--line); padding: 0 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
     .brand { display: flex; align-items: center; gap: 14px; }
-    .mark { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid #55515a; border-radius: 8px; color: var(--accent); font: 20px ui-monospace, monospace; }
+    .mark { width: 32px; height: 32px; display: grid; place-items: center; flex-shrink: 0; color: var(--accent); font: 20px ui-monospace, monospace; }
     h1 { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: -.3px; }
     .brand small { margin-top: 3px; font-size: 11px; }
     h2 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -.2px; }
@@ -104,7 +105,7 @@
     #review-panel { padding: 16px; background: var(--review); border: 1px solid #5e4d37; border-radius: 6px; margin-bottom: 20px; }
     /* Each palette has its own material, contrast, and accent treatment. */
     .section-head .eyebrow { color: var(--accent); border: 1px solid var(--line); padding: 4px 7px; border-radius: 4px; }
-    .mark { border-color: var(--accent); }
+    .mark svg { width: 100%; height: 100%; overflow: visible; }
     .notice { border-left: 3px solid var(--accent); }
     pre { border-left-color: var(--accent); }
     :root[data-theme=midnight] .content { background: radial-gradient(ellipse at top right, #e8bb7d0c, transparent 55%); }
@@ -167,7 +168,10 @@
 <body>
 <main>
   <header>
-    <div class="brand"><div class="mark" aria-hidden="true">↳</div><div><h1>Codex Approval Helper</h1><small>Local control · Linux desktop</small></div></div>
+    <div class="brand"><div class="mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <path d="M31 26A13 13 0 1 1 23 8h12" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <path d="m29 2 6 6-6 6" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg></div><div><h1>Onward</h1><small>Keep your agents moving · Local control</small></div></div>
     <div class="header-tools"><span class="badge" id="status">Paused · disconnected</span><select id="theme" aria-label="Color theme"><option value="midnight">Midnight</option><option value="paper">Paper</option><option value="cobalt">Cobalt</option><option value="forest">Forest</option><option value="rose">Rose</option><option value="terminal">Terminal</option></select></div>
   </header>
   <div class="workspace">

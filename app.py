@@ -100,7 +100,7 @@ def connect():
     connection = {"process": process, "errors": errors, "next_id": 0, "buffer": b""}
     try:
         rpc(connection, "initialize", {"clientInfo": {
-            "name": "codex_approval_helper", "title": "Codex Approval Helper",
+            "name": "codex_approval_helper", "title": "Onward",
             "version": "0.1.0"}})
         process.stdin.write(b'{"method":"initialized","params":{}}\n')
         process.stdin.flush()
@@ -425,12 +425,15 @@ def main():
                 return self.reply({"error": "Invalid host"}, 403)
             if self.path == "/api/state":
                 return self.reply(snapshot(app))
-            if self.path not in {"/", "/assets/space-grotesk.ttf"}:
+            files = {"/": ("index.html", "text/html; charset=utf-8"),
+                     "/assets/space-grotesk.ttf": ("assets/space-grotesk.ttf", "font/ttf"),
+                     "/assets/onward.svg": ("assets/onward.svg", "image/svg+xml")}
+            if self.path not in files:
                 return self.reply({"error": "Not found"}, 404)
-            font = self.path == "/assets/space-grotesk.ttf"
-            body = (ROOT / ("assets/space-grotesk.ttf" if font else "index.html")).read_bytes()
+            filename, content_type = files[self.path]
+            body = (ROOT / filename).read_bytes()
             self.send_response(200)
-            self.send_header("Content-Type", "font/ttf" if font else "text/html; charset=utf-8")
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -516,7 +519,7 @@ def main():
                 self.reply(snapshot(app), 503)
 
     server = HTTPServer(("127.0.0.1", args.port), Handler)
-    print(f"Codex Approval Helper: http://127.0.0.1:{args.port}", flush=True)
+    print(f"Onward: http://127.0.0.1:{args.port}", flush=True)
     print("Starts paused. Keep the control window open to monitor.", flush=True)
     try:
         server.serve_forever()
