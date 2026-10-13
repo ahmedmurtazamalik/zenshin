@@ -49,12 +49,16 @@ def matching(root, role, name):
             if node.get_role_name() == role and node.get_name() == name]
 
 
+def answer_entries(root):
+    return matching(root, "entry", "Or write your own response") + matching(root, "entry", "Reply…")
+
+
 def card(doc, question):
     # The expanded request card is separate from the ordinary message composer.
-    forms = matching(doc, "entry", "Or write your own response")
+    forms = answer_entries(doc)
     for entry in forms:
         parent = entry.get_parent()
-        if matching(parent, "static", question) and matching(parent, "push button", "Send"):
+        if matching(parent, "static", question) and (matching(parent, "push button", "Send") or matching(parent, "push button", "Next")):
             return parent, True
     closed = []
     for button in matching(doc, "push button", "Answer question"):
@@ -94,7 +98,40 @@ def entry_text(entry):
                             and node.get_parent().get_role_name() == "section"))
 
 
-def answer(name, question, response):
+def write_text(name, entry, response):
+    api = atspi()
+    if api.EditableText.set_text_contents(entry, response):
+        return
+    # Wayland Chromium rejects EditableText. Use a short GNOME keyboard session
+    # only while the selected empty field retains focus, then verify readback.
+    if "\n" in response:
+        raise RuntimeError("Desktop keyboard fallback supports single-line replies")
+    from gi.repository import Gio, GLib
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    destination = "org.gnome.Mutter.RemoteDesktop"
+    path = bus.call_sync(destination, "/org/gnome/Mutter/RemoteDesktop", destination,
+                         "CreateSession", None, None, 0, 3000, None).unpack()[0]
+    def call(method, args=None):
+        return bus.call_sync(destination, path, destination + ".Session", method,
+                             args, None, 0, 3000, None)
+    call("Start")
+    try:
+        if not entry.grab_focus():
+            raise RuntimeError("Cannot focus the answer field")
+        time.sleep(0.1)
+        for character in response:
+            if document(name) is None or not entry.get_state_set().contains(api.StateType.FOCUSED):
+                raise RuntimeError("The chat or text focus changed; inspect the draft manually")
+            keysym = ord(character)
+            if keysym > 127:
+                keysym |= 0x01000000
+            for pressed in (True, False):
+                call("NotifyKeyboardKeysym", GLib.Variant("(ub)", (keysym, pressed)))
+    finally:
+        call("Stop")
+
+
+def answer(name, question, response, next_question=None):
     doc = document(name)
     root, expanded = card(doc, question)
     if root is None:
@@ -126,17 +163,16 @@ def answer(name, question, response):
             raise RuntimeError("The offered response is disabled")
         press(options[0])
     else:
-        entries = matching(root, "entry", "Or write your own response")
+        entries = answer_entries(root)
         if len(entries) != 1 or entry_text(entries[0]).strip():
             raise RuntimeError("The custom answer already contains a draft; answer it manually")
-        if not api.EditableText.set_text_contents(entries[0], response):
-            raise RuntimeError("Desktop text input is unavailable; answer this request manually")
-        # Read back the live form immediately before sending. Never use global
-        # keyboard input or overwrite an existing user draft.
+        write_text(name, entries[0], response)
+        # Read back the live form immediately before sending. Never
+        # overwrite an existing user draft.
         doc = document(name)
         root, expanded = card(doc, question)
-        entries = matching(root, "entry", "Or write your own response")
-        buttons = matching(root, "push button", "Send")
+        entries = answer_entries(root)
+        buttons = matching(root, "push button", "Next" if next_question else "Send")
         if (not expanded or len(entries) != 1 or len(buttons) != 1
                 or entry_text(entries[0]) != response
                 or not buttons[0].get_state_set().contains(api.StateType.ENABLED)):
@@ -149,7 +185,45 @@ def answer(name, question, response):
         doc = document(name)
         if doc is None:
             raise RuntimeError("The chat changed during delivery; verify it manually")
-        if card(doc, question)[0] is None and len(matching(doc, "static", response)) > prior_echoes:
+        if next_question and card(doc, next_question)[0] is not None:
+            return
+        if not next_question and card(doc, question)[0] is None and len(matching(doc, "static", response)) > prior_echoes:
             return
         time.sleep(0.2)
     raise RuntimeError("Delivery was not confirmed; inspect the chat before taking further action")
+
+
+def conversation_pending(name, text):
+    doc = document(name)
+    return bool(doc and matching(doc, "static", text)
+                and not matching(doc, "push button", "Stop")
+                and not matching(doc, "push button", "Answer question")
+                and not answer_entries(doc))
+
+
+def reply(name, text, response):
+    if not conversation_pending(name, text):
+        raise RuntimeError("The chat is running or its latest message is not visible")
+    doc = document(name)
+    entries = matching(doc, "entry", "Work with Codex")
+    if len(entries) != 1 or entry_text(entries[0]).strip():
+        raise RuntimeError("The composer contains a draft; reply manually")
+    prior = len(matching(doc, "static", response))
+    write_text(name, entries[0], response)
+    doc = document(name)
+    entries = matching(doc, "entry", "Work with Codex")
+    buttons = matching(entries[0].get_parent(), "push button", "Send") if len(entries) == 1 else []
+    if (not conversation_pending(name, text) or len(entries) != 1
+            or entry_text(entries[0]) != response or len(buttons) != 1
+            or not buttons[0].get_state_set().contains(atspi().StateType.ENABLED)):
+        raise RuntimeError("Composer changed before Send; inspect its draft manually")
+    press(buttons[0])
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        doc = document(name)
+        if doc is None:
+            break
+        if len(matching(doc, "static", response)) > prior:
+            return
+        time.sleep(0.2)
+    raise RuntimeError("Reply delivery was not confirmed; inspect the chat manually")
