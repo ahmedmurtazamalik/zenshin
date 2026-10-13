@@ -63,7 +63,7 @@
         <div class="toolbar"><input id="target-id" type="text" aria-label="Codex thread ID"><button id="find-target">Add chat by ID</button></div>
       </details>
       <details><summary class="muted">Connection availability</summary>
-        <p class="muted">App Server: chat identity and saved messages.<br>Linux desktop: single-question cards and offered choices; custom answers require working accessibility text input.<br>Browser chat, dot, and tool approval dialogs: access not verified.</p>
+        <p class="muted">App Server: chat identity and saved messages.<br>Linux desktop: question forms, custom answers, and ordinary continuation replies.<br>Command/file approval dialogs: not yet supported.</p>
       </details>
     </section>
     <section>
@@ -74,7 +74,7 @@
         <p class="muted">Codex analyzes the latest 8 conversational messages and the request against your instructions. Each unchanged request, context, and instruction set is analyzed once. Calls use your CLI account and consume model usage.</p>
         <label for="instructions">Standing instructions</label>
         <textarea id="instructions" placeholder="Continue the current task when the next step is already within my instructions. Ask me for missing personal information or a new decision."></textarea>
-        <p class="muted">Start in preview to inspect decisions and reasons. Desktop AI responses currently support offered choices on single-question cards. Ordinary messages are analyzed but not automatically answered.</p>
+        <p class="muted">Start in preview to inspect decisions and reasons. Desktop AI responses support offered choices, custom answers, and ordinary replies. Every question in a form needs authorization.</p>
       </div>
       <div id="exact-fields">
       <p class="muted">Paste the complete question and your authorized response. Matching ignores whitespace but requires all wording to match. Offered choices submit directly. Other responses use the custom-answer field when desktop text input is available; failed input pauses monitoring.</p>
@@ -86,7 +86,7 @@
   <section>
     <h2>3. Monitoring</h2>
     <label for="mode">Response mode</label>
-    <select id="mode"><option value="preview">Read-only preview</option><option value="desktop">Answer matching desktop questions</option></select>
+    <select id="mode"><option value="preview">Read-only preview</option><option value="desktop">Answer authorized desktop requests</option></select>
     <p class="muted">Keep the selected chat open in Codex for desktop responses. Checks every 5 seconds while this window is open. Starts paused after every restart. Saving changes pauses monitoring. Pause stops future responses after the current check.</p>
     <div class="toolbar"><button id="save">Save settings</button><button class="primary" id="start" disabled>Start monitoring</button><button id="pause" disabled>Pause</button><span class="muted" id="saved"></span></div>
     <p id="error" role="alert" hidden></p>
@@ -167,7 +167,7 @@
     $('mode-title').textContent = (state.decision_method === 'ai' ? 'AI analysis · ' : '') +
       (state.mode === 'desktop' ? 'Desktop responses enabled' : 'Read-only preview');
     $('mode-description').textContent = state.mode === 'desktop'
-      ? 'Answers only live, matching question cards in the selected Codex chat. Unmatched requests remain pending; uncertain delivery pauses monitoring.'
+      ? 'Answers matching question forms and visible latest messages in the selected idle Codex chat. Unmatched requests remain pending; uncertain delivery pauses monitoring.'
       : 'Reads saved chat messages and proposes responses without sending them. A historical message is not proof of a pending request.';
     $('refresh').disabled = !state.connected;
     $('start').disabled = !state.connected || state.running;
