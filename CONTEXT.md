@@ -54,3 +54,7 @@ Continue from the desktop question connection under AGENTS.md. Verify a represen
 Before changing code, state the concrete outcome, material assumptions, smallest approach, exclusions, and an observable verification check as required by AGENTS.md. The user has already requested implementation; do not restart with another generic planning or permission question. Ask only when an unresolved choice materially changes the outcome or authorization scope.
 
 The user has now requested implementation in this project. The older handoff request is historical context.
+
+## 13 October desktop completion
+
+User explicitly approved GNOME RemoteDesktop keyboard sessions and harmless prompts in Approval Helper controlled test. Keyboard fallback verified; Reply… fields supported. Multi-question forms authorize all questions first, offered answers advance immediately, and one journal entry covers the form. Ordinary composer replies require a visible latest message, stopped chat, no pending form, empty draft, readback and echoed delivery. Real AI offered-choice and ordinary-reply paths passed. Seventeen unit tests pass. Browser chat is excluded (Codex only); dot skipped per user instruction. Tool approval dialogs still need a supported live surface. Existing video predates these changes.
