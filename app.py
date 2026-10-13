@@ -288,13 +288,26 @@ def poll_desktop(app):
             app["running"] = False
             raise RuntimeError("The selected chat was renamed; select and save it again")
         requests = list(reversed(questions(thread)))
+        for card in linux_ui.approval_cards(target["name"]):
+            turns = thread.get("turns", [])
+            if not turns:
+                continue
+            fingerprint = hashlib.sha256(card["text"].encode()).hexdigest()
+            requests.insert(0, {**card, "thread_id": thread["id"], "turn_id": turns[-1]["id"],
+                                "item_id": turns[-1]["id"] + ":approval:" + fingerprint,
+                                "approval": True})
         latest = preview_latest(thread, app["state"]["rules"])
         if latest:
             requests.append({**latest, "options": [], "conversation": True})
         for request in requests:
             try:
-                is_pending = (linux_ui.conversation_pending(target["name"], request["text"])
-                              if request.get("conversation") else linux_ui.pending(target["name"], request["text"]))
+                if request.get("approval"):
+                    is_pending = any(card["text"] == request["text"]
+                                     for card in linux_ui.approval_cards(target["name"]))
+                elif request.get("conversation"):
+                    is_pending = linux_ui.conversation_pending(target["name"], request["text"])
+                else:
+                    is_pending = linux_ui.pending(target["name"], request["text"])
             except Exception as error:
                 app["running"] = False
                 raise RuntimeError("Desktop access failed: " + str(error)) from error
@@ -316,6 +329,9 @@ def poll_desktop(app):
                        "status": "Pending — every question needs authorization"}
             if decision:
                 preview.update(decision)
+            if request.get("approval") and responses[0] != "Allow once":
+                responses[0] = None
+                preview["response"] = None
             previews.append(preview)
             if len(prompts) > 1:
                 preview["answers"] = [{"question": prompt["title"], "response": response}
@@ -333,7 +349,9 @@ def poll_desktop(app):
             save_state(app["path"], app["state"])
             try:
                 for index, (prompt, response) in enumerate(zip(prompts, responses)):
-                    if request.get("conversation"):
+                    if request.get("approval"):
+                        linux_ui.approve(target["name"], prompt["title"], response)
+                    elif request.get("conversation"):
                         linux_ui.reply(target["name"], prompt["title"], response)
                     elif index + 1 < len(prompts):
                         linux_ui.answer(target["name"], prompt["title"], response, prompts[index + 1]["title"])
