@@ -14,6 +14,8 @@ The user then said, "Okay, start building the app." Before implementation began,
 
 ## Current state
 
+- On 13 October 2026, added `ai_decision.py` and an AI/exact-method selector with standing instructions. AI analyzes eight recent conversational messages and the request using ephemeral read-only `codex exec` with a structured output schema and existing CLI auth. Classifier calls are polled without blocking the control server and canceled by Pause/settings changes. Decisions persist by request/context/instructions fingerprint. AI desktop delivery only accepts an authorized offered choice on a live single-question card; ordinary messages and custom suggestions are previewed only. Fifteen tests pass. Two harmless real CLI tests classified authorized continuation and missing salary information correctly; no new desktop response was sent. Git was previously initialized on main with 60 granular commits and a captioned demo under `demo/`; that video predates AI mode.
+
 - First build created in this directory on 12 October 2026: `app.py`, `index.html`, `test_app.py`, and `README.md`. No third-party dependencies.
 - Run `python3 app.py` and open http://127.0.0.1:8765. The window supports real local chat discovery, selected targets, saved exact request/response rules, Start/Pause, message previews, and persistent activity history.
 - Desktop single-question responses are now implemented in `linux_ui.py`. App Server remains read-only; the actual response uses the question card's offered choice through Linux AT-SPI. The UI provides a saved preview/desktop mode.
