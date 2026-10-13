@@ -198,7 +198,8 @@ def conversation_pending(name, text):
     return bool(doc and matching(doc, "static", text)
                 and not matching(doc, "push button", "Stop")
                 and not matching(doc, "push button", "Answer question")
-                and not answer_entries(doc))
+                and not answer_entries(doc)
+                and not matching(doc, "push button", "Allow once"))
 
 
 def reply(name, text, response):
@@ -227,3 +228,50 @@ def reply(name, text, response):
             return
         time.sleep(0.2)
     raise RuntimeError("Reply delivery was not confirmed; inspect the chat manually")
+
+
+def approval_forms(name):
+    doc = document(name)
+    if doc is None:
+        return []
+    forms = []
+    for button in matching(doc, "push button", "Allow once"):
+        root = button.get_parent()
+        # The installed card has an alert header and a Deny/Allow form.
+        while root and root.get_role_name() != "document web":
+            if matching(root, "entry", "Work with Codex"):
+                break
+            if any(node.get_role_name() == "alert" for node in nodes(root)):
+                if len(matching(root, "push button", "Deny")) != 1:
+                    break
+                text = "\n".join(node.get_name() for node in nodes(root)
+                                 if node.get_role_name() == "static")
+                if text.strip():
+                    forms.append({"text": text, "button": button})
+                break
+            root = root.get_parent()
+    return forms
+
+
+def approval_cards(name):
+    return [{"text": form["text"], "options": ["Allow once"]} for form in approval_forms(name)]
+
+
+def approve(name, text, response):
+    if response != "Allow once":
+        raise RuntimeError("Approval dialogs only support the one-time Allow once action")
+    forms = [form for form in approval_forms(name) if form["text"] == text]
+    if len(forms) != 1:
+        raise RuntimeError("The approval card changed or is ambiguous; inspect it manually")
+    button = forms[0]["button"]
+    if not button.get_state_set().contains(atspi().StateType.ENABLED):
+        raise RuntimeError("The approval action is disabled")
+    press(button)
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        if document(name) is None:
+            raise RuntimeError("The chat changed during approval; inspect it manually")
+        if not any(card["text"] == text for card in approval_cards(name)):
+            return
+        time.sleep(0.2)
+    raise RuntimeError("Approval was not confirmed; inspect the request manually")
