@@ -14,8 +14,8 @@ Open http://127.0.0.1:8765. Requires Python 3 and a signed-in `codex` CLI. Deskt
 
 1. Connect to Codex and select chats. If a new chat is missing, add its thread ID; the app reads its actual title.
 2. Give selected chats unique titles, and keep the chat you want answered open in a Codex window. Multiple visible copies are rejected.
-3. Choose **AI analysis with Codex CLI** and write standing instructions describing what the helper may approve or continue. Alternatively, keep **Exact question rules** for the existing deterministic behavior.
-4. Choose **Read-only preview** first, or **Answer authorized desktop requests** to enable scoped responses, then Start monitoring.
+3. Choose **AI · follow my instructions** and write standing instructions describing what the helper may approve or continue. Alternatively, keep **Match exact questions** for the existing deterministic behavior.
+4. Choose **Preview only** first, or **Send authorized replies** to enable scoped responses, then Start monitoring.
 
 The app starts paused after restart. Saving changes pauses monitoring. Keep the control window open for its five-second polling. Pause stops future checks after the current check. One response is handled per check. It does not stop Codex work or undo actions.
 
@@ -25,7 +25,7 @@ Optional: `python3 app.py --port 8766 --state /path/to/state.json`.
 
 AI mode reads the latest eight user/assistant messages plus the request and offered choices. It runs a separate, ephemeral `codex exec` in a read-only temporary directory using the existing CLI sign-in. Its structured decision is `approve`, `continue`, `needs_input`, or `no_response`, with a proposed response and reason. The CLI is instructed not to use tools; any observed tool use causes its decision to be discarded. Conversation content is treated as data, not authorization to expand the standing instructions.
 
-Start in **Read-only preview** to inspect decisions. For example: “Continue formatting this report within my existing instructions. Ask me for missing personal information or a new decision.” You do not need to predict the question's wording. Empty standing instructions cannot start AI monitoring. Existing saved exact-rule settings retain their behavior until you switch methods.
+Start in **Preview only** to inspect decisions. For example: “Continue formatting this report within my existing instructions. Ask me for missing personal information or a new decision.” You do not need to predict the question's wording. Empty standing instructions cannot start AI monitoring. Existing saved exact-rule settings retain their behavior until you switch methods.
 
 An unchanged request, recent context, and instruction set reuse a saved decision, including after restart. New context or changed instructions trigger a new analysis. Calls consume Codex model usage and require working CLI authentication and model access; they are not local/offline inference. Analysis runs without blocking the HTTP server, times out after 60 seconds, and is canceled by Pause or changed settings. Invalid results and CLI failures pause monitoring without sending.
 
