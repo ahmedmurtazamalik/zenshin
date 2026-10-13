@@ -406,5 +406,34 @@ class AIDecisionTests(unittest.TestCase):
         self.assertFalse(root.exists())
 
 
+class ServerTests(unittest.TestCase):
+    def test_idle_browser_connection_does_not_block_loading_page(self):
+        import select
+        import socket
+        import subprocess
+        import sys
+        import time
+        from urllib.request import urlopen
+
+        with tempfile.TemporaryDirectory() as directory:
+            with socket.socket() as reservation:
+                reservation.bind(("127.0.0.1", 0))
+                port = reservation.getsockname()[1]
+            process = subprocess.Popen([sys.executable, str(app.ROOT / "app.py"),
+                                        "--port", str(port), "--state", str(Path(directory) / "state.json")],
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            try:
+                self.assertTrue(select.select([process.stdout], [], [], 5)[0], "Server did not start")
+                self.assertIn(b"Codex Approval Helper", process.stdout.readline())
+                with socket.create_connection(("127.0.0.1", port), timeout=5):
+                    time.sleep(0.05)
+                    with urlopen(f"http://127.0.0.1:{port}/", timeout=5) as response:
+                        self.assertEqual(response.status, 200)
+                        self.assertIn(b"Codex Approval Helper", response.read())
+            finally:
+                process.terminate()
+                process.communicate(timeout=5)
+
+
 if __name__ == "__main__":
     unittest.main()
