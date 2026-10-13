@@ -425,11 +425,12 @@ def main():
                 return self.reply({"error": "Invalid host"}, 403)
             if self.path == "/api/state":
                 return self.reply(snapshot(app))
-            if self.path != "/":
+            if self.path not in {"/", "/assets/space-grotesk.ttf"}:
                 return self.reply({"error": "Not found"}, 404)
-            body = (ROOT / "index.html").read_bytes()
+            font = self.path == "/assets/space-grotesk.ttf"
+            body = (ROOT / ("assets/space-grotesk.ttf" if font else "index.html")).read_bytes()
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Type", "font/ttf" if font else "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
