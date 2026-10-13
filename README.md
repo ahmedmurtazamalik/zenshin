@@ -1,6 +1,6 @@
-# Onward
+# Zenshin
 
-**Keep your agents moving.**
+**Keep moving forward.**
 
 A local Linux app for reducing repeated Codex permission interruptions. It reads chat identity and history through Codex App Server and can answer **question forms and ordinary continuation requests in the Codex desktop app** through normal Linux accessibility controls.
 

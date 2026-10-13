@@ -100,7 +100,7 @@ def connect():
     connection = {"process": process, "errors": errors, "next_id": 0, "buffer": b""}
     try:
         rpc(connection, "initialize", {"clientInfo": {
-            "name": "codex_approval_helper", "title": "Onward",
+            "name": "codex_approval_helper", "title": "Zenshin",
             "version": "0.1.0"}})
         process.stdin.write(b'{"method":"initialized","params":{}}\n')
         process.stdin.flush()
@@ -427,7 +427,7 @@ def main():
                 return self.reply(snapshot(app))
             files = {"/": ("index.html", "text/html; charset=utf-8"),
                      "/assets/space-grotesk.ttf": ("assets/space-grotesk.ttf", "font/ttf"),
-                     "/assets/onward.svg": ("assets/onward.svg", "image/svg+xml")}
+                     "/assets/zenshin.svg": ("assets/zenshin.svg", "image/svg+xml")}
             if self.path not in files:
                 return self.reply({"error": "Not found"}, 404)
             filename, content_type = files[self.path]
@@ -519,7 +519,7 @@ def main():
                 self.reply(snapshot(app), 503)
 
     server = HTTPServer(("127.0.0.1", args.port), Handler)
-    print(f"Onward: http://127.0.0.1:{args.port}", flush=True)
+    print(f"Zenshin: http://127.0.0.1:{args.port}", flush=True)
     print("Starts paused. Keep the control window open to monitor.", flush=True)
     try:
         server.serve_forever()
