@@ -1,4 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="#e8bb7d">
-  <path d="M4 5h28v6L18 22H7l15-11H4z"/>
-  <path d="M7 24h18v-5l11 8-11 8v-5H4v-3z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 86 106" fill="none" stroke="currentColor" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round" color="#30385f">
+  <style>@media (prefers-color-scheme: dark) { svg { color: #dca374; } }</style>
+  <path d="M82 9V4Q82 2 80 2H4Q2 2 2 4V100Q2 102 4 102H80Q82 102 82 100V24"/>
+  <path d="M14 17H70M29 11L32 17M58 11L55 17"/>
+  <path d="M17 50V23H40V50H33M17 31H40M17 39H40M51 24V40M67 23V47Q67 50 64 50H56"/>
+  <path d="M15 57L23 59M14 68H23V85Q26 93 39 93H71M23 85Q20 91 14 93"/>
+  <path d="M41 57L33 65L30 66M55 57L52 63M36 63V87H71M36 63H71M36 71H68M36 79H68M53 63V87"/>
 </svg>
