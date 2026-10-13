@@ -9,6 +9,10 @@
     @font-face { font-family: 'Space Grotesk'; src: url('/assets/space-grotesk.ttf') format('truetype'); font-weight: 300 700; font-display: swap; }
     :root { color-scheme: dark; font-family: 'Space Grotesk', sans-serif; color: var(--text); background: var(--bg); font-size: 14px; --bg: #141416; --surface: #171719; --field: #1b1b1f; --button: #222226; --hover: #303035; --selected: #29272a; --text: #e4e4e7; --line: #36363e; --muted: #a3a3af; --accent: #e8bb7d; --primary: #e4e4e7; --primary-text: #18181b; --error-bg: #402324; --error-text: #f1b2b2; --review: #332b22; }
     :root[data-theme=paper] { color-scheme: light; --bg: #f5f1e9; --surface: #ede8de; --field: #fffcf5; --button: #e7e0d4; --hover: #dcd3c3; --selected: #e6d9c1; --text: #29271f; --line: #cbc3b5; --muted: #6d675c; --accent: #855819; --primary: #29271f; --primary-text: #fffaf0; --error-bg: #f7dedb; --error-text: #8b2929; --review: #eee0c7; }
+    :root[data-theme=cobalt] { --bg: #101a31; --surface: #14213b; --field: #192a48; --button: #203555; --hover: #2b456b; --selected: #284467; --text: #e5edff; --line: #354e73; --muted: #a2b6d9; --accent: #80bfff; --primary: #9bcaff; --primary-text: #10213a; --review: #303349; }
+    :root[data-theme=forest] { --bg: #12201b; --surface: #172920; --field: #1c3027; --button: #243b30; --hover: #304d3d; --selected: #2a4738; --text: #e3eee4; --line: #3b5547; --muted: #a1b8a8; --accent: #b8d994; --primary: #b8d994; --primary-text: #18251b; --review: #353b28; }
+    :root[data-theme=rose] { color-scheme: light; --bg: #faf0f1; --surface: #f1e3e7; --field: #fff9fa; --button: #ead3dc; --hover: #dfbdca; --selected: #eed0dc; --text: #402936; --line: #d7b9c6; --muted: #806371; --accent: #a03c68; --primary: #8e365b; --primary-text: #fff7fa; --error-bg: #f7d9d9; --error-text: #8b2929; --review: #f0decf; }
+    :root[data-theme=terminal] { --bg: #0b110d; --surface: #0f1812; --field: #142019; --button: #19291e; --hover: #233b2a; --selected: #1d3425; --text: #d5f1dc; --line: #304f38; --muted: #90b899; --accent: #79ef97; --primary: #79ef97; --primary-text: #0c2112; --review: #303821; }
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
     body { margin: 0; }
@@ -48,7 +52,7 @@
     #selection { font: 11px ui-monospace, monospace; margin: 14px 0; }
     input[type=text], textarea, select { border: 1px solid var(--line); background: var(--field); color: var(--text); border-radius: 6px; padding: 10px 12px; min-width: 0; }
     input[type=text] { width: 100%; }
-    input::placeholder, textarea::placeholder { color: #686872; }
+    input::placeholder, textarea::placeholder { color: var(--muted); }
     #chat-search { font-size: 12px; background: var(--bg); }
     #threads { max-height: 460px; overflow-y: auto; margin: 0 -8px 18px; scrollbar-width: thin; }
     .chat { display: flex; align-items: flex-start; gap: 10px; padding: 11px 8px; border-radius: 5px; cursor: pointer; }
@@ -110,7 +114,7 @@
 <main>
   <header>
     <div class="brand"><div class="mark" aria-hidden="true">↳</div><div><h1>Codex Approval Helper</h1><small>Local control · Linux desktop</small></div></div>
-    <div class="header-tools"><span class="badge" id="status">Paused · disconnected</span><select id="theme" aria-label="Color theme"><option value="midnight">Midnight</option><option value="paper">Paper</option></select></div>
+    <div class="header-tools"><span class="badge" id="status">Paused · disconnected</span><select id="theme" aria-label="Color theme"><option value="midnight">Midnight</option><option value="paper">Paper</option><option value="cobalt">Cobalt</option><option value="forest">Forest</option><option value="rose">Rose</option><option value="terminal">Terminal</option></select></div>
   </header>
   <div class="workspace">
     <aside aria-label="Chat selection">
