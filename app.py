@@ -239,15 +239,15 @@ def poll(app):
 
 def questions(thread):
     requests = []
-    for turn in thread.get("turns", []):
+    for turn in thread.get("turns", [])[-1:]:
         for item in turn.get("items", []):
             prompts = item.get("questions") or []
-            # The verified desktop form handles one question per request.
-            if item["type"] == "agentMessage" and len(prompts) == 1:
+            if item["type"] == "agentMessage" and prompts:
                 question = prompts[0]
                 requests.append({"thread_id": thread["id"], "turn_id": turn["id"],
                                  "item_id": item["id"], "text": question["title"],
-                                 "options": question.get("options") or []})
+                                 "options": question.get("options") or [],
+                                 **({"questions": prompts} if len(prompts) > 1 else {})})
     return requests
 
 
@@ -287,32 +287,41 @@ def poll_desktop(app):
         if thread.get("name") != target["name"]:
             app["running"] = False
             raise RuntimeError("The selected chat was renamed; select and save it again")
-        for request in reversed(questions(thread)):
+        requests = list(reversed(questions(thread)))
+        latest = preview_latest(thread, app["state"]["rules"])
+        if latest:
+            requests.append({**latest, "options": [], "conversation": True})
+        for request in requests:
             try:
-                is_pending = linux_ui.pending(target["name"], request["text"])
+                is_pending = (linux_ui.conversation_pending(target["name"], request["text"])
+                              if request.get("conversation") else linux_ui.pending(target["name"], request["text"]))
             except Exception as error:
                 app["running"] = False
                 raise RuntimeError("Desktop access failed: " + str(error)) from error
             if not is_pending:
                 continue
+            responses = []
             decision = None
-            if app["state"]["decision_method"] == "ai":
-                decision = analyze_request(app, thread, {**request, "name": target["name"]})
-                response = decision["response"] if decision.get("decision") in {"approve", "continue"} else None
-            else:
-                response = next((rule["response"] for rule in app["state"]["rules"]
-                                 if normalize(rule["request"]) == normalize(request["text"])), None)
-            choice = next((option for option in request["options"]
-                           if response is not None and normalize(option) == normalize(response)),
-                          None if decision else response)
-            preview = {**request, "name": target["name"], "response": choice,
-                       "status": "Pending — no matching rule"}
+            prompts = request.get("questions") or [{"title": request["text"], "options": request["options"]}]
+            for prompt in prompts:
+                current = {**request, "text": prompt["title"], "options": prompt.get("options") or []}
+                if app["state"]["decision_method"] == "ai":
+                    decision = analyze_request(app, thread, {**current, "name": target["name"]})
+                    response = decision["response"] if decision.get("decision") in {"approve", "continue"} else None
+                else:
+                    response = next((rule["response"] for rule in app["state"]["rules"]
+                                     if normalize(rule["request"]) == normalize(current["text"])), None)
+                responses.append(response)
+            preview = {**request, "name": target["name"], "response": responses[0],
+                       "status": "Pending — every question needs authorization"}
             if decision:
                 preview.update(decision)
-                if response and choice is None:
-                    preview["status"] = "AI proposed text — no supported offered choice; no response sent"
             previews.append(preview)
-            if choice is None:
+            if len(prompts) > 1:
+                preview["answers"] = [{"question": prompt["title"], "response": response}
+                                      for prompt, response in zip(prompts, responses)]
+            if any(response is None for response in responses):
+                preview["status"] = "Pending — every question needs authorization"
                 continue
             key = request["thread_id"] + ":" + request["item_id"]
             if key in app["state"]["attempts"]:
@@ -323,7 +332,13 @@ def poll_desktop(app):
             app["state"]["attempts"][key] = attempt
             save_state(app["path"], app["state"])
             try:
-                linux_ui.answer(target["name"], request["text"], choice)
+                for index, (prompt, response) in enumerate(zip(prompts, responses)):
+                    if request.get("conversation"):
+                        linux_ui.reply(target["name"], prompt["title"], response)
+                    elif index + 1 < len(prompts):
+                        linux_ui.answer(target["name"], prompt["title"], response, prompts[index + 1]["title"])
+                    else:
+                        linux_ui.answer(target["name"], prompt["title"], response)
             except Exception as error:
                 attempt["status"] = "uncertain"
                 attempt["error"] = str(error)
@@ -344,7 +359,7 @@ def poll_desktop(app):
             if app["state"]["decision_method"] == "ai":
                 latest = analyze_request(app, thread, {**latest, "name": target["name"]})
             previews.append({**latest, "name": target["name"],
-                             "status": latest["status"] + " — no live single-question card; no response sent"})
+                             "status": latest["status"] + " — no live response control; no response sent"})
 
 
 def snapshot(app):
