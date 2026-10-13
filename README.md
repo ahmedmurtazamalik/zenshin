@@ -14,7 +14,7 @@ Open http://127.0.0.1:8765. Requires Python 3 and a signed-in `codex` CLI. Deskt
 
 1. Connect to Codex and select chats. If a new chat is missing, add its thread ID; the app reads its actual title.
 2. Give selected chats unique titles, and keep the chat you want answered open in a Codex window. Multiple visible copies are rejected.
-3. Save a rule containing the complete question and the response you authorize. Prefer an exact offered choice on the tested Wayland desktop.
+3. Choose **AI analysis with Codex CLI** and write standing instructions describing what the helper may approve or continue. Alternatively, keep **Exact question rules** for the existing deterministic behavior.
 4. Choose **Read-only preview** first, or **Answer matching desktop questions** to enable scoped responses, then Start monitoring.
 
 The app starts paused after restart. Saving changes pauses monitoring. Keep the control window open for its five-second polling. Pause stops future checks after the current check. One response is handled per check. It does not stop Codex work or undo actions.
@@ -22,6 +22,14 @@ The app starts paused after restart. Saving changes pauses monitoring. Keep the 
 Optional: `python3 app.py --port 8766 --state /path/to/state.json`.
 
 ## Response behavior
+
+AI mode reads the latest eight user/assistant messages plus the request and offered choices. It runs a separate, ephemeral `codex exec` in a read-only temporary directory using the existing CLI sign-in. Its structured decision is `approve`, `continue`, `needs_input`, or `no_response`, with a proposed response and reason. The CLI is instructed not to use tools; any observed tool use causes its decision to be discarded. Conversation content is treated as data, not authorization to expand the standing instructions.
+
+Start in **Read-only preview** to inspect decisions. For example: “Continue formatting this report within my existing instructions. Ask me for missing personal information or a new decision.” You do not need to predict the question's wording. Empty standing instructions cannot start AI monitoring. Existing saved exact-rule settings retain their behavior until you switch methods.
+
+An unchanged request, recent context, and instruction set reuse a saved decision, including after restart. New context or changed instructions trigger a new analysis. Calls consume Codex model usage and require working CLI authentication and model access; they are not local/offline inference. Analysis runs without blocking the HTTP server, times out after 60 seconds, and is canceled by Pause or changed settings. Invalid results and CLI failures pause monitoring without sending.
+
+In AI desktop mode, only `approve` or `continue` can send, and the response must match an offered choice on a live single-question card. The live chat/card is checked again after analysis through the normal polling and delivery path. Missing information, uncovered requests, ordinary conversational replies, and custom-text suggestions remain visible without automatic delivery. The attempt journal and delivery confirmation still apply. AI interpretation can be wrong: use clear, narrow standing instructions and inspect preview decisions before enabling desktop responses.
 
 Preview mode reads the latest assistant message without sending anything. Historical messages are not proof of a pending request.
 
@@ -53,4 +61,4 @@ No credentials are extracted, internal approvals fabricated, or managed restrict
 python3 -m unittest -v
 ```
 
-The tests cover exact matching, target selection, Pause, persistence, attempts recorded before delivery, duplicate prevention, uncertainty, omitted chat inventory entries, and the observed immediate-choice submission behavior. The desktop test used a real Codex question; unit tests do not send approvals.
+The 15 tests cover exact matching, target selection, Pause, persistence, attempts recorded before delivery, duplicate prevention, uncertainty, omitted chat inventory entries, custom draft preservation, AI decision reuse, context input, missing-information decisions, unsupported choices, invalid model output, and cancellation. On 13 October 2026, two real CLI classification checks returned `continue` with the offered option for an authorized formatting request and `needs_input` with no response for a salary question. A full browser-to-CLI preview check correctly returned `no_response` for the controlled chat's completed action, displayed its reason, reused one persisted result across polls, and paused successfully. No new live AI-driven desktop approval was sent. The earlier desktop test used a real Codex question; unit tests do not send approvals.
