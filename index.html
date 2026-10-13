@@ -105,7 +105,7 @@
     #review-panel { padding: 16px; background: var(--review); border: 1px solid #5e4d37; border-radius: 6px; margin-bottom: 20px; }
     /* Each palette has its own material, contrast, and accent treatment. */
     .section-head .eyebrow { color: var(--accent); border: 1px solid var(--line); padding: 4px 7px; border-radius: 4px; }
-    .mark svg { width: 100%; height: 100%; overflow: visible; }
+    .mark svg { width: 100%; height: 100%; }
     .notice { border-left: 3px solid var(--accent); }
     pre { border-left-color: var(--accent); }
     :root[data-theme=midnight] .content { background: radial-gradient(ellipse at top right, #e8bb7d0c, transparent 55%); }
@@ -168,9 +168,9 @@
 <body>
 <main>
   <header>
-    <div class="brand"><div class="mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
-  <path d="M31 26A13 13 0 1 1 23 8h12" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-  <path d="m29 2 6 6-6 6" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <div class="brand"><div class="mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="currentColor">
+  <path d="M4 5h28v6L18 22H7l15-11H4z"/>
+  <path d="M7 24h18v-5l11 8-11 8v-5H4v-3z"/>
 </svg></div><div><h1>Zenshin</h1><small>Keep moving forward · Local control</small></div></div>
     <div class="header-tools"><span class="badge" id="status">Paused · disconnected</span><select id="theme" aria-label="Color theme"><option value="midnight">Midnight</option><option value="paper">Paper</option><option value="cobalt">Cobalt</option><option value="forest">Forest</option><option value="rose">Rose</option><option value="terminal">Terminal</option></select></div>
   </header>
