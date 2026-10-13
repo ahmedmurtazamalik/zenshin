@@ -6,6 +6,8 @@ Follow the accompanying AGENTS.md. The app name is provisional.
 
 ## Implementation progress — 12 October 2026
 
+13 October update: AI request interpretation is implemented using Codex CLI and standing instructions, with structured decisions, read-only preview, persistent decision reuse, cancellable analysis, and offered-choice desktop delivery. This replaces exact-wording requirements when AI mode is selected. Live CLI classification was verified; AI-driven desktop delivery has behavior tests but no new live end-to-end receipt. The existing demo predates this feature.
+
 The local control window, App Server identity/history reading, and a Linux desktop connection for single-question cards are implemented. The desktop path matches exact authorized questions and offered choices, saves attempts before responding, confirms delivery, prevents duplicate responses after restart, and pauses on uncertainty. A real controlled test chat received its offered answer. Custom-answer logic now preserves drafts and verifies text before Send, but live input is blocked: this Wayland session rejects AT-SPI editing and does not deliver synthetic keyboard input. Automatic approval review rejected a GNOME RemoteDesktop session test; user approval is pending. Browser/dot, ordinary text replies, multi-question cards, and tool approval dialogs remain unimplemented until their live surfaces are verified. See README.md for launch instructions and concrete limits. A separate App Server listed desktop chats as `notLoaded`, and the managed daemon socket was absent; it is used for identity/history rather than live event control.
 
 ## Outcome and assumptions
