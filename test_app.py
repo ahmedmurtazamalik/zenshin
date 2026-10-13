@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 import app
 import linux_ui
+import ai_decision
 
 
 def thread(thread_id="selected", text="May I submit this application?"):
@@ -206,6 +207,84 @@ class DesktopTests(unittest.TestCase):
             read.reset_mock()
             app.poll(monitor)
             read.assert_not_called()
+
+
+class AIDecisionTests(unittest.TestCase):
+    def monitor(self, path):
+        state = app.load_state(path)
+        state.update(decision_method="ai", mode="desktop", instructions="Continue formatting the report.",
+                     targets=[{"id": "selected", "name": "Test chat"}])
+        data = thread(text="Shall I carry on?")
+        data["name"] = "Test chat"
+        data["turns"][0]["items"].insert(0, {"type": "userMessage", "id": "user-1",
+            "content": [{"type": "text", "text": "Format the report."}]})
+        data["turns"][0]["items"][-1]["questions"] = [{"title": "Shall I carry on?",
+                                                                   "options": ["Yes, continue.", "No."]}]
+        return {"state": state, "path": path, "running": True, "connection": None,
+                "previews": []}, data
+
+    def test_ai_uses_context_and_sends_offered_choice_once_without_exact_rule(self):
+        with tempfile.TemporaryDirectory() as directory:
+            monitor, data = self.monitor(Path(directory) / "state.json")
+            decision = {"decision": "continue", "response": "Yes, continue.",
+                        "reason": "Formatting is authorized."}
+            with patch.object(app, "rpc", return_value={"thread": data}), \
+                 patch.object(linux_ui, "pending", return_value=True), \
+                 patch.object(linux_ui, "answer") as send, \
+                 patch.object(ai_decision, "start", return_value={}) as start, \
+                 patch.object(ai_decision, "result", return_value=decision):
+                app.poll(monitor)
+                send.assert_not_called()
+                self.assertEqual(start.call_args.args[0]["messages"][0]["role"], "user")
+                app.poll(monitor)
+                send.assert_called_once_with("Test chat", "Shall I carry on?", "Yes, continue.")
+                monitor["state"] = app.load_state(monitor["path"])
+                app.poll(monitor)
+                start.assert_called_once()
+                self.assertEqual(send.call_count, 1)
+
+    def test_missing_information_and_unavailable_choices_never_send(self):
+        for decision in [{"decision": "needs_input", "response": None, "reason": "Salary is missing."},
+                         {"decision": "continue", "response": "A custom answer", "reason": "Authorized."}]:
+            with self.subTest(decision=decision), tempfile.TemporaryDirectory() as directory:
+                monitor, data = self.monitor(Path(directory) / "state.json")
+                with patch.object(app, "rpc", return_value={"thread": data}), \
+                     patch.object(linux_ui, "pending", return_value=True), \
+                     patch.object(linux_ui, "answer") as send, \
+                     patch.object(ai_decision, "start", return_value={}) as start, \
+                     patch.object(ai_decision, "result", return_value=decision):
+                    app.poll(monitor)
+                    app.poll(monitor)
+                    app.poll(monitor)
+                    send.assert_not_called()
+                    start.assert_called_once()
+                    self.assertEqual(monitor["previews"][0]["reason"], decision["reason"])
+
+    def test_pause_cancels_analysis_and_does_not_poll_or_send(self):
+        with tempfile.TemporaryDirectory() as directory:
+            monitor, data = self.monitor(Path(directory) / "state.json")
+            monitor["analysis"] = {"key": "pending"}
+            with patch.object(ai_decision, "cancel") as cancel, \
+                 patch.object(app, "rpc") as read, patch.object(linux_ui, "answer") as send:
+                monitor["running"] = False
+                app.cancel_analysis(monitor)
+                app.poll(monitor)
+                cancel.assert_called_once_with({"key": "pending"})
+                read.assert_not_called()
+                send.assert_not_called()
+
+    def test_invalid_model_decision_is_rejected_and_temporary_files_cleaned(self):
+        directory = tempfile.TemporaryDirectory()
+        root = Path(directory.name)
+        (root / "decision.json").write_text('{"decision":"approve","response":null,"reason":"Yes"}')
+        process = Mock()
+        process.poll.return_value = 0
+        process.returncode = 0
+        job = {"process": process, "directory": directory,
+               "output": (root / "events").open("w+"), "errors": (root / "errors").open("w+")}
+        with self.assertRaisesRegex(RuntimeError, "invalid decision"):
+            ai_decision.result(job)
+        self.assertFalse(root.exists())
 
 
 if __name__ == "__main__":
