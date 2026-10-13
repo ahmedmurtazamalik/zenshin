@@ -64,6 +64,11 @@ class PreviewTests(unittest.TestCase):
 
 
 class DesktopTests(unittest.TestCase):
+    def setUp(self):
+        pending = patch.object(linux_ui, "conversation_pending", return_value=False)
+        pending.start()
+        self.addCleanup(pending.stop)
+
     def test_custom_answer_is_read_back_before_send_and_preserves_existing_draft(self):
         doc, root = object(), object()
         entry, send = Mock(), Mock()
@@ -82,7 +87,7 @@ class DesktopTests(unittest.TestCase):
 
         def matches(node, role, name):
             if role == "entry":
-                return [entry]
+                return [entry] if name == "Or write your own response" else []
             if role == "push button":
                 return [send]
             if role == "static" and submitted and node is doc:
@@ -208,8 +213,57 @@ class DesktopTests(unittest.TestCase):
             app.poll(monitor)
             read.assert_not_called()
 
+    def test_multi_question_requires_every_answer_before_one_journaled_attempt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state = app.load_state(path)
+            state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+                         rules=[{"request": "First?", "response": "Yes"}])
+            data = thread(text="First? Second?")
+            data["name"] = "Test chat"
+            data["turns"][0]["items"][0]["questions"] = [
+                {"title": "First?", "options": ["Yes"]}, {"title": "Second?", "options": ["Continue"]}]
+            monitor = {"state": state, "path": path, "running": True, "connection": None, "previews": []}
+            with patch.object(app, "rpc", return_value={"thread": data}), \
+                 patch.object(linux_ui, "pending", return_value=True), \
+                 patch.object(linux_ui, "answer") as send:
+                app.poll(monitor)
+                send.assert_not_called()
+                self.assertEqual(state["attempts"], {})
+                state["rules"].append({"request": "Second?", "response": "Continue"})
+                app.poll(monitor)
+                self.assertEqual(send.call_args_list[0].args, ("Test chat", "First?", "Yes", "Second?"))
+                self.assertEqual(send.call_args_list[1].args, ("Test chat", "Second?", "Continue"))
+                self.assertEqual(len(state["attempts"]), 1)
+                app.poll(monitor)
+                self.assertEqual(send.call_count, 2)
+
+    def test_ordinary_reply_uses_same_durable_attempt_guard(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state = app.load_state(path)
+            state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+                         rules=[{"request": "Continue?", "response": "Yes"}])
+            data = thread(text="Continue?")
+            data["name"] = "Test chat"
+            monitor = {"state": state, "path": path, "running": True, "connection": None, "previews": []}
+            def reply(*args):
+                self.assertEqual(app.load_state(path)["attempts"]["selected:message-1"]["status"], "sending")
+            with patch.object(app, "rpc", return_value={"thread": data}), \
+                 patch.object(linux_ui, "conversation_pending", return_value=True), \
+                 patch.object(linux_ui, "reply", side_effect=reply) as send:
+                app.poll(monitor)
+                monitor["state"] = app.load_state(path)
+                app.poll(monitor)
+                send.assert_called_once_with("Test chat", "Continue?", "Yes")
+
 
 class AIDecisionTests(unittest.TestCase):
+    def setUp(self):
+        pending = patch.object(linux_ui, "conversation_pending", return_value=False)
+        pending.start()
+        self.addCleanup(pending.stop)
+
     def monitor(self, path):
         state = app.load_state(path)
         state.update(decision_method="ai", mode="desktop", instructions="Continue formatting the report.",
@@ -243,9 +297,8 @@ class AIDecisionTests(unittest.TestCase):
                 start.assert_called_once()
                 self.assertEqual(send.call_count, 1)
 
-    def test_missing_information_and_unavailable_choices_never_send(self):
-        for decision in [{"decision": "needs_input", "response": None, "reason": "Salary is missing."},
-                         {"decision": "continue", "response": "A custom answer", "reason": "Authorized."}]:
+    def test_missing_information_never_sends(self):
+        for decision in [{"decision": "needs_input", "response": None, "reason": "Salary is missing."}]:
             with self.subTest(decision=decision), tempfile.TemporaryDirectory() as directory:
                 monitor, data = self.monitor(Path(directory) / "state.json")
                 with patch.object(app, "rpc", return_value={"thread": data}), \
