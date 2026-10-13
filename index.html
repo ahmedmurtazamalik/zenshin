@@ -63,7 +63,7 @@
         <div class="toolbar"><input id="target-id" type="text" aria-label="Codex thread ID"><button id="find-target">Add chat by ID</button></div>
       </details>
       <details><summary class="muted">Connection availability</summary>
-        <p class="muted">App Server: chat identity and saved messages.<br>Linux desktop: question forms, custom answers, and ordinary continuation replies.<br>Command/file approval dialogs: not yet supported.</p>
+        <p class="muted">App Server: chat identity and saved messages.<br>Linux desktop: question forms, custom answers, and ordinary continuation replies.<br>Approval cards with Allow once: implemented; live delivery verification pending.</p>
       </details>
     </section>
     <section>
@@ -74,7 +74,7 @@
         <p class="muted">Codex analyzes the latest 8 conversational messages and the request against your instructions. Each unchanged request, context, and instruction set is analyzed once. Calls use your CLI account and consume model usage.</p>
         <label for="instructions">Standing instructions</label>
         <textarea id="instructions" placeholder="Continue the current task when the next step is already within my instructions. Ask me for missing personal information or a new decision."></textarea>
-        <p class="muted">Start in preview to inspect decisions and reasons. Desktop AI responses support offered choices, custom answers, and ordinary replies. Every question in a form needs authorization.</p>
+        <p class="muted">Start in preview to inspect decisions and reasons. Desktop AI responses support offered choices, custom answers, and ordinary replies. Every question in a form needs authorization. Approval cards permit only Allow once.</p>
       </div>
       <div id="exact-fields">
       <p class="muted">Paste the complete question and your authorized response. Matching ignores whitespace but requires all wording to match. Offered choices submit directly. Other responses use the custom-answer field when desktop text input is available; failed input pauses monitoring.</p>
