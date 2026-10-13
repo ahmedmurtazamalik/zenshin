@@ -401,6 +401,9 @@ def main():
            "connection": None, "previews": [], "error": ""}
 
     class Handler(BaseHTTPRequestHandler):
+        # Browsers may pre-open an idle socket; do not let it block all requests.
+        timeout = 2
+
         def log_message(self, *_args):
             pass
 
