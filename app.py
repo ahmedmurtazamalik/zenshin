@@ -11,6 +11,8 @@ import tempfile
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+import ai_decision
+
 
 ROOT = Path(__file__).resolve().parent
 
@@ -22,6 +24,9 @@ def load_state(path):
         state = {"targets": [], "rules": [], "activity": [], "seen": []}
     state.setdefault("mode", "preview")
     state.setdefault("attempts", {})
+    state.setdefault("decision_method", "exact")
+    state.setdefault("instructions", "")
+    state.setdefault("ai_decisions", {})
     return state
 
 
@@ -147,9 +152,65 @@ def preview_latest(thread, rules):
             "status": "Rule matched — preview only" if response else "No exact rule match"}
 
 
+def analysis_input(thread, request, instructions):
+    messages = []
+    for turn in thread.get("turns", []):
+        for item in turn.get("items", []):
+            if item["type"] == "agentMessage" and item.get("text"):
+                messages.append({"role": "assistant", "text": item["text"]})
+            elif item["type"] == "userMessage":
+                text = "\n".join(part.get("text", "[non-text content omitted]")
+                                 for part in item.get("content", []))
+                messages.append({"role": "user", "text": text})
+    return {"standing_instructions": instructions, "messages": messages[-8:],
+            "request": {key: request.get(key) for key in
+                        ("thread_id", "turn_id", "item_id", "text", "options")}}
+
+
+def cancel_analysis(app):
+    job = app.pop("analysis", None)
+    if job:
+        ai_decision.cancel(job)
+
+
+def finish_analysis(app):
+    job = app.get("analysis")
+    if not job:
+        return
+    try:
+        decision = ai_decision.result(job)
+    except RuntimeError as error:
+        app.pop("analysis", None)
+        app["running"] = False
+        decision = {"decision": "needs_input", "response": None, "reason": str(error)}
+        app["state"]["ai_decisions"][job["key"]] = decision
+        save_state(app["path"], app["state"])
+        raise
+    if decision is not None:
+        app.pop("analysis", None)
+        app["state"]["ai_decisions"][job["key"]] = decision
+        app["state"]["activity"].append({**job["request"], **decision,
+                                        "status": "AI analysis — " + decision["decision"],
+                                        "time": int(time.time())})
+        app["state"]["activity"] = app["state"]["activity"][-100:]
+        save_state(app["path"], app["state"])
+
+
+def analyze_request(app, thread, request):
+    data = analysis_input(thread, request, app["state"]["instructions"])
+    key = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+    saved = app["state"]["ai_decisions"].get(key)
+    if saved:
+        return {**request, **saved, "status": "AI — " + saved["decision"]}
+    if not app.get("analysis"):
+        app["analysis"] = {**ai_decision.start(data), "key": key, "request": request}
+    return {**request, "response": None, "status": "AI analysis pending — no response sent"}
+
+
 def poll(app):
     if not app["running"]:
         return
+    finish_analysis(app)
     if app["state"].get("mode") == "desktop":
         return poll_desktop(app)
     previews = []
@@ -160,6 +221,12 @@ def poll(app):
         if not preview:
             continue
         preview["name"] = target["name"]
+        if app["state"]["decision_method"] == "ai":
+            structured = next((item for item in questions(thread)
+                               if item["item_id"] == preview["item_id"]), None)
+            preview = analyze_request(app, thread, {**preview, **(structured or {})})
+            previews.append(preview)
+            continue
         previews.append(preview)
         fingerprint = hashlib.sha256(json.dumps(preview, sort_keys=True).encode()).hexdigest()
         if fingerprint not in app["state"]["seen"]:
@@ -228,12 +295,22 @@ def poll_desktop(app):
                 raise RuntimeError("Desktop access failed: " + str(error)) from error
             if not is_pending:
                 continue
-            response = next((rule["response"] for rule in app["state"]["rules"]
-                             if normalize(rule["request"]) == normalize(request["text"])), None)
+            decision = None
+            if app["state"]["decision_method"] == "ai":
+                decision = analyze_request(app, thread, {**request, "name": target["name"]})
+                response = decision["response"] if decision.get("decision") in {"approve", "continue"} else None
+            else:
+                response = next((rule["response"] for rule in app["state"]["rules"]
+                                 if normalize(rule["request"]) == normalize(request["text"])), None)
             choice = next((option for option in request["options"]
-                           if response is not None and normalize(option) == normalize(response)), response)
+                           if response is not None and normalize(option) == normalize(response)),
+                          None if decision else response)
             preview = {**request, "name": target["name"], "response": choice,
                        "status": "Pending — no matching rule"}
+            if decision:
+                preview.update(decision)
+                if response and choice is None:
+                    preview["status"] = "AI proposed text — no supported offered choice; no response sent"
             previews.append(preview)
             if choice is None:
                 continue
@@ -264,14 +341,18 @@ def poll_desktop(app):
             return
         latest = preview_latest(thread, app["state"]["rules"])
         if latest and not any(entry["thread_id"] == target["id"] for entry in previews):
+            if app["state"]["decision_method"] == "ai":
+                latest = analyze_request(app, thread, {**latest, "name": target["name"]})
             previews.append({**latest, "name": target["name"],
-                             "status": "Message preview — no live single-question card; no response sent"})
+                             "status": latest["status"] + " — no live single-question card; no response sent"})
 
 
 def snapshot(app):
     return {"connected": app["connection"] is not None, "running": app["running"],
             "mode": app["state"].get("mode", "preview"),
             "targets": app["state"]["targets"], "rules": app["state"]["rules"],
+            "decision_method": app["state"]["decision_method"],
+            "instructions": app["state"]["instructions"],
             "activity": app["state"]["activity"], "previews": app["previews"],
             "unconfirmed": sum(attempt["status"] not in {"sent", "reviewed"}
                                for attempt in app["state"]["attempts"].values()),
@@ -330,6 +411,7 @@ def main():
                 data = json.loads(self.rfile.read(size))
                 if self.path == "/api/connect":
                     app["running"] = False
+                    cancel_analysis(app)
                     close_connection(app["connection"])
                     app["connection"] = None
                     app["connection"] = connect()
@@ -352,19 +434,28 @@ def main():
                     mode = data.get("mode", "preview")
                     if mode not in {"preview", "desktop"}:
                         raise ValueError("Choose preview or desktop mode")
-                    state = {**app["state"], "targets": targets, "rules": rules, "mode": mode}
+                    method = data.get("decision_method", "exact")
+                    instructions = data.get("instructions", "")
+                    if method not in {"exact", "ai"} or not isinstance(instructions, str):
+                        raise ValueError("Choose exact rules or AI with text instructions")
+                    state = {**app["state"], "targets": targets, "rules": rules, "mode": mode,
+                             "decision_method": method, "instructions": instructions}
                     save_state(app["path"], state)
+                    cancel_analysis(app)
                     app["state"] = state
                     app["running"] = False
                     app["previews"] = []
                 elif self.path == "/api/start":
                     if not app["connection"] or not app["state"]["targets"]:
                         raise ValueError("Connect and save at least one selected chat first")
+                    if app["state"]["decision_method"] == "ai" and not app["state"]["instructions"].strip():
+                        raise ValueError("Write your standing instructions before starting AI analysis")
                     if app["state"].get("mode") == "desktop":
                         verify_desktop_targets(app)
                     app["running"] = True
                 elif self.path == "/api/pause":
                     app["running"] = False
+                    cancel_analysis(app)
                 elif self.path == "/api/review":
                     app["running"] = False
                     for attempt in app["state"]["attempts"].values():
@@ -381,6 +472,7 @@ def main():
                 self.reply({"error": str(error)}, 400)
             except (OSError, RuntimeError) as error:
                 app["running"] = False
+                cancel_analysis(app)
                 close_connection(app["connection"])
                 app["connection"] = None
                 app["error"] = str(error)
@@ -395,6 +487,7 @@ def main():
         pass
     finally:
         server.server_close()
+        cancel_analysis(app)
         close_connection(app["connection"])
 
 
