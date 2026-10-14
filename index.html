@@ -159,8 +159,20 @@
     @media (max-width: 620px) { header { height: 68px; padding: 0 16px; } .brand { gap: 10px; } .brand small { display: none; } .brand .mark { width: 29px; height: 36px; flex-shrink: 0; } h1 { font-size: 12px; max-width: 130px; } .badge { font-size: 10px; } .workspace { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid var(--line); padding: 22px 20px; } #threads { max-height: 220px; } .content { padding: 26px 20px; } .rule { grid-template-columns: 1fr; } .control-inner { padding: 14px 16px; gap: 8px; flex-wrap: wrap; } .control-label { flex-basis: 100%; } .control-inner .toolbar { width: 100%; } #saved { flex-basis: 100%; } #pause:disabled { display: none; } main { padding-bottom: 150px; } }
       .header-tools { display: flex; align-items: center; gap: 18px; }
     #theme { padding: 6px 10px; font-size: 11px; }
-    #progress { position: relative; padding: 12px 32px; background: var(--surface); color: var(--accent); border-top: 1px solid var(--line); font-size: 12px; display: flex; align-items: center; gap: 10px; }
+    #progress { position: relative; padding: 12px 32px; background: var(--surface); color: var(--accent); border-top: 1px solid var(--line); font-size: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     #progress::after { content: ''; position: absolute; top: 0; left: 0; width: 25%; height: 2px; background: var(--accent); animation: sweep 1.8s ease-in-out infinite; }
+    #progress[data-stage=waiting]::after, #progress[data-stage=done]::after, #progress[data-stage=error]::after { display: none; }
+    #progress[data-stage=waiting] .spinner, #progress[data-stage=done] .spinner, #progress[data-stage=error] .spinner { display: none; }
+    #progress-time { margin-left: auto; font: 11px ui-monospace, monospace; color: var(--muted); font-variant-numeric: tabular-nums; }
+    #progress-detail { flex-basis: 100%; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #check-steps { display: flex; gap: 16px; flex-wrap: wrap; flex-basis: 100%; }
+    .check-step { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
+    .check-step::before { content: ''; width: 6px; height: 6px; border: 1px solid var(--muted); border-radius: 50%; }
+    .check-step.complete::before { background: var(--accent); border-color: var(--accent); }
+    .check-step.active { color: var(--accent); }
+    .check-step.active::before { border: 2px solid var(--accent); border-right-color: transparent; width: 9px; height: 9px; animation: spin .8s linear infinite; }
+    #progress[data-stage=error] { color: var(--error-text); background: var(--error-bg); }
+    main:has(#progress:not([hidden])) { padding-bottom: 200px; }
     .spinner, button[data-loading]::before { content: ''; display: inline-block; width: 13px; height: 13px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0; }
     button[data-loading] { opacity: 1; display: inline-flex; align-items: center; gap: 8px; }
     .skeleton { height: 44px; border-radius: 5px; margin: 10px 0; background: linear-gradient(90deg, var(--field), var(--hover), var(--field)); background-size: 200% 100%; animation: shimmer 1.5s linear infinite; }
@@ -168,7 +180,7 @@
     @keyframes sweep { 0% { left: 0; } 50% { left: 75%; } 100% { left: 0; } }
     @keyframes shimmer { to { background-position: -200% 0; } }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
-    @media (max-width: 620px) { header { height: auto; min-height: 84px; padding-top: 12px; padding-bottom: 12px; } .header-tools { flex-direction: column; align-items: flex-end; gap: 8px; } #progress { padding: 12px 16px; } }
+    @media (max-width: 620px) { header { height: auto; min-height: 84px; padding-top: 12px; padding-bottom: 12px; } .header-tools { flex-direction: column; align-items: flex-end; gap: 8px; } #progress { padding: 12px 16px; } main:has(#progress:not([hidden])) { padding-bottom: 260px; } }
   </style>
 </head>
 <body>
@@ -229,7 +241,7 @@
       </section>
     </div>
   </div>
-  <div class="control-bar"><div id="progress" role="status" hidden><span class="spinner" aria-hidden="true"></span><span id="progress-text"></span></div><div class="control-inner"><span class="control-label" id="next-step">Connect to Codex to begin</span><div class="toolbar"><span id="saved" role="status"></span><button id="save">Save changes</button><button class="primary" id="start" disabled>Start monitoring</button><button id="pause" disabled>Pause</button></div></div></div>
+  <div class="control-bar"><div id="progress" role="status" hidden><span class="spinner" aria-hidden="true"></span><span id="progress-text"></span><span id="progress-time" aria-hidden="true"></span><span id="progress-detail" hidden></span><div id="check-steps" aria-hidden="true" hidden><span class="check-step" data-step="reading">Read chats</span><span class="check-step" data-step="inspecting">Find request</span><span class="check-step" data-step="deciding">Decide</span><span class="check-step" data-step="sending">Send</span><span class="check-step" data-step="confirming">Confirm</span></div></div><div class="control-inner"><span class="control-label" id="next-step">Connect to Codex to begin</span><div class="toolbar"><span id="saved" role="status"></span><button id="save">Save changes</button><button class="primary" id="start" disabled>Start monitoring</button><button id="pause" disabled>Pause</button></div></div></div>
 </main>
 <script>
   const $ = id => document.getElementById(id);
@@ -242,6 +254,8 @@
   $('theme').onchange = () => { document.documentElement.dataset.theme = $('theme').value; localStorage.setItem('helper-theme', $('theme').value); updateFavicon(); };
   updateFavicon();
   let state, chats = [], selected = new Map(), cursor = null, busy = false, pauseRequested = false;
+  let monitorProgress = null, progressReceived = Date.now(), progressBusy = false;
+  let nextCheckAt = Date.now() + 5000, operationMessage = '', operationStarted = Date.now();
   function element(tag, text, className) {
     const node = document.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -249,6 +263,44 @@
     return node;
   }
   function showError(message) { $('error').textContent = message; $('error').hidden = !message; }
+  function renderProgress() {
+    const p = monitorProgress;
+    if (p && (p.running || (p.stage === 'error' && state?.error))) {
+      const titles = {reading: 'Reading chats', inspecting: 'Checking for a request',
+        deciding: p.detail === 'Using a saved decision.' ? 'Using saved decision' : state?.decision_method === 'ai' ? 'AI deciding' : 'Matching your rule',
+        sending: 'Sending answer', confirming: 'Confirming delivery',
+        waiting: 'Waiting for next check', done: 'Check complete', error: 'Check failed'};
+      $('progress').hidden = false; $('progress').dataset.stage = p.stage;
+      const title = (titles[p.stage] || 'Checking chats') + (p.chat ? ' · ' + p.chat : '');
+      if ($('progress-text').textContent !== title) $('progress-text').textContent = title;
+      $('progress-time').textContent = p.stage === 'error' ? 'Monitoring paused' : p.stage === 'done' ? 'Done' : p.stage === 'waiting'
+        ? `Next check in ${Math.max(0, Math.ceil((nextCheckAt - Date.now()) / 1000))}s`
+        : `${Math.floor(p.elapsed + (Date.now() - progressReceived) / 1000)}s elapsed`;
+      $('progress-detail').textContent = p.detail;
+      $('progress-detail').hidden = !p.detail;
+      $('check-steps').hidden = false;
+      for (const step of $('check-steps').children) {
+        step.classList.toggle('active', step.dataset.step === p.stage);
+        step.classList.toggle('complete', p.steps.includes(step.dataset.step) && step.dataset.step !== p.stage);
+      }
+    } else if (busy) {
+      $('progress').hidden = false; $('progress').dataset.stage = 'working';
+      $('progress-text').textContent = operationMessage;
+      $('progress-time').textContent = `${Math.floor((Date.now() - operationStarted) / 1000)}s elapsed`;
+      $('progress-detail').hidden = true; $('check-steps').hidden = true;
+    } else $('progress').hidden = true;
+  }
+  async function refreshProgress() {
+    if (progressBusy || (!state?.running && !busy)) return;
+    progressBusy = true;
+    try {
+      const response = await fetch('/api/progress');
+      if (response.ok) {
+        monitorProgress = await response.json(); progressReceived = Date.now(); renderProgress();
+      }
+    } catch (_) { /* The main operation reports connection errors. */ }
+    finally { progressBusy = false; }
+  }
   async function request(path, data = {}) {
     const response = await fetch('/api/' + path, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
     const result = await response.json();
@@ -326,6 +378,7 @@
   }
   function renderState(result) {
     state = result;
+    monitorProgress = result.progress; progressReceived = Date.now(); renderProgress();
     $('status').textContent = `${state.running ? 'Monitoring' : 'Paused'} · ${state.connected ? 'connected' : 'disconnected'}`;
     $('status').classList.toggle('running', state.running);
     $('mode-title').textContent = state.mode === 'desktop' ? 'Authorized replies will be sent' : 'Suggestions only — nothing is sent';
@@ -341,7 +394,7 @@
     showError(state.error);
   }
   async function loadChats(append = false) {
-    $('progress-text').textContent = 'Loading your Codex chats…';
+    operationMessage = 'Loading your Codex chats…'; renderProgress();
     $('threads').setAttribute('aria-busy', 'true');
     if (!append) $('threads').replaceChildren(...Array.from({length: 4}, () => element('div', undefined, 'skeleton')));
     try {
@@ -359,13 +412,13 @@
   async function action(work, control, message = 'Checking selected chats · AI analysis may take a moment…') {
     if (busy) return;
     busy = true;
-    $('progress-text').textContent = message; $('progress').hidden = false;
+    operationMessage = message; operationStarted = Date.now(); renderProgress();
     if (control) $(control).setAttribute('data-loading', 'true');
     for (const id of ['connect', 'refresh', 'more', 'find-target', 'save', 'start']) $(id).disabled = true;
     document.querySelector('main').setAttribute('aria-busy', 'true');
     try { showError(''); await work(); } catch (error) { showError(error.message); } finally {
       busy = false;
-      $('progress').hidden = true;
+      renderProgress();
       if (control) $(control).removeAttribute('data-loading');
       document.querySelector('main').setAttribute('aria-busy', 'false');
       for (const id of ['connect', 'more', 'find-target', 'save']) $(id).disabled = false;
@@ -410,7 +463,8 @@
     $('instructions').value = result.instructions; showAuthorization(); renderState(result);
     if (result.connected) await loadChats();
   }, null, 'Loading your saved settings…');
-  setInterval(() => { if (state?.running && !busy) action(async () => renderState(await request('poll'))); }, 5000);
+  setInterval(() => { nextCheckAt = Date.now() + 5000; if (state?.running && !busy) action(async () => renderState(await request('poll'))); }, 5000);
+  setInterval(() => { renderProgress(); refreshProgress(); }, 1000);
 </script>
 </body>
 </html>
