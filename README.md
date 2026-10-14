@@ -21,6 +21,8 @@ Open http://127.0.0.1:8765. Requires Python 3 and a signed-in `codex` CLI. Deskt
 
 The app starts paused after restart. Saving changes pauses monitoring. Keep the control window open for its five-second polling. Pause stops future checks after the current check. One response is handled per check. It does not stop Codex work or undo actions.
 
+The progress strip shows the current chat and actual step: reading, finding a request, deciding, sending, and confirming delivery. It keeps AI elapsed time visible between checks and shows a countdown while waiting. Read-only progress updates refresh every second, including during slow desktop actions; checks still run on the five-second schedule. AI progress is indeterminate. Settings changes and reply operations remain serialized.
+
 Optional: `python3 app.py --port 8766 --state /path/to/state.json`.
 
 ## Response behavior
@@ -69,6 +71,6 @@ No credentials are extracted, internal approvals fabricated, or managed restrict
 python3 -m unittest -v
 ```
 
-The 21 tests cover matching, target identity, Pause, persistence, draft preservation, AI classification handling, attempts saved before delivery, duplicate prevention, uncertain delivery, multi-question authorization, ordinary reply journaling, one-time approval restrictions, captured file-access card detection, changed-card/navigation failures, and idle browser connections. The suite runs in about two seconds.
+The 22 tests cover matching, target identity, Pause, persistence, draft preservation, AI classification handling, attempts saved before delivery, duplicate prevention, uncertain delivery, multi-question authorization, ordinary reply journaling, one-time approval restrictions, captured file-access card detection, changed-card/navigation failures, idle browser connections, and readable progress during a slow check with Pause still serialized. The suite runs in about one second.
 
 On 13 October 2026, authorized live tests in “Approval Helper controlled test” confirmed an AI-selected offered answer, a custom free-text answer using GNOME input, a complete two-question form under one attempt, and an AI-selected ordinary composer reply. These used isolated journals in `/tmp`; the user's monitoring settings were preserved. The existing demo video predates AI mode and these additional desktop paths.
