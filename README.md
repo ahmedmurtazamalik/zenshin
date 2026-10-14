@@ -15,13 +15,13 @@ python3 app.py
 Open http://127.0.0.1:8765. Requires Python 3 and a signed-in `codex` CLI. Desktop mode also requires the system Python `gi` package and AT-SPI. On GNOME Wayland, keyboard fallback also uses a temporary Mutter RemoteDesktop session; these were already installed on the tested machine. No pip packages or frontend build are needed. Run outside a filesystem sandbox that prevents Codex from initializing its own runtime or accessing the desktop accessibility bus.
 
 1. Connect to Codex and select chats. If a new chat is missing, add its thread ID; the app reads its actual title.
-2. Give selected chats unique titles, and keep the chat you want answered open in a Codex window. Multiple visible copies are rejected.
+2. Give selected chats unique titles. In desktop mode, Zenshin opens each selected chat in Codex as needed, one at a time. Multiple visible copies are rejected.
 3. Choose **AI · follow my instructions** and write standing instructions describing what the helper may approve or continue. Alternatively, keep **Match exact questions** for the existing deterministic behavior.
 4. Choose **Preview only** first, or **Send authorized replies** to enable scoped responses, then Start monitoring.
 
 The app starts paused after restart. Saving changes pauses monitoring. Keep the control window open for its five-second polling. Pause stops future checks after the current check. One response is handled per check. It does not stop Codex work or undo actions.
 
-The progress strip shows the current chat and actual step: reading, finding a request, deciding, sending, and confirming delivery. It keeps AI elapsed time visible between checks and shows a countdown while waiting. Read-only progress updates refresh every second, including during slow desktop actions; checks still run on the five-second schedule. AI progress is indeterminate. Settings changes and reply operations remain serialized.
+The progress strip shows the current chat and actual step: reading, opening the chat when needed, finding a request, deciding, sending, and confirming delivery. It keeps AI elapsed time visible between checks and shows a countdown while waiting. Read-only progress updates refresh every second, including during slow desktop actions; checks still run on the five-second schedule. AI progress is indeterminate. Settings changes and reply operations remain serialized.
 
 Optional: `python3 app.py --port 8766 --state /path/to/state.json`.
 
@@ -45,7 +45,9 @@ Chromium on this Wayland machine rejects accessibility text editing. After expli
 
 Settings, the latest 100 activity entries, preview fingerprints, and a permanent response-attempt journal are stored in `.local/state.json`. Attempts are saved atomically **before** UI actions. An interrupted or unconfirmed attempt pauses monitoring and blocks that chat after restart. Inspect and resolve the request in Codex, then use **I reviewed the unconfirmed requests**. Reviewed requests still cannot be sent again automatically; future requests can be monitored.
 
-Desktop documents expose chat titles rather than thread URLs. The app checks selected IDs and titles against App Server and rejects known duplicate titles and multiple visible copies. Keep titles unique. It does not switch chats automatically.
+Desktop documents expose chat titles rather than thread URLs. The app checks selected IDs and titles against App Server and rejects known duplicate titles and multiple visible copies. Keep titles unique. If a selected chat is not displayed, Zenshin opens its `codex://threads/<thread-id>` link through Linux's `xdg-open` and waits up to ten seconds for that chat's document before inspecting requests. This switches the chat in your Codex window; selected chats are checked sequentially. A chat already displayed is left in place. Navigation failure pauses monitoring without sending a response. Preview-only mode does not navigate.
+
+The automatic navigation flow has regression coverage. Its live check on 14 October was blocked because the running Codex app exposed window frames with no readable accessibility contents, even after temporarily enabling GNOME accessibility. The link launcher returned success, but chat arrival could not be confirmed; monitoring paused without sending. The original desktop settings were restored. Live navigation still needs verification in a Codex session with readable accessibility contents.
 
 ## Verified scope and remaining work
 
@@ -71,6 +73,6 @@ No credentials are extracted, internal approvals fabricated, or managed restrict
 python3 -m unittest -v
 ```
 
-The 22 tests cover matching, target identity, Pause, persistence, draft preservation, AI classification handling, attempts saved before delivery, duplicate prevention, uncertain delivery, multi-question authorization, ordinary reply journaling, one-time approval restrictions, captured file-access card detection, changed-card/navigation failures, idle browser connections, and readable progress during a slow check with Pause still serialized. The suite runs in about one second.
+The 26 tests cover matching, target identity, Pause, persistence, draft preservation, AI classification handling, attempts saved before delivery, duplicate prevention, uncertain delivery, multi-question authorization, ordinary reply journaling, one-time approval restrictions, captured file-access card detection, changed-card/navigation failures, opening selected chats in order, navigation load/timeout behavior, idle browser connections, and readable progress during a slow check with Pause still serialized. The suite runs in about one second.
 
 On 13 October 2026, authorized live tests in “Approval Helper controlled test” confirmed an AI-selected offered answer, a custom free-text answer using GNOME input, a complete two-question form under one attempt, and an AI-selected ordinary composer reply. These used isolated journals in `/tmp`; the user's monitoring settings were preserved. The existing demo video predates AI mode and these additional desktop paths.
