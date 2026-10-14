@@ -266,7 +266,7 @@
   function renderProgress() {
     const p = monitorProgress;
     if (p && (p.running || (p.stage === 'error' && state?.error))) {
-      const titles = {reading: 'Reading chats', inspecting: 'Checking for a request',
+      const titles = {reading: 'Reading chats', opening: 'Opening chat in Codex', inspecting: 'Checking for a request',
         deciding: p.detail === 'Using a saved decision.' ? 'Using saved decision' : state?.decision_method === 'ai' ? 'AI deciding' : 'Matching your rule',
         sending: 'Sending answer', confirming: 'Confirming delivery',
         waiting: 'Waiting for next check', done: 'Check complete', error: 'Check failed'};
@@ -383,7 +383,7 @@
     $('status').classList.toggle('running', state.running);
     $('mode-title').textContent = state.mode === 'desktop' ? 'Authorized replies will be sent' : 'Suggestions only — nothing is sent';
     $('mode-description').textContent = state.mode === 'desktop'
-      ? 'Keep selected chats open in Codex. Requests covered by your rules or instructions are answered. Unclear requests stay for you; an unconfirmed send pauses the helper.'
+      ? 'Selected chats open automatically in Codex, one at a time. Requests covered by your rules or instructions are answered. Unclear requests stay for you; an unconfirmed send pauses the helper.'
       : 'Reads saved messages and shows suggested replies here. Check your instructions before enabling automatic replies. Live approval cards are read in Send authorized replies mode.';
     $('refresh').disabled = busy || !state.connected;
     updateSelection();
