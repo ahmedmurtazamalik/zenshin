@@ -237,11 +237,12 @@ def approval_forms(name):
     forms = []
     for button in matching(doc, "push button", "Allow once"):
         root = button.get_parent()
-        # The installed card has an alert header and a Deny/Allow form.
+        # Command cards have an alert; file-access cards have a Permissions heading.
         while root and root.get_role_name() != "document web":
             if matching(root, "entry", "Work with Codex"):
                 break
-            if any(node.get_role_name() == "alert" for node in nodes(root)):
+            if (any(node.get_role_name() == "alert" for node in nodes(root))
+                    or matching(root, "static", "Permissions")):
                 if len(matching(root, "push button", "Deny")) != 1:
                     break
                 text = "\n".join(node.get_name() for node in nodes(root)

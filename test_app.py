@@ -306,6 +306,18 @@ class DesktopTests(unittest.TestCase):
             node("section", "", [context, form, node("entry", "Work with Codex")])
             self.assertEqual(linux_ui.approval_forms("Test chat"), [])
 
+        # Captured request_permissions cards use a Permissions heading, not an alert.
+        context = node("section", "", [node("static", "Permissions"),
+                                         node("static", "Read the exact probe file?")])
+        form = node("form", "", [node("push button", "Deny"), allow])
+        card = node("section", "", [context, form])
+        doc = node("document web", "Test chat", [card])
+        with patch.object(linux_ui, "document", return_value=doc):
+            self.assertEqual(linux_ui.approval_forms("Test chat"), [
+                {"text": "Permissions\nRead the exact probe file?", "button": allow}])
+            node("section", "", [context, form, node("entry", "Work with Codex")])
+            self.assertEqual(linux_ui.approval_forms("Test chat"), [])
+
     def test_approval_rechecks_card_and_requires_same_chat_confirmation(self):
         button = Mock()
         with patch.object(linux_ui, "approval_forms", return_value=[]) as forms, \
