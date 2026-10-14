@@ -131,7 +131,7 @@ def write_text(name, entry, response):
         call("Stop")
 
 
-def answer(name, question, response, next_question=None):
+def answer(name, question, response, next_question=None, on_progress=None):
     doc = document(name)
     root, expanded = card(doc, question)
     if root is None:
@@ -180,6 +180,8 @@ def answer(name, question, response, next_question=None):
         press(buttons[0])
     # A closed card alone could mean navigation or dismissal. Require an echoed
     # answer in the same chat as well before reporting delivery.
+    if on_progress:
+        on_progress("confirming")
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
         doc = document(name)
@@ -202,7 +204,7 @@ def conversation_pending(name, text):
                 and not matching(doc, "push button", "Allow once"))
 
 
-def reply(name, text, response):
+def reply(name, text, response, on_progress=None):
     if not conversation_pending(name, text):
         raise RuntimeError("The chat is running or its latest message is not visible")
     doc = document(name)
@@ -219,6 +221,8 @@ def reply(name, text, response):
             or not buttons[0].get_state_set().contains(atspi().StateType.ENABLED)):
         raise RuntimeError("Composer changed before Send; inspect its draft manually")
     press(buttons[0])
+    if on_progress:
+        on_progress("confirming")
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
         doc = document(name)
@@ -258,7 +262,7 @@ def approval_cards(name):
     return [{"text": form["text"], "options": ["Allow once"]} for form in approval_forms(name)]
 
 
-def approve(name, text, response):
+def approve(name, text, response, on_progress=None):
     if response != "Allow once":
         raise RuntimeError("Approval dialogs only support the one-time Allow once action")
     forms = [form for form in approval_forms(name) if form["text"] == text]
@@ -268,6 +272,8 @@ def approve(name, text, response):
     if not button.get_state_set().contains(atspi().StateType.ENABLED):
         raise RuntimeError("The approval action is disabled")
     press(button)
+    if on_progress:
+        on_progress("confirming")
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
         if document(name) is None:

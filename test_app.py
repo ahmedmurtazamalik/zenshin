@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import app
 import linux_ui
@@ -161,7 +161,7 @@ class DesktopTests(unittest.TestCase):
             monitor = {"state": state, "path": path, "running": True,
                        "connection": None, "previews": []}
 
-            def answer(*_args):
+            def answer(*_args, **_kwargs):
                 saved = app.load_state(path)
                 self.assertEqual(saved["attempts"]["selected:message-1"]["status"], "sending")
 
@@ -171,7 +171,7 @@ class DesktopTests(unittest.TestCase):
                 app.poll(monitor)
                 monitor["state"] = app.load_state(path)
                 app.poll(monitor)
-                send.assert_called_once_with("Test chat", "Complete test?", "Yes")
+                send.assert_called_once_with("Test chat", "Complete test?", "Yes", on_progress=ANY)
                 self.assertEqual(monitor["state"]["attempts"]["selected:message-1"]["status"], "sent")
 
     def test_uncertain_delivery_pauses_and_blocks_restart(self):
@@ -250,7 +250,7 @@ class DesktopTests(unittest.TestCase):
             data = thread(text="Continue?")
             data["name"] = "Test chat"
             monitor = {"state": state, "path": path, "running": True, "connection": None, "previews": []}
-            def reply(*args):
+            def reply(*args, **kwargs):
                 self.assertEqual(app.load_state(path)["attempts"]["selected:message-1"]["status"], "sending")
             with patch.object(app, "rpc", return_value={"thread": data}), \
                  patch.object(linux_ui, "conversation_pending", return_value=True), \
@@ -258,7 +258,7 @@ class DesktopTests(unittest.TestCase):
                 app.poll(monitor)
                 monitor["state"] = app.load_state(path)
                 app.poll(monitor)
-                send.assert_called_once_with("Test chat", "Continue?", "Yes")
+                send.assert_called_once_with("Test chat", "Continue?", "Yes", on_progress=ANY)
 
     def test_approval_card_allows_once_and_persists_before_action(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -270,7 +270,7 @@ class DesktopTests(unittest.TestCase):
             data = thread()
             data["name"] = "Test chat"
             monitor = {"state": state, "path": path, "running": True, "connection": None, "previews": []}
-            def approve(*args):
+            def approve(*args, **kwargs):
                 saved = app.load_state(path)
                 self.assertEqual(next(iter(saved["attempts"].values()))["status"], "sending")
             with patch.object(app, "rpc", return_value={"thread": data}), \
@@ -283,7 +283,7 @@ class DesktopTests(unittest.TestCase):
                 app.poll(monitor)
                 monitor["state"] = app.load_state(path)
                 app.poll(monitor)
-                send.assert_called_once_with("Test chat", text, "Allow once")
+                send.assert_called_once_with("Test chat", text, "Allow once", on_progress=ANY)
 
     def test_approval_detection_reads_card_context_and_excludes_chat_composer(self):
         def node(role, name, children=()):
@@ -369,7 +369,7 @@ class AIDecisionTests(unittest.TestCase):
                 send.assert_not_called()
                 self.assertEqual(start.call_args.args[0]["messages"][0]["role"], "user")
                 app.poll(monitor)
-                send.assert_called_once_with("Test chat", "Shall I carry on?", "Yes, continue.")
+                send.assert_called_once_with("Test chat", "Shall I carry on?", "Yes, continue.", on_progress=ANY)
                 monitor["state"] = app.load_state(monitor["path"])
                 app.poll(monitor)
                 start.assert_called_once()
@@ -419,6 +419,75 @@ class AIDecisionTests(unittest.TestCase):
 
 
 class ServerTests(unittest.TestCase):
+    def test_progress_remains_readable_during_slow_check_and_pause_waits(self):
+        import json
+        import socket
+        import threading
+        from urllib.request import Request, urlopen
+        from urllib.error import HTTPError
+
+        entered, release, created, paused = (threading.Event() for _ in range(4))
+        servers, results = [], {}
+        server_class = app.ThreadingHTTPServer
+        def make_server(*args):
+            server = server_class(*args)
+            servers.append(server)
+            created.set()
+            return server
+        def slow_check(monitor):
+            monitor["running"] = True
+            app.set_progress(monitor, "reading", "Slow test chat")
+            entered.set()
+            release.wait(3)
+        def post(path):
+            with urlopen(Request(base + "/api/" + path, data=b"{}",
+                                 headers={"Content-Type": "application/json"}), timeout=4) as response:
+                results[path] = json.load(response)
+            if path == "pause":
+                paused.set()
+
+        with tempfile.TemporaryDirectory() as directory:
+            with socket.socket() as reservation:
+                reservation.bind(("127.0.0.1", 0))
+                port = reservation.getsockname()[1]
+            base = f"http://127.0.0.1:{port}"
+            with patch.object(app, "ThreadingHTTPServer", side_effect=make_server), \
+                 patch.object(app, "poll", side_effect=slow_check), patch("builtins.print"), \
+                 patch("sys.argv", ["app.py", "--port", str(port), "--state", str(Path(directory) / "state.json")]):
+                main = threading.Thread(target=app.main, daemon=True)
+                main.start()
+                try:
+                    self.assertTrue(created.wait(2))
+                    checking = threading.Thread(target=post, args=("poll",))
+                    checking.start()
+                    self.assertTrue(entered.wait(2))
+                    pausing = threading.Thread(target=post, args=("pause",))
+                    pausing.start()
+                    with urlopen(base + "/api/progress", timeout=.5) as response:
+                        progress = json.load(response)
+                    self.assertEqual((progress["stage"], progress["chat"]), ("reading", "Slow test chat"))
+                    self.assertFalse(paused.wait(.05))
+                    release.set()
+                    checking.join(2)
+                    pausing.join(2)
+                    self.assertTrue(paused.is_set())
+                    self.assertFalse(results["pause"]["running"])
+                    def failed_check(monitor):
+                        app.set_progress(monitor, "error", "Slow test chat", "Chat unavailable")
+                        raise RuntimeError("Chat unavailable")
+                    with patch.object(app, "poll", side_effect=failed_check):
+                        with self.assertRaises(HTTPError):
+                            post("poll")
+                    with patch.object(app, "poll", return_value=None):
+                        post("poll")
+                    self.assertEqual(results["poll"]["error"], "Chat unavailable")
+                    self.assertEqual(results["poll"]["progress"]["stage"], "error")
+                finally:
+                    release.set()
+                    if servers:
+                        servers[0].shutdown()
+                    main.join(2)
+
     def test_idle_browser_connection_does_not_block_loading_page(self):
         import select
         import socket

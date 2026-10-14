@@ -9,7 +9,8 @@ import select
 import subprocess
 import tempfile
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Lock
 
 import ai_decision
 
@@ -114,6 +115,32 @@ def normalize(text):
     return " ".join(text.split())
 
 
+def set_progress(app, stage, chat="", detail="", started=None):
+    previous = app.get("progress", {})
+    # Keep the AI timer visible while later polls recheck its pending request.
+    if app.get("analysis") and stage in {"reading", "inspecting"}:
+        return
+    steps = previous.get("steps", [])
+    if stage not in steps and stage in {"reading", "inspecting", "deciding", "sending", "confirming"}:
+        steps = steps + [stage]
+    if started is None:
+        started = (previous["started"] if previous.get("stage") == stage
+                   and previous.get("chat") == chat else time.monotonic())
+    app["progress"] = {"stage": stage, "chat": chat, "detail": detail,
+                       "started": started, "steps": steps}
+
+
+def progress_snapshot(app):
+    progress = app.get("progress", {})
+    stage = progress.get("stage", "waiting" if app["running"] else "paused")
+    if not app["running"] and stage != "error":
+        stage = "paused"
+    return {"running": app["running"], "stage": stage,
+            "chat": progress.get("chat", ""), "detail": progress.get("detail", ""),
+            "steps": progress.get("steps", []),
+            "elapsed": max(0, time.monotonic() - progress.get("started", time.monotonic()))}
+
+
 def validate_settings(data):
     targets, rules = data["targets"], data["rules"]
     if not isinstance(targets, list) or not isinstance(rules, list):
@@ -201,22 +228,47 @@ def analyze_request(app, thread, request):
     key = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
     saved = app["state"]["ai_decisions"].get(key)
     if saved:
+        set_progress(app, "deciding", request.get("name", ""), "Using a saved decision.")
         return {**request, **saved, "status": "AI — " + saved["decision"]}
     if not app.get("analysis"):
-        app["analysis"] = {**ai_decision.start(data), "key": key, "request": request}
+        started = time.monotonic()
+        set_progress(app, "deciding", request.get("name", ""), "AI is reviewing the recent messages.", started)
+        app["analysis"] = {**ai_decision.start(data), "key": key, "request": request, "started": started}
     return {**request, "response": None, "status": "AI analysis pending — no response sent"}
 
 
 def poll(app):
     if not app["running"]:
         return
+    if not app.get("analysis"):
+        app.pop("progress", None)
+    try:
+        check_chats(app)
+    except Exception as error:
+        set_progress(app, "error", app.get("progress", {}).get("chat", ""), str(error))
+        raise
+    job = app.get("analysis")
+    if job:
+        set_progress(app, "deciding", job["request"].get("name", ""),
+                     "AI is reviewing the recent messages.", job["started"])
+    else:
+        progress = app.get("progress", {})
+        set_progress(app, "waiting", progress.get("chat", ""),
+                     progress.get("detail", "") if progress.get("stage") == "done" else "Check complete.")
+
+
+def check_chats(app):
     finish_analysis(app)
     if app["state"].get("mode") == "desktop":
         return poll_desktop(app)
     previews = []
     for target in app["state"]["targets"]:
+        set_progress(app, "reading", target["name"])
         thread = rpc(app["connection"], "thread/read",
                      {"threadId": target["id"], "includeTurns": True})["thread"]
+        set_progress(app, "inspecting", target["name"])
+        if app["state"]["decision_method"] == "exact":
+            set_progress(app, "deciding", target["name"], "Matching your saved rule.")
         preview = preview_latest(thread, app["state"]["rules"])
         if not preview:
             continue
@@ -235,6 +287,8 @@ def poll(app):
             app["state"]["activity"] = app["state"]["activity"][-100:]
             save_state(app["path"], app["state"])
     app["previews"] = previews
+    if not app.get("analysis"):
+        set_progress(app, "done", app.get("progress", {}).get("chat", ""), "Preview updated; nothing sent.")
 
 
 def questions(thread):
@@ -282,11 +336,13 @@ def poll_desktop(app):
     previews = []
     app["previews"] = previews
     for target in app["state"]["targets"]:
+        set_progress(app, "reading", target["name"])
         thread = rpc(app["connection"], "thread/read", {
             "threadId": target["id"], "includeTurns": True})["thread"]
         if thread.get("name") != target["name"]:
             app["running"] = False
             raise RuntimeError("The selected chat was renamed; select and save it again")
+        set_progress(app, "inspecting", target["name"])
         requests = list(reversed(questions(thread)))
         for card in linux_ui.approval_cards(target["name"]):
             turns = thread.get("turns", [])
@@ -322,6 +378,7 @@ def poll_desktop(app):
                     decision = analyze_request(app, thread, {**current, "name": target["name"]})
                     response = decision["response"] if decision.get("decision") in {"approve", "continue"} else None
                 else:
+                    set_progress(app, "deciding", target["name"], "Matching your saved rule.")
                     response = next((rule["response"] for rule in app["state"]["rules"]
                                      if normalize(rule["request"]) == normalize(current["text"])), None)
                 responses.append(response)
@@ -338,6 +395,8 @@ def poll_desktop(app):
                                       for prompt, response in zip(prompts, responses)]
             if any(response is None for response in responses):
                 preview["status"] = "Pending — every question needs authorization"
+                if not app.get("analysis"):
+                    set_progress(app, "done", target["name"], "Request left for you; no answer sent.")
                 continue
             key = request["thread_id"] + ":" + request["item_id"]
             if key in app["state"]["attempts"]:
@@ -349,14 +408,16 @@ def poll_desktop(app):
             save_state(app["path"], app["state"])
             try:
                 for index, (prompt, response) in enumerate(zip(prompts, responses)):
+                    set_progress(app, "sending", target["name"], response)
+                    notify = lambda stage: set_progress(app, stage, target["name"], response)
                     if request.get("approval"):
-                        linux_ui.approve(target["name"], prompt["title"], response)
+                        linux_ui.approve(target["name"], prompt["title"], response, on_progress=notify)
                     elif request.get("conversation"):
-                        linux_ui.reply(target["name"], prompt["title"], response)
+                        linux_ui.reply(target["name"], prompt["title"], response, on_progress=notify)
                     elif index + 1 < len(prompts):
-                        linux_ui.answer(target["name"], prompt["title"], response, prompts[index + 1]["title"])
+                        linux_ui.answer(target["name"], prompt["title"], response, prompts[index + 1]["title"], on_progress=notify)
                     else:
-                        linux_ui.answer(target["name"], prompt["title"], response)
+                        linux_ui.answer(target["name"], prompt["title"], response, on_progress=notify)
             except Exception as error:
                 attempt["status"] = "uncertain"
                 attempt["error"] = str(error)
@@ -365,6 +426,7 @@ def poll_desktop(app):
             else:
                 attempt["status"] = "sent"
                 preview["status"] = "Response delivered"
+                set_progress(app, "done", target["name"], "Response delivered.")
             app["state"]["activity"].append(dict(attempt))
             app["state"]["activity"] = app["state"]["activity"][-100:]
             save_state(app["path"], app["state"])
@@ -389,6 +451,7 @@ def snapshot(app):
             "activity": app["state"]["activity"], "previews": app["previews"],
             "unconfirmed": sum(attempt["status"] not in {"sent", "reviewed"}
                                for attempt in app["state"]["attempts"].values()),
+            "progress": progress_snapshot(app),
             "error": app["error"]}
 
 
@@ -399,6 +462,7 @@ def main():
     args = parser.parse_args()
     app = {"path": args.state, "state": load_state(args.state), "running": False,
            "connection": None, "previews": [], "error": ""}
+    operations = Lock()
 
     class Handler(BaseHTTPRequestHandler):
         # Browsers may pre-open an idle socket; do not let it block all requests.
@@ -424,7 +488,10 @@ def main():
             if not self.valid_host():
                 return self.reply({"error": "Invalid host"}, 403)
             if self.path == "/api/state":
-                return self.reply(snapshot(app))
+                with operations:
+                    return self.reply(snapshot(app))
+            if self.path == "/api/progress":
+                return self.reply(progress_snapshot(app))
             files = {"/": ("index.html", "text/html; charset=utf-8"),
                      "/assets/space-grotesk.ttf": ("assets/space-grotesk.ttf", "font/ttf"),
                      "/assets/zenshin.svg": ("assets/zenshin.svg", "image/svg+xml")}
@@ -439,6 +506,11 @@ def main():
             self.wfile.write(body)
 
         def do_POST(self):
+            # Only read-only progress can run alongside a desktop action.
+            with operations:
+                self.handle_operation()
+
+        def handle_operation(self):
             origin = self.headers.get("Origin")
             if (not self.valid_host() or self.headers.get("Content-Type") != "application/json"
                     or origin not in {None, f"http://127.0.0.1:{args.port}",
@@ -506,7 +578,11 @@ def main():
                     poll(app)
                 else:
                     return self.reply({"error": "Not found"}, 404)
-                app["error"] = ""
+                if self.path != "/api/poll":
+                    app.pop("progress", None)
+                    app["error"] = ""
+                elif app["running"]:
+                    app["error"] = ""
                 self.reply(snapshot(app))
             except (ValueError, KeyError, TypeError) as error:
                 self.reply({"error": str(error)}, 400)
@@ -518,7 +594,7 @@ def main():
                 app["error"] = str(error)
                 self.reply(snapshot(app), 503)
 
-    server = HTTPServer(("127.0.0.1", args.port), Handler)
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(f"Zenshin: http://127.0.0.1:{args.port}", flush=True)
     print("Starts paused. Keep the control window open to monitor.", flush=True)
     try:
@@ -527,8 +603,9 @@ def main():
         pass
     finally:
         server.server_close()
-        cancel_analysis(app)
-        close_connection(app["connection"])
+        with operations:
+            cancel_analysis(app)
+            close_connection(app["connection"])
 
 
 if __name__ == "__main__":
