@@ -65,12 +65,58 @@ class PreviewTests(unittest.TestCase):
 
 class DesktopTests(unittest.TestCase):
     def setUp(self):
+        navigation = patch.object(linux_ui, "open_chat")
+        self.open_chat = navigation.start()
+        self.addCleanup(navigation.stop)
         pending = patch.object(linux_ui, "conversation_pending", return_value=False)
         pending.start()
         self.addCleanup(pending.stop)
         cards = patch.object(linux_ui, "approval_cards", return_value=[])
         cards.start()
         self.addCleanup(cards.stop)
+
+    def test_selected_chats_are_opened_in_order_before_inspection(self):
+        state = app.load_state(Path("/nonexistent-approval-helper-test-state"))
+        state.update(mode="desktop", targets=[{"id": "first", "name": "First chat"},
+                                             {"id": "second", "name": "Second chat"}])
+        monitor = {"state": state, "running": True, "connection": None, "previews": []}
+        events = []
+        self.open_chat.side_effect = lambda identity, name, **kwargs: events.append(("open", identity))
+        def read(_connection, _method, params):
+            identity = params["threadId"]
+            data = thread(identity, text="Work finished.")
+            data["name"] = "First chat" if identity == "first" else "Second chat"
+            return {"thread": data}
+        def inspect(name):
+            events.append(("inspect", name))
+            return []
+        with patch.object(app, "rpc", side_effect=read), \
+             patch.object(linux_ui, "approval_cards", side_effect=inspect):
+            app.poll(monitor)
+        self.assertEqual(events, [("open", "first"), ("inspect", "First chat"),
+                                  ("open", "second"), ("inspect", "Second chat")])
+
+    def test_navigation_failure_pauses_before_inspection_or_response(self):
+        state = app.load_state(Path("/nonexistent-approval-helper-test-state"))
+        state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+                     rules=[{"request": "Continue?", "response": "Yes"}])
+        data = thread(text="Continue?")
+        data["name"] = "Test chat"
+        monitor = {"state": state, "running": True, "connection": None, "previews": []}
+        self.open_chat.side_effect = RuntimeError("Chat did not appear")
+        with patch.object(app, "rpc", return_value={"thread": data}), \
+             patch.object(linux_ui, "approval_cards") as inspect, \
+             patch.object(linux_ui, "reply") as reply, \
+             patch.object(linux_ui, "answer") as answer, \
+             patch.object(linux_ui, "approve") as approve:
+            with self.assertRaisesRegex(RuntimeError, "Chat did not appear"):
+                app.poll(monitor)
+            inspect.assert_not_called()
+            reply.assert_not_called()
+            answer.assert_not_called()
+            approve.assert_not_called()
+        self.assertFalse(monitor["running"])
+        self.assertEqual(state["attempts"], {})
 
     def test_custom_answer_is_read_back_before_send_and_preserves_existing_draft(self):
         doc, root = object(), object()
@@ -333,8 +379,35 @@ class DesktopTests(unittest.TestCase):
             send.assert_called_once_with(button)
 
 
+class ChatNavigationTests(unittest.TestCase):
+    def test_open_chat_skips_visible_chat_and_waits_for_requested_chat_to_load(self):
+        with patch.object(linux_ui, "document", return_value=object()), \
+             patch.object(linux_ui.subprocess, "run") as launch:
+            linux_ui.open_chat("selected", "Test chat")
+            launch.assert_not_called()
+        on_open = Mock()
+        with patch.object(linux_ui, "document", side_effect=[None, None, object()]) as visible, \
+             patch.object(linux_ui.subprocess, "run") as launch, \
+             patch.object(linux_ui.time, "sleep"):
+            linux_ui.open_chat("selected/id", "Test chat", on_open=on_open)
+        on_open.assert_called_once_with()
+        self.assertEqual(launch.call_args.args[0], ["xdg-open", "codex://threads/selected%2Fid"])
+        self.assertTrue(all(call.args == ("Test chat",) for call in visible.call_args_list))
+
+    def test_open_chat_fails_if_requested_chat_never_appears(self):
+        with patch.object(linux_ui, "document", return_value=None), \
+             patch.object(linux_ui.subprocess, "run"), \
+             patch.object(linux_ui.time, "monotonic", side_effect=[0, 0, 11]), \
+             patch.object(linux_ui.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "selected chat did not appear"):
+                linux_ui.open_chat("selected", "Test chat")
+
+
 class AIDecisionTests(unittest.TestCase):
     def setUp(self):
+        navigation = patch.object(linux_ui, "open_chat")
+        navigation.start()
+        self.addCleanup(navigation.stop)
         pending = patch.object(linux_ui, "conversation_pending", return_value=False)
         pending.start()
         self.addCleanup(pending.stop)

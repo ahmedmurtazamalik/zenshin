@@ -1,6 +1,8 @@
 """Normal Linux accessibility controls for Codex's question cards."""
 
+import subprocess
 import time
+from urllib.parse import quote
 
 
 def atspi():
@@ -42,6 +44,25 @@ def document(name):
     if len(matches) > 1:
         raise RuntimeError("This chat is open in multiple desktop windows; leave only one open")
     return matches[0] if matches else None
+
+
+def open_chat(thread_id, name, on_open=None):
+    if document(name) is not None:
+        return
+    if on_open:
+        on_open()
+    try:
+        subprocess.run(["xdg-open", "codex://threads/" + quote(thread_id, safe="")],
+                       check=True, timeout=5, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.PIPE, text=True)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise RuntimeError("Could not open the selected chat in Codex: " + str(error)) from error
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        if document(name) is not None:
+            return
+        time.sleep(.25)
+    raise RuntimeError("The selected chat did not appear in Codex; check desktop accessibility, open it manually, and restart monitoring")
 
 
 def matching(root, role, name):

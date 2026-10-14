@@ -342,6 +342,12 @@ def poll_desktop(app):
         if thread.get("name") != target["name"]:
             app["running"] = False
             raise RuntimeError("The selected chat was renamed; select and save it again")
+        try:
+            linux_ui.open_chat(target["id"], target["name"], on_open=lambda: set_progress(
+                app, "opening", target["name"], "Waiting for the selected chat to load in Codex."))
+        except Exception:
+            app["running"] = False
+            raise
         set_progress(app, "inspecting", target["name"])
         requests = list(reversed(questions(thread)))
         for card in linux_ui.approval_cards(target["name"]):
