@@ -65,6 +65,12 @@ class PreviewTests(unittest.TestCase):
 
 class DesktopTests(unittest.TestCase):
     def setUp(self):
+        desktop = patch.object(app, "poll_desktop", side_effect=lambda monitor: app.check_desktop(monitor, linux_ui))
+        desktop.start()
+        self.addCleanup(desktop.stop)
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.empty_state = Path(directory.name) / "state.json"
         navigation = patch.object(linux_ui, "open_chat")
         self.open_chat = navigation.start()
         self.addCleanup(navigation.stop)
@@ -76,7 +82,7 @@ class DesktopTests(unittest.TestCase):
         self.addCleanup(cards.stop)
 
     def test_selected_chats_are_opened_in_order_before_inspection(self):
-        state = app.load_state(Path("/nonexistent-approval-helper-test-state"))
+        state = app.load_state(self.empty_state)
         state.update(mode="desktop", targets=[{"id": "first", "name": "First chat"},
                                              {"id": "second", "name": "Second chat"}])
         monitor = {"state": state, "running": True, "connection": None, "previews": []}
@@ -97,7 +103,7 @@ class DesktopTests(unittest.TestCase):
                                   ("open", "second"), ("inspect", "Second chat")])
 
     def test_navigation_failure_pauses_before_inspection_or_response(self):
-        state = app.load_state(Path("/nonexistent-approval-helper-test-state"))
+        state = app.load_state(self.empty_state)
         state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
                      rules=[{"request": "Continue?", "response": "Yes"}])
         data = thread(text="Continue?")
@@ -244,7 +250,7 @@ class DesktopTests(unittest.TestCase):
                     app.verify_desktop_targets(monitor)
 
     def test_unmatched_request_and_pause_do_not_send(self):
-        state = app.load_state(Path("/nonexistent-approval-helper-test-state"))
+        state = app.load_state(self.empty_state)
         state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
                      rules=[{"request": "A different request?", "response": "Yes"}])
         data = thread()
@@ -405,6 +411,9 @@ class ChatNavigationTests(unittest.TestCase):
 
 class AIDecisionTests(unittest.TestCase):
     def setUp(self):
+        desktop = patch.object(app, "poll_desktop", side_effect=lambda monitor: app.check_desktop(monitor, linux_ui))
+        desktop.start()
+        self.addCleanup(desktop.stop)
         navigation = patch.object(linux_ui, "open_chat")
         navigation.start()
         self.addCleanup(navigation.stop)
@@ -562,7 +571,6 @@ class ServerTests(unittest.TestCase):
                     main.join(2)
 
     def test_idle_browser_connection_does_not_block_loading_page(self):
-        import select
         import socket
         import subprocess
         import sys
@@ -577,8 +585,16 @@ class ServerTests(unittest.TestCase):
                                         "--port", str(port), "--state", str(Path(directory) / "state.json")],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             try:
-                self.assertTrue(select.select([process.stdout], [], [], 5)[0], "Server did not start")
-                self.assertIn(b"Zenshin", process.stdout.readline())
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    try:
+                        with socket.create_connection(("127.0.0.1", port), timeout=.2):
+                            break
+                    except OSError:
+                        self.assertIsNone(process.poll(), "Server exited before accepting connections")
+                        time.sleep(.02)
+                else:
+                    self.fail("Server did not start")
                 with socket.create_connection(("127.0.0.1", port), timeout=5):
                     time.sleep(0.05)
                     with urlopen(f"http://127.0.0.1:{port}/", timeout=5) as response:

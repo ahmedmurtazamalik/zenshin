@@ -1,7 +1,9 @@
 """Read-only, non-interactive Codex classification of a supplied request."""
 
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import time
@@ -30,19 +32,34 @@ no_response, response must be null. Explain the decision in one short sentence.
 """
 
 
+def cli_command():
+    if os.name != "nt":
+        return ["codex"]
+    executable = shutil.which("codex.exe")
+    if executable:
+        return [executable]
+    # npm's Windows command shim cannot safely carry a multiline AI prompt.
+    shim, node = shutil.which("codex.cmd"), shutil.which("node.exe")
+    script = Path(shim).parent / "node_modules/@openai/codex/bin/codex.js" if shim else None
+    if node and script and script.is_file():
+        return [node, str(script)]
+    raise RuntimeError("Install the native Codex CLI and put codex.exe or its npm installation on PATH")
+
+
 def start(data):
     directory = tempfile.TemporaryDirectory(prefix="approval-helper-ai-")
     root = Path(directory.name)
-    (root / "schema.json").write_text(json.dumps(SCHEMA))
-    output = (root / "events.jsonl").open("w+")
-    errors = (root / "errors.txt").open("w+")
+    (root / "schema.json").write_text(json.dumps(SCHEMA), encoding="utf-8")
+    output = (root / "events.jsonl").open("w+", encoding="utf-8")
+    errors = (root / "errors.txt").open("w+", encoding="utf-8")
     try:
-        process = subprocess.Popen([
-            "codex", "exec", "--ephemeral", "--ignore-user-config",
+        process = subprocess.Popen(cli_command() + [
+            "exec", "--ephemeral", "--ignore-user-config",
             "--sandbox", "read-only", "--skip-git-repo-check", "--json",
             "--output-schema", str(root / "schema.json"),
             "--output-last-message", str(root / "decision.json"),
-            "-C", str(root), PROMPT], stdin=subprocess.PIPE, stdout=output, stderr=errors)
+            "-C", str(root), PROMPT], stdin=subprocess.PIPE, stdout=output, stderr=errors,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
         process.stdin.write(json.dumps(data).encode())
         process.stdin.close()
     except Exception:
@@ -84,7 +101,7 @@ def result(job):
                     "command_execution", "mcp_tool_call", "file_change", "web_search"}:
                 raise RuntimeError("AI analysis used a tool; its decision was discarded")
         path = Path(job["directory"].name) / "decision.json"
-        decision = json.loads(path.read_text())
+        decision = json.loads(path.read_text(encoding="utf-8"))
         if (set(decision) != {"decision", "response", "reason"}
                 or decision["decision"] not in SCHEMA["properties"]["decision"]["enum"]
                 or not isinstance(decision["reason"], str)

@@ -2,9 +2,9 @@
 
 **Keep moving forward.**
 
-A local Linux app for reducing repeated Codex permission interruptions. It reads chat identity and history through Codex App Server and can answer **question forms and ordinary continuation requests in the Codex desktop app** through normal Linux accessibility controls.
+A local Linux and Windows app for reducing repeated Codex permission interruptions. It reads chat identity and history through Codex App Server and can answer **question forms and ordinary continuation requests in the Codex desktop app** through normal accessibility controls.
 
-The [v0.1.0 Linux MVP release](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.1.0) is a source distribution. Windows support is not implemented yet; see the [Windows development handoff](WINDOWS.md) to continue the port on a Windows device. [Release notes](RELEASE_NOTES.md).
+The [v0.1.0 Linux MVP release](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.1.0) remains a Linux-only source distribution. This checkout also implements native Windows support; see [Windows setup and verification](WINDOWS.md). [Release notes](RELEASE_NOTES.md).
 
 [Watch the captioned video walkthrough](demo/approval-helper-demo.mp4). [Transcript and chapter guide](demo/README.md). The walkthrough shows real app screens using separate demo settings; no new approval is sent during recording.
 
@@ -14,7 +14,17 @@ The [v0.1.0 Linux MVP release](https://github.com/ahmedmurtazamalik/zenshin/rele
 python3 app.py
 ```
 
-Open http://127.0.0.1:8765. Requires Python 3 and a signed-in `codex` CLI. Desktop mode also requires the system Python `gi` package and AT-SPI. On GNOME Wayland, keyboard fallback also uses a temporary Mutter RemoteDesktop session; these were already installed on the tested machine. No pip packages or frontend build are needed. Run outside a filesystem sandbox that prevents Codex from initializing its own runtime or accessing the desktop accessibility bus.
+Open http://127.0.0.1:8765. Requires Python 3 and a signed-in `codex` CLI. On Linux, desktop mode also requires the system Python `gi` package and AT-SPI. On GNOME Wayland, keyboard fallback also uses a temporary Mutter RemoteDesktop session; these were already installed on the tested machine. Linux needs no pip packages or frontend build. Run outside a filesystem sandbox that prevents Codex from initializing its own runtime or accessing the desktop accessibility bus.
+
+On Windows, use native Python and Codex. Install the Windows desktop dependency once, then run:
+
+```powershell
+py -3 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements-windows.txt
+.venv\Scripts\python.exe app.py
+```
+
+Windows desktop control uses UI Automation Value, Invoke, and Selection patterns. It verifies the installed Codex process, including the `ChatGPT.exe` name used by the Microsoft Store Codex package, and the selected chat document. It does not need keyboard or coordinate input.
 
 1. Connect to Codex and select chats. If a new chat is missing, add its thread ID; the app reads its actual title.
 2. Give selected chats unique titles. In desktop mode, Zenshin opens each selected chat in Codex as needed, one at a time. Multiple visible copies are rejected.
@@ -75,6 +85,8 @@ No credentials are extracted, internal approvals fabricated, or managed restrict
 python3 -m unittest -v
 ```
 
-The 26 tests cover matching, target identity, Pause, persistence, draft preservation, AI classification handling, attempts saved before delivery, duplicate prevention, uncertain delivery, multi-question authorization, ordinary reply journaling, one-time approval restrictions, captured file-access card detection, changed-card/navigation failures, opening selected chats in order, navigation load/timeout behavior, idle browser connections, and readable progress during a slow check with Pause still serialized. The suite runs in about one second.
+The 33 tests cover matching, target identity, Pause, persistence, draft preservation, AI classification handling, attempts saved before delivery, duplicate prevention, uncertain delivery, multi-question authorization, ordinary reply journaling, one-time approval restrictions, captured file-access card detection, changed-card/navigation failures, opening selected chats in order, navigation load/timeout behavior, idle browser connections, and readable progress during a slow check with Pause still serialized. Windows cases also cover split UTF-8 pipe messages and EOF, packaged-app identity, placeholder handling, approval context, and confirmation after an Invoke event error. On 14 October 2026 the full suite passed on Windows in 2.109 seconds and Ubuntu in 1.218 seconds.
 
 On 13 October 2026, authorized live tests in “Approval Helper controlled test” confirmed an AI-selected offered answer, a custom free-text answer using GNOME input, a complete two-question form under one attempt, and an AI-selected ordinary composer reply. These used isolated journals in `/tmp`; the user's monitoring settings were preserved. The existing demo video predates AI mode and these additional desktop paths.
+
+On 14 October 2026, native Windows tests in “Zenshin Windows test” confirmed App Server listing/history, a Unicode AI preview, offered answers, custom Unicode text, a two-question form, an AI-selected ordinary reply, existing-draft preservation, and sequential chat navigation. Tests used separate journals under `.local`. A real Windows approval card could not be produced: the test chat had no permission-request tool and Approve for me resolved its command escalation automatically. One-time card handling is implemented and behavior-tested, but still needs that live verification.

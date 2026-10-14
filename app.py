@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent
 
 def load_state(path):
     if path.exists():
-        state = json.loads(path.read_text())
+        state = json.loads(path.read_text(encoding="utf-8"))
     else:
         state = {"targets": [], "rules": [], "activity": [], "seen": []}
     state.setdefault("mode", "preview")
@@ -36,7 +36,7 @@ def save_state(path, state):
     # Replace atomically so an interrupted save doesn't lose settings/history.
     fd, temporary = tempfile.mkstemp(dir=path.parent)
     try:
-        with os.fdopen(fd, "w") as file:
+        with os.fdopen(fd, "w", encoding="utf-8") as file:
             json.dump(state, file, indent=2)
         os.replace(temporary, path)
     finally:
@@ -59,6 +59,25 @@ def close_connection(connection):
     connection["errors"].close()
 
 
+def pipe_ready(pipe):
+    if os.name != "nt":
+        return bool(select.select([pipe], [], [], 0.2)[0])
+    # Windows select accepts sockets only. Peek without consuming pipe bytes.
+    import ctypes
+    import msvcrt
+    available = ctypes.c_ulong()
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    if not kernel.PeekNamedPipe(ctypes.c_void_p(msvcrt.get_osfhandle(pipe.fileno())),
+                               None, 0, None, ctypes.byref(available), None):
+        error = ctypes.get_last_error()
+        if error == 109:  # Broken pipe: let rpc read EOF and the stderr detail.
+            return True
+        raise ctypes.WinError(error)
+    if not available.value:
+        time.sleep(.02)
+    return bool(available.value)
+
+
 def rpc(connection, method, params):
     # This build intentionally cannot send turns, resume chats, or approvals.
     if method not in {"initialize", "thread/list", "thread/read"}:
@@ -72,7 +91,7 @@ def rpc(connection, method, params):
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
         if b"\n" not in connection["buffer"]:
-            if not select.select([process.stdout], [], [], 0.2)[0]:
+            if not pipe_ready(process.stdout):
                 continue
             chunk = os.read(process.stdout.fileno(), 65536)
             if not chunk:
@@ -93,9 +112,10 @@ def rpc(connection, method, params):
 def connect():
     errors = tempfile.TemporaryFile()
     try:
-        process = subprocess.Popen(["codex", "app-server"], stdin=subprocess.PIPE,
-                                   stdout=subprocess.PIPE, stderr=errors)
-    except OSError:
+        process = subprocess.Popen(ai_decision.cli_command() + ["app-server"], stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=errors,
+                                   creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+    except (OSError, RuntimeError):
         errors.close()
         raise
     connection = {"process": process, "errors": errors, "next_id": 0, "buffer": b""}
@@ -331,7 +351,15 @@ def verify_desktop_targets(app):
 
 
 def poll_desktop(app):
+    if os.name == "nt":
+        import windows_ui
+        with windows_ui.session():
+            return check_desktop(app, windows_ui)
     import linux_ui
+    return check_desktop(app, linux_ui)
+
+
+def check_desktop(app, ui):
 
     previews = []
     app["previews"] = previews
@@ -343,14 +371,14 @@ def poll_desktop(app):
             app["running"] = False
             raise RuntimeError("The selected chat was renamed; select and save it again")
         try:
-            linux_ui.open_chat(target["id"], target["name"], on_open=lambda: set_progress(
+            ui.open_chat(target["id"], target["name"], on_open=lambda: set_progress(
                 app, "opening", target["name"], "Waiting for the selected chat to load in Codex."))
         except Exception:
             app["running"] = False
             raise
         set_progress(app, "inspecting", target["name"])
         requests = list(reversed(questions(thread)))
-        for card in linux_ui.approval_cards(target["name"]):
+        for card in ui.approval_cards(target["name"]):
             turns = thread.get("turns", [])
             if not turns:
                 continue
@@ -365,11 +393,11 @@ def poll_desktop(app):
             try:
                 if request.get("approval"):
                     is_pending = any(card["text"] == request["text"]
-                                     for card in linux_ui.approval_cards(target["name"]))
+                                     for card in ui.approval_cards(target["name"]))
                 elif request.get("conversation"):
-                    is_pending = linux_ui.conversation_pending(target["name"], request["text"])
+                    is_pending = ui.conversation_pending(target["name"], request["text"])
                 else:
-                    is_pending = linux_ui.pending(target["name"], request["text"])
+                    is_pending = ui.pending(target["name"], request["text"])
             except Exception as error:
                 app["running"] = False
                 raise RuntimeError("Desktop access failed: " + str(error)) from error
@@ -417,13 +445,13 @@ def poll_desktop(app):
                     set_progress(app, "sending", target["name"], response)
                     notify = lambda stage: set_progress(app, stage, target["name"], response)
                     if request.get("approval"):
-                        linux_ui.approve(target["name"], prompt["title"], response, on_progress=notify)
+                        ui.approve(target["name"], prompt["title"], response, on_progress=notify)
                     elif request.get("conversation"):
-                        linux_ui.reply(target["name"], prompt["title"], response, on_progress=notify)
+                        ui.reply(target["name"], prompt["title"], response, on_progress=notify)
                     elif index + 1 < len(prompts):
-                        linux_ui.answer(target["name"], prompt["title"], response, prompts[index + 1]["title"], on_progress=notify)
+                        ui.answer(target["name"], prompt["title"], response, prompts[index + 1]["title"], on_progress=notify)
                     else:
-                        linux_ui.answer(target["name"], prompt["title"], response, on_progress=notify)
+                        ui.answer(target["name"], prompt["title"], response, on_progress=notify)
             except Exception as error:
                 attempt["status"] = "uncertain"
                 attempt["error"] = str(error)
