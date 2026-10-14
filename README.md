@@ -4,6 +4,8 @@
 
 A local Linux app for reducing repeated Codex permission interruptions. It reads chat identity and history through Codex App Server and can answer **question forms and ordinary continuation requests in the Codex desktop app** through normal Linux accessibility controls.
 
+The [v0.1.0 Linux MVP release](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.1.0) is a source distribution. Windows support is not implemented yet; see the [Windows development handoff](WINDOWS.md) to continue the port on a Windows device. [Release notes](RELEASE_NOTES.md).
+
 [Watch the captioned video walkthrough](demo/approval-helper-demo.mp4). [Transcript and chapter guide](demo/README.md). The walkthrough shows real app screens using separate demo settings; no new approval is sent during recording.
 
 ## Run
