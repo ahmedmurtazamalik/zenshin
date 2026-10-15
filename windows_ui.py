@@ -3,6 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import ctypes
 import os
+import re
 import subprocess
 import time
 from urllib.parse import quote, urlsplit
@@ -289,6 +290,62 @@ def accept_chrome_password(address):
             raise RuntimeError("Chrome's suggestion did not close after activation; inspect Chrome before trying again")
         time.sleep(.2)
     raise RuntimeError("No supported Chrome password suggestion appeared for this site within 30 seconds; nothing was selected")
+
+
+def chrome_signup_request(origin, password=False, terms=False):
+    browser, suggestion = chrome_password_suggestion(origin)
+    if password and suggestion is not None:
+        return {"kind": "password", "label": "Chrome suggested password"}
+    if not terms or browser is None:
+        return None
+    matches = []
+    api = automation()
+    for doc in nodes(browser, stop_at_documents=True):
+        if doc.ControlTypeName != "DocumentControl" or doc.IsOffscreen:
+            continue
+        value = doc.GetPattern(api.PatternId.ValuePattern)
+        if not value or not value.Value.startswith(origin + "/"):
+            continue
+        for control in nodes(doc):
+            if control.ControlTypeName != "CheckBoxControl" or control.IsOffscreen or not control.IsEnabled:
+                continue
+            label = control.Name
+            if (not re.search(r"\b(?:agree|accept)\b.*\bterms\b|\bterms (?:and|&) conditions\b|\bterms of (?:service|use)\b", label, re.I)
+                    or re.search(r"marketing|newsletter|promotional|offers|updates|subscrib|partners", label, re.I)):
+                continue
+            toggle = control.GetPattern(api.PatternId.TogglePattern)
+            if toggle and toggle.ToggleState == 0:
+                matches.append({"kind": "terms", "label": label})
+    if len(matches) > 1:
+        raise RuntimeError("Several terms checkboxes are available; inspect the form manually")
+    return matches[0] if matches else None
+
+
+def perform_chrome_signup_request(origin, request):
+    current = chrome_signup_request(origin, password=request["kind"] == "password",
+                                    terms=request["kind"] == "terms")
+    if current != request:
+        raise RuntimeError("Chrome's signup control changed; nothing was selected")
+    if request["kind"] == "password":
+        return accept_chrome_password(origin)
+    browser, _ = chrome_password_suggestion(origin)
+    controls = [control for control in nodes(browser) if control.ControlTypeName == "CheckBoxControl"
+                and control.Name == request["label"] and not control.IsOffscreen and control.IsEnabled]
+    if len(controls) != 1:
+        raise RuntimeError("The terms checkbox changed or is ambiguous; inspect Chrome manually")
+    toggle = controls[0].GetPattern(automation().PatternId.TogglePattern)
+    if not toggle or toggle.ToggleState != 0:
+        raise RuntimeError("The terms checkbox changed; nothing was selected")
+    toggle.Toggle()
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        current_browser, _ = chrome_password_suggestion(origin)
+        if current_browser is None or not automation().ControlsAreSame(browser, current_browser):
+            break
+        if toggle.ToggleState == 1:
+            return
+        time.sleep(.2)
+    raise RuntimeError("Terms checkbox selection was not confirmed; inspect Chrome before trying again")
 
 
 def entry_text(entry):

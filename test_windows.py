@@ -204,6 +204,25 @@ class WindowsControlsTests(unittest.TestCase):
             self.assertEqual(ui.chrome_password_suggestion("https://127.0.0.1:8877"), (None, None))
         webpage.GetChildren.assert_not_called()
 
+    def test_terms_checks_only_unchecked_agreement_and_leaves_marketing_alone(self):
+        api, window, address_bar, webpage, suggestion = self.chrome_form()
+        window.GetChildren.return_value = [address_bar, webpage]
+        terms = node("CheckBoxControl", "I agree to the Terms and Conditions")
+        marketing = node("CheckBoxControl", "I agree to the terms and subscribe to marketing updates")
+        toggle = terms.GetPattern.return_value
+        toggle.ToggleState = marketing.GetPattern.return_value.ToggleState = 0
+        toggle.Toggle.side_effect = lambda: setattr(toggle, "ToggleState", 1)
+        webpage.GetChildren.return_value = [terms, marketing]
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"):
+            request = ui.chrome_signup_request("https://jobs.example.com", terms=True)
+            self.assertEqual(request, {"kind": "terms", "label": terms.Name})
+            ui.perform_chrome_signup_request("https://jobs.example.com", request)
+            self.assertIsNone(ui.chrome_signup_request("https://jobs.example.com", terms=True))
+            self.assertIsNone(ui.chrome_signup_request("https://unrelated.example.com", terms=True))
+        toggle.Toggle.assert_called_once()
+        marketing.GetPattern.return_value.Toggle.assert_not_called()
+
     def test_ordinary_reply_confirms_echo_after_invoke_event_error_without_retry(self):
         class EventError(Exception):
             hresult = -2147220991
