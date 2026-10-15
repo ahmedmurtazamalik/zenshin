@@ -29,6 +29,8 @@ def load_state(path):
     state.setdefault("decision_method", "exact")
     state.setdefault("instructions", "")
     state.setdefault("ai_decisions", {})
+    state.setdefault("auto_password", False)
+    state.setdefault("auto_terms", False)
     return state
 
 
@@ -363,6 +365,7 @@ def check_desktop(app, ui):
 
     previews = []
     app["previews"] = previews
+    selected = []
     for target in app["state"]["targets"]:
         set_progress(app, "reading", target["name"])
         thread = rpc(app["connection"], "thread/read", {
@@ -370,6 +373,13 @@ def check_desktop(app, ui):
         if thread.get("name") != target["name"]:
             app["running"] = False
             raise RuntimeError("The selected chat was renamed; select and save it again")
+        selected.append((target, thread))
+    # Inspect Chrome before opening Codex, which can dismiss its native popup.
+    if os.name == "nt" and (app["state"].get("auto_password") or app["state"].get("auto_terms")):
+        for target, thread in selected:
+            if check_browser_request(app, ui, target, thread):
+                return
+    for target, thread in selected:
         try:
             ui.open_chat(target["id"], target["name"], on_open=lambda: set_progress(
                 app, "opening", target["name"], "Waiting for the selected chat to load in Codex."))
@@ -481,6 +491,83 @@ def check_desktop(app, ui):
                              "status": latest["status"] + " — no live response control; no response sent"})
 
 
+def check_browser_request(app, ui, target, thread):
+    latest = preview_latest(thread, [])
+    if not latest or thread["turns"][-1].get("status") != "completed":
+        return False
+    text = latest["text"].casefold()
+    if not re.search(r"\b(?:please|cannot|can['’]t|unable|manual(?:ly)?|need|must|waiting|enter|fill|accept|check|requires?)\b", text):
+        return False
+    password = app["state"].get("auto_password", False) and "password" in text
+    terms = app["state"].get("auto_terms", False) and bool(re.search(r"\bterms\b|\bcheckbox", text))
+    if not password and not terms:
+        return False
+    recent = analysis_input(thread, latest, "")["messages"]
+    context = "\n".join(message["text"] for message in recent)
+    # Browser navigation URLs often appear only in the last turn's tool calls.
+    context += "\n" + "\n".join(json.dumps(item.get("arguments", {}))
+                                 for item in thread["turns"][-1].get("items", [])
+                                 if item["type"] == "mcpToolCall")
+    if re.search(r"https?://", latest["text"]):
+        context = latest["text"]
+    origins = []
+    for address in re.findall(r"https?://[^\s<>\"'\\]+", context):
+        try:
+            origin = ui.site_origin(address.rstrip(".,;:)]}"))
+        except ValueError:
+            continue
+        if origin not in origins:
+            origins.append(origin)
+    for origin in origins:
+        request = ui.chrome_signup_request(origin, password=password, terms=terms)
+        if not request:
+            continue
+        fingerprint = hashlib.sha256(json.dumps([origin, request], sort_keys=True).encode()).hexdigest()
+        key = thread["id"] + ":" + latest["item_id"] + ":browser:" + fingerprint
+        if key in app["state"]["attempts"]:
+            continue
+        description = ("Select Chrome's suggested password" if request["kind"] == "password"
+                       else "Accept site terms: " + request["label"])
+        completed = ("selected Chrome's suggested password" if request["kind"] == "password"
+                     else "checked the site's terms agreement checkbox")
+        response = f"Zenshin {completed} on {origin}. Continue within the existing task authorization."
+        attempt = {**latest, "name": target["name"], "text": description + " on " + origin,
+                   "response": response, "time": int(time.time()), "status": "sending"}
+        cancel_analysis(app)
+        app["state"]["attempts"][key] = attempt
+        save_state(app["path"], app["state"])
+        try:
+            set_progress(app, "reading", target["name"], "Waiting for Chrome to finish loading.")
+            ui.prepare_chrome_site(origin, open_site=False)
+            set_progress(app, "sending", target["name"], description)
+            ui.perform_chrome_signup_request(origin, request)
+            attempt["browser_completed"] = True
+            save_state(app["path"], app["state"])
+            ui.open_chat(target["id"], target["name"])
+            try:
+                ui.reply(target["name"], latest["text"], response)
+            except Exception:
+                # A Windows provider can report an event error after Send.
+                # Confirm the exact new persisted reply; never send it again.
+                if not persisted_reply(app["connection"], target["id"], latest["turn_id"], response):
+                    raise
+                attempt["reply_confirmed_by"] = "app_server"
+        except Exception as error:
+            attempt.update(status="uncertain", error=str(error))
+            app["running"] = False
+        else:
+            attempt["status"] = "sent"
+            set_progress(app, "done", target["name"], description + "; Codex notified.")
+        app["state"]["activity"].append(dict(attempt))
+        app["state"]["activity"] = app["state"]["activity"][-100:]
+        app["previews"] = [dict(attempt)]
+        save_state(app["path"], app["state"])
+        if attempt["status"] == "uncertain":
+            raise RuntimeError("Browser action or Codex continuation was not confirmed: " + attempt["error"])
+        return True
+    return False
+
+
 def persisted_reply(connection, thread_id, turn_id, response):
     fresh = rpc(connection, "thread/read", {"threadId": thread_id, "includeTurns": True})["thread"]
     turns = fresh.get("turns", [])
@@ -502,6 +589,8 @@ def snapshot(app):
             "decision_method": app["state"]["decision_method"],
             "instructions": app["state"]["instructions"],
             "chrome_password_supported": os.name == "nt",
+            "auto_password": app["state"].get("auto_password", False),
+            "auto_terms": app["state"].get("auto_terms", False),
             "activity": app["state"]["activity"], "previews": app["previews"],
             "unconfirmed": sum(attempt["status"] not in {"sent", "reviewed"}
                                for attempt in app["state"]["attempts"].values()),
@@ -620,8 +709,13 @@ def main():
                     instructions = data.get("instructions", "")
                     if method not in {"exact", "ai"} or not isinstance(instructions, str):
                         raise ValueError("Choose exact rules or AI with text instructions")
+                    browser = {key: data.get(key, False) for key in ("auto_password", "auto_terms")}
+                    if any(type(value) is not bool for value in browser.values()):
+                        raise ValueError("Browser automation toggles must be on or off")
+                    if os.name != "nt" and any(browser.values()):
+                        raise ValueError("Automatic Chrome actions are available on Windows only")
                     state = {**app["state"], "targets": targets, "rules": rules, "mode": mode,
-                             "decision_method": method, "instructions": instructions}
+                             "decision_method": method, "instructions": instructions, **browser}
                     save_state(app["path"], state)
                     cancel_analysis(app)
                     app["state"] = state

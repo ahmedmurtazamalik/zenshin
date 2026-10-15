@@ -237,6 +237,9 @@
       </section>
       <section id="chrome-password-panel" aria-labelledby="chrome-password-heading" hidden>
         <div class="section-head"><h2 id="chrome-password-heading">Chrome signup assistance</h2><span class="eyebrow">Windows</span></div>
+        <label><input id="auto-password" type="checkbox"> Automatically select Chrome's suggested password</label>
+        <label><input id="auto-terms" type="checkbox"> Automatically accept site terms checkboxes</label>
+        <p class="muted help">While Send authorized replies monitoring is running, these act when a selected chat stops and asks about a password or terms, on a site found in its recent context. Password assistance requires Chrome's suggestion to be open. Terms assistance accepts clearly labeled agreement boxes, leaving marketing opt-ins alone. Codex is notified to continue. Both start off; save changes to apply.</p>
         <label for="chrome-password-site">Registration site</label>
         <input id="chrome-password-site" type="text" placeholder="https://jobs.example.com">
         <button id="chrome-prepare">Open and verify in Chrome</button>
@@ -350,8 +353,8 @@
     $('selection').textContent = selected.size ? `${selected.size} chat${selected.size === 1 ? '' : 's'} selected` : 'Select one or more chats to monitor.';
     const ai = $('decision-method').value === 'ai';
     const rows = [...$('rules').children];
-    const authorized = ai ? !!$('instructions').value.trim() : rows.length > 0 && rows.every(row =>
-      [...row.querySelectorAll('textarea')].every(input => input.value.trim()));
+    const authorized = ai ? !!$('instructions').value.trim() : ($('auto-password').checked || $('auto-terms').checked ||
+      rows.length > 0 && rows.every(row => [...row.querySelectorAll('textarea')].every(input => input.value.trim())));
     $('start').disabled = busy || !state?.connected || state.running || !selected.size || !authorized;
     $('next-step').textContent = !state?.connected ? 'Connect to Codex to begin'
       : !selected.size ? 'Select at least one chat'
@@ -420,7 +423,8 @@
     const rules = [...$('rules').children].map(row => ({request: row.querySelector('[data-field="request"]').value,
       response: row.querySelector('[data-field="response"]').value}));
     renderState(await request('settings', {targets: [...selected.values()], rules, mode: $('mode').value,
-      decision_method: $('decision-method').value, instructions: $('instructions').value}));
+      decision_method: $('decision-method').value, instructions: $('instructions').value,
+      auto_password: $('auto-password').checked, auto_terms: $('auto-terms').checked}));
     $('saved').textContent = 'Settings saved.';
   }
   async function action(work, control, message = 'Checking selected chats · AI analysis may take a moment…') {
@@ -455,6 +459,8 @@
   $('add').onclick = () => { addRule(); markChanged(); };
   for (const id of ['instructions', 'rules']) $(id).addEventListener('input', markChanged);
   $('mode').onchange = markChanged;
+  $('auto-password').onchange = markChanged;
+  $('auto-terms').onchange = markChanged;
   function showAuthorization() {
     $('ai-fields').hidden = $('decision-method').value !== 'ai';
     $('exact-fields').hidden = $('decision-method').value === 'ai';
@@ -493,6 +499,7 @@
     drawChats(); result.rules.forEach(addRule); $('mode').value = result.mode;
     $('decision-method').value = result.decision_method;
     $('instructions').value = result.instructions; showAuthorization(); renderState(result);
+    $('auto-password').checked = result.auto_password; $('auto-terms').checked = result.auto_terms; updateSelection();
     if (result.connected) await loadChats();
   }, null, 'Loading your saved settings…');
   setInterval(() => { nextCheckAt = Date.now() + 5000; if (state?.running && !busy) action(async () => renderState(await request('poll'))); }, 5000);

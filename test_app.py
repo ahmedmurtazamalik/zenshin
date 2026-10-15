@@ -63,6 +63,115 @@ class PreviewTests(unittest.TestCase):
             app.rpc({}, "turn/start", {})
 
 
+@unittest.skipUnless(app.os.name == "nt", "Windows-only browser assistance")
+class BrowserAutomationTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.path = Path(self.directory.name) / "state.json"
+        state = app.load_state(self.path)
+        state.update(mode="desktop", auto_password=True, auto_terms=True,
+                     targets=[{"id": "selected", "name": "Job search"}])
+        self.monitor = {"path": self.path, "state": state, "running": True,
+                        "connection": None, "previews": []}
+        self.data = thread(text="Please enter the password and accept the terms at https://jobs.example.com/signup.")
+        self.data["name"] = "Job search"
+        self.data["turns"][-1]["status"] = "completed"
+        self.ui = Mock()
+        self.ui.site_origin.side_effect = lambda address: "https://jobs.example.com"
+        self.ui.chrome_signup_request.return_value = {"kind": "password", "label": "Chrome suggested password"}
+        self.ui.approval_cards.return_value = []
+        self.ui.pending.return_value = self.ui.conversation_pending.return_value = False
+
+    def test_browser_action_is_journaled_before_ui_and_not_repeated_after_restart(self):
+        events = []
+        def perform(origin, request):
+            saved = app.load_state(self.path)
+            self.assertEqual(next(iter(saved["attempts"].values()))["status"], "sending")
+            events.append("browser")
+        self.ui.perform_chrome_signup_request.side_effect = perform
+        self.ui.open_chat.side_effect = lambda *args, **kwargs: events.append("open")
+        self.ui.reply.side_effect = lambda *args: events.append("reply")
+        with patch.object(app, "rpc", return_value={"thread": self.data}):
+            app.check_desktop(self.monitor, self.ui)
+            self.assertEqual(events, ["browser", "open", "reply"])
+            self.monitor["state"] = app.load_state(self.path)
+            app.check_desktop(self.monitor, self.ui)
+        self.ui.perform_chrome_signup_request.assert_called_once()
+        self.ui.reply.assert_called_once()
+        self.assertTrue(next(iter(self.monitor["state"]["attempts"].values()))["browser_completed"])
+
+    def test_toggles_off_running_turn_and_unrelated_message_do_not_inspect_chrome(self):
+        self.assertFalse(app.load_state(self.path)["auto_password"])
+        self.assertFalse(app.load_state(self.path)["auto_terms"])
+        self.monitor["state"].update(auto_password=False, auto_terms=False)
+        app.check_browser_request(self.monitor, self.ui, self.monitor["state"]["targets"][0], self.data)
+        self.monitor["state"]["auto_password"] = True
+        self.data["turns"][-1]["status"] = "inProgress"
+        app.check_browser_request(self.monitor, self.ui, self.monitor["state"]["targets"][0], self.data)
+        self.data["turns"][-1].update(status="completed", items=[{"type": "agentMessage", "id": "done", "text": "Password and terms completed at https://jobs.example.com/."}])
+        app.check_browser_request(self.monitor, self.ui, self.monitor["state"]["targets"][0], self.data)
+        self.ui.chrome_signup_request.assert_not_called()
+        self.ui.perform_chrome_signup_request.assert_not_called()
+
+    def test_browser_failure_pauses_and_preserves_uncertain_attempt(self):
+        self.ui.chrome_signup_request.return_value = {"kind": "terms", "label": "I agree to the terms"}
+        self.ui.reply.side_effect = RuntimeError("Composer has a draft")
+        with patch.object(app, "rpc", return_value={"thread": self.data}):
+            with self.assertRaisesRegex(RuntimeError, "not confirmed"):
+                app.check_desktop(self.monitor, self.ui)
+            app.poll(self.monitor)
+        self.assertFalse(self.monitor["running"])
+        saved = next(iter(app.load_state(self.path)["attempts"].values()))
+        self.assertEqual(saved["status"], "uncertain")
+        self.assertTrue(saved["browser_completed"])
+        self.ui.perform_chrome_signup_request.assert_called_once()
+
+    def test_browser_readiness_failure_pauses_before_selection_or_continuation(self):
+        self.ui.prepare_chrome_site.side_effect = RuntimeError("Chrome site is not ready")
+        with patch.object(app, "rpc", return_value={"thread": self.data}):
+            with self.assertRaisesRegex(RuntimeError, "not ready"):
+                app.check_desktop(self.monitor, self.ui)
+        self.assertFalse(self.monitor["running"])
+        self.ui.prepare_chrome_site.assert_called_once_with("https://jobs.example.com", open_site=False)
+        self.ui.perform_chrome_signup_request.assert_not_called()
+        self.ui.reply.assert_not_called()
+
+    def test_explicit_requested_site_takes_precedence_over_older_sites(self):
+        self.data["turns"][-1]["items"].insert(0, {"type": "userMessage", "content": [
+            {"type": "inputText", "text": "An earlier site was https://old.example.com/register"}]})
+        self.ui.site_origin.side_effect = lambda address: (
+            "https://old.example.com" if "old.example.com" in address else "https://jobs.example.com")
+        self.ui.chrome_signup_request.return_value = None
+        app.check_browser_request(self.monitor, self.ui, self.monitor["state"]["targets"][0], self.data)
+        self.ui.chrome_signup_request.assert_called_once_with("https://jobs.example.com", password=True, terms=True)
+
+    def test_browser_reply_event_error_confirms_new_history_without_resending(self):
+        def delivered_then_error(name, text, response):
+            self.data["turns"].append({"id": "continued", "status": "inProgress", "items": [
+                {"type": "userMessage", "content": [{"type": "inputText", "text": response}]}]})
+            raise RuntimeError("Event subscriber failed after delivery")
+        self.ui.reply.side_effect = delivered_then_error
+        with patch.object(app, "rpc", return_value={"thread": self.data}):
+            app.check_desktop(self.monitor, self.ui)
+        self.ui.reply.assert_called_once()
+        self.ui.perform_chrome_signup_request.assert_called_once()
+        saved = next(iter(app.load_state(self.path)["attempts"].values()))
+        self.assertEqual(saved["status"], "sent")
+        self.assertEqual(saved["reply_confirmed_by"], "app_server")
+
+    def test_browser_scope_uses_recent_tool_url_and_ignores_missing_site(self):
+        self.data["turns"][-1]["items"][0]["text"] = "Please enter the password in the browser."
+        target = self.monitor["state"]["targets"][0]
+        self.assertFalse(app.check_browser_request(self.monitor, self.ui, target, self.data))
+        self.ui.chrome_signup_request.assert_not_called()
+        self.data["turns"][-1]["items"].insert(0, {"type": "mcpToolCall", "arguments": {"url": "https://jobs.example.com/signup"}})
+        self.ui.chrome_signup_request.return_value = None
+        app.check_browser_request(self.monitor, self.ui, target, self.data)
+        self.ui.chrome_signup_request.assert_called_once_with("https://jobs.example.com", password=True, terms=False)
+        self.ui.perform_chrome_signup_request.assert_not_called()
+
+
 class DesktopTests(unittest.TestCase):
     def setUp(self):
         desktop = patch.object(app, "poll_desktop", side_effect=lambda monitor: app.check_desktop(monitor, linux_ui))
