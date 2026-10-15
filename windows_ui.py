@@ -239,9 +239,23 @@ def answer(name, question, response, next_question=None, on_progress=None):
     raise RuntimeError("Delivery was not confirmed; inspect the chat before taking further action")
 
 
+def message_matches(doc, text):
+    matches = matching(doc, "TextControl", text)
+    expected = " ".join(text.split())
+    for group in nodes(doc):
+        if group.ControlTypeName != "GroupControl":
+            continue
+        if not any(child.ControlTypeName == "TextControl" for child in group.GetChildren()):
+            continue
+        fragments = [child.Name for child in nodes(group) if child.ControlTypeName == "TextControl"]
+        if len(fragments) > 1 and " ".join("".join(fragments).split()) == expected:
+            matches.append(group)
+    return matches
+
+
 def conversation_pending(name, text):
     doc = document(name)
-    return bool(doc and matching(doc, "TextControl", text)
+    return bool(doc and any(not control.IsOffscreen for control in message_matches(doc, text))
                 and not matching(doc, "ButtonControl", "Stop")
                 and not matching(doc, "ButtonControl", "Answer question")
                 and not answer_entries(doc)
@@ -255,7 +269,7 @@ def reply(name, text, response, on_progress=None):
     entries = matching(doc, "EditControl", "Work with Codex")
     if len(entries) != 1 or entry_text(entries[0]).strip():
         raise RuntimeError("The composer contains a draft; reply manually")
-    prior = len(matching(doc, "TextControl", response))
+    prior = len(message_matches(doc, response))
     write_text(name, entries[0], response)
     doc = document(name)
     entries = matching(doc, "EditControl", "Work with Codex")
@@ -270,7 +284,7 @@ def reply(name, text, response, on_progress=None):
         doc = document(name)
         if doc is None:
             break
-        if len(matching(doc, "TextControl", response)) > prior:
+        if len(message_matches(doc, response)) > prior:
             return
         time.sleep(.2)
     raise RuntimeError("Reply delivery was not confirmed; inspect the chat manually")

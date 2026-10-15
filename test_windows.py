@@ -92,6 +92,25 @@ class WindowsControlsTests(unittest.TestCase):
             ui.reply("Test chat", "Continue?", "Continue the test.")
         send.GetPattern.return_value.Invoke.assert_called_once()
 
+    def test_reply_matches_hyperlinked_request_and_echo_as_paragraphs(self):
+        origin = "http://127.0.0.1:8897/"
+        request = "Please enter the password at " + origin + " for the test."
+        response = "Zenshin completed the browser action on " + origin + " Continue."
+        paragraph = node("GroupControl", children=[node("TextControl", "Please enter the password at "),
+            node("HyperlinkControl", origin, [node("TextControl", origin)]), node("TextControl", " for the test.")])
+        value = Mock(Value="", IsReadOnly=False)
+        value.SetValue.side_effect = lambda text: setattr(value, "Value", text)
+        entry, send = node("EditControl", "Work with Codex"), node("ButtonControl", "Send")
+        entry.GetPattern.return_value = value
+        composer = node("GroupControl", children=[entry, send])
+        doc = node("DocumentControl", "Test chat", [paragraph, composer])
+        echo = node("GroupControl", children=[node("TextControl", "Zenshin completed the browser action on "),
+            node("HyperlinkControl", origin, [node("TextControl", origin)]), node("TextControl", " Continue.")])
+        send.GetPattern.return_value.Invoke.side_effect = lambda: doc.GetChildren.return_value.append(echo)
+        with patch.object(ui, "automation", return_value=Mock()), patch.object(ui, "document", return_value=doc):
+            ui.reply("Test chat", request, response)
+        send.GetPattern.return_value.Invoke.assert_called_once()
+
     def test_codex_packaged_identity_and_duplicate_visible_chats(self):
         doc = node("DocumentControl", "Test chat")
         window = node("WindowControl", "ChatGPT", [doc])
