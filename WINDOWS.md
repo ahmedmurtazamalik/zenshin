@@ -52,8 +52,14 @@ The complete suite passes on native Windows (33 tests, 2.109 seconds) and Ubuntu
 .venv\Scripts\python.exe -B -m unittest -v
 ```
 
-## Remaining live verification
+## Current limits and verification
 
-A real Windows approval card could not be produced in the controlled chat. No permission-request tool was available; the one command-escalation test completed automatically under Approve for me. Neither result proves the card was operated. Card-context detection, one-time-only authorization, and changed-card rejection have behavior coverage, but file, command, and other tool-card variants still need live verification when such a card is actually available. Approval settings and managed restrictions were preserved.
+Windows UI Automation calls run on one persistent MTA worker, with its cached client released on that thread at server shutdown. This replaces the unsuccessful per-request COM cache-reset workaround. No matching native crash recurred during the latest 20-minute check. HTTP progress remains readable during a desktop operation.
 
-The older demo is a Linux walkthrough and predates AI mode and these Windows tests. Browser-chat and dot support remain outside the agreed product scope.
+The original form and navigation features have the live evidence above. Ordinary chat replies are currently unreliable: Send may succeed before an accessibility event error, and confirmation can still fail. Windows operation of a real Allow once card and other command/tool-card variants remain unverified.
+
+The individual Chrome password and terms actions passed earlier browser-side live tests. Their complete automatic chat handoff has not passed. The global preparation hooks, preparation toggle, callback endpoint, and per-chat preparation bookkeeping have been removed. The existing two action toggles, standalone manual checks, site guards, and attempt journal remain. The future direct individual-action integration has not been built; see [PLAN.md](PLAN.md).
+
+Historical crash, URL-detector, and handoff evidence is preserved in `.local/chrome-url-diagnostics-2026-10-15.json`, `.local/chrome-restart-e2e-result.json`, and `.local/chrome-mta-e2e-result.json`. See [Chrome usage and limits](README.md#chrome-assistance-on-windows).
+
+The older demo is a Linux walkthrough. This checkout supports Windows; the published v0.1.0 archive remains Linux-only. Browser-chat and dot support remain outside the agreed scope.
