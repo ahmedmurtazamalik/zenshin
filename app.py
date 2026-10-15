@@ -353,8 +353,7 @@ def verify_desktop_targets(app):
 def poll_desktop(app):
     if os.name == "nt":
         import windows_ui
-        with windows_ui.session():
-            return check_desktop(app, windows_ui)
+        return windows_ui.run(check_desktop, app, windows_ui)
     import linux_ui
     return check_desktop(app, linux_ui)
 
@@ -640,6 +639,9 @@ def main():
         with operations:
             cancel_analysis(app)
             close_connection(app["connection"])
+            if os.name == "nt":
+                import windows_ui
+                windows_ui.shutdown()
 
 
 if __name__ == "__main__":

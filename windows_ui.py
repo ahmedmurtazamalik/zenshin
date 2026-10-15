@@ -1,6 +1,6 @@
 """Named Windows UI Automation controls for the native Codex desktop app."""
 
-from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor
 import ctypes
 import os
 import time
@@ -15,15 +15,36 @@ def automation():
     return uiautomation
 
 
-@contextmanager
-def session():
-    # HTTP operations run on different threads; controls stay in their own poll.
+_worker = None
+
+
+def run(operation, *args, **kwargs):
+    # The HTTP operation lock serializes callers. Keep the cached UIA client and
+    # all its controls on one MTA thread for the lifetime of the server.
+    global _worker
     api = automation()
-    with api.UIAutomationInitializerInThread():
-        try:
-            yield
-        except api.comtypes.COMError as error:
-            raise RuntimeError("Windows desktop controls became unavailable; inspect the chat manually") from error
+    if _worker is None:
+        _worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="zenshin-uia",
+                                     initializer=api.comtypes.CoInitializeEx, initargs=(0,))
+    try:
+        return _worker.submit(operation, *args, **kwargs).result()
+    except api.comtypes.COMError as error:
+        raise RuntimeError("Windows desktop controls became unavailable; inspect the chat manually") from error
+
+
+def shutdown():
+    global _worker
+    if _worker is None:
+        return
+    def release():
+        api = automation()
+        api.uiautomation._AutomationClient._instance = None
+        api.comtypes.CoUninitialize()
+    try:
+        _worker.submit(release).result()
+    finally:
+        _worker.shutdown()
+        _worker = None
 
 
 def process_path(identity):

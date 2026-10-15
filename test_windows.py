@@ -1,6 +1,7 @@
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import Mock, patch
 
@@ -40,6 +41,31 @@ sys.stderr.write('test server stopped');sys.stderr.flush()
                     app.rpc(connection, "thread/read", {})
             finally:
                 app.close_connection(connection)
+
+
+class AutomationLifetimeTests(unittest.TestCase):
+    def test_requests_share_one_mta_until_server_shutdown(self):
+        api = Mock()
+        api.comtypes.COMError = OSError
+        lifecycle = []
+        api.comtypes.CoInitializeEx.side_effect = lambda mode: lifecycle.append(("init", mode, threading.get_ident()))
+        api.comtypes.CoUninitialize.side_effect = lambda: lifecycle.append(("exit", threading.get_ident()))
+        owners = []
+        with patch.object(ui, "automation", return_value=api):
+            try:
+                for _ in range(3):
+                    request = threading.Thread(target=lambda: owners.append(ui.run(threading.get_ident)))
+                    request.start()
+                    request.join(2)
+                    self.assertFalse(request.is_alive())
+                self.assertEqual(len(owners), 3)
+                self.assertEqual(len(set(owners)), 1)
+                self.assertEqual(lifecycle, [("init", 0, owners[0])])
+                self.assertIsNotNone(api.uiautomation._AutomationClient._instance)
+            finally:
+                ui.shutdown()
+        self.assertEqual(lifecycle[-1], ("exit", owners[0]))
+        self.assertIsNone(api.uiautomation._AutomationClient._instance)
 
 
 class WindowsControlsTests(unittest.TestCase):
