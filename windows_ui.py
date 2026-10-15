@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import ctypes
 import os
 import time
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 
 def automation():
@@ -155,6 +155,79 @@ def press(button):
         selection.Select()
         return
     raise RuntimeError("The desktop control does not expose an Invoke or Selection action")
+
+
+def site_origin(address):
+    parsed = urlsplit(address if "://" in address else "https://" + address)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError("Enter the registration site's http:// or https:// address")
+    port = parsed.port
+    suffix = f":{port}" if port and port != {"http": 80, "https": 443}[parsed.scheme] else ""
+    return f"{parsed.scheme}://{parsed.hostname.lower()}{suffix}"
+
+
+def chrome_password_suggestion(origin):
+    matches, browsers = [], []
+    api = automation()
+    for window in api.GetRootControl().GetChildren():
+        if window.IsOffscreen or not process_path(window.ProcessId).lower().endswith("\\chrome.exe"):
+            continue
+        # Browser chrome only: never inspect webpage controls or password fields.
+        native = list(nodes(window, stop_at_documents=True))
+        addresses = [node for node in native if node.ControlTypeName == "EditControl"
+                     and node.Name == "Address and search bar"]
+        if len(addresses) != 1:
+            continue
+        # The omnibox omits schemes and sometimes "www". Read only the native
+        # document URL, without traversing webpage controls or password fields.
+        origins = []
+        for node in native:
+            if node.ControlTypeName != "DocumentControl" or node.IsOffscreen:
+                continue
+            value = node.GetPattern(api.PatternId.ValuePattern)
+            if value and value.Value.startswith(("http://", "https://")):
+                origins.append(site_origin(value.Value))
+        if origins != [origin]:
+            continue
+        browsers.append(window)
+        for node in native:
+            if node.IsOffscreen or not node.IsEnabled or node.ControlTypeName not in {"MenuItemControl", "ButtonControl", "ListItemControl"}:
+                continue
+            # Chrome can append the generated password to the accessible name.
+            # Match the label prefix, and never return or log that name.
+            label = node.Name.casefold()
+            if any(label == text or label.startswith(text + " ") for text in
+                   ("use strong password", "use suggested password")):
+                matches.append(node)
+    if len(browsers) > 1 or len(matches) > 1:
+        raise RuntimeError("Several Chrome windows or password suggestions match this site; leave only one open")
+    return (browsers[0] if browsers else None, matches[0] if matches else None)
+
+
+def accept_chrome_password(address):
+    origin = site_origin(address.strip())
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        browser, suggestion = chrome_password_suggestion(origin)
+        if suggestion is not None:
+            # Re-read the site and native popup immediately before activation.
+            current_browser, current = chrome_password_suggestion(origin)
+            api = automation()
+            if (current is None or not api.ControlsAreSame(browser, current_browser)
+                    or not api.ControlsAreSame(suggestion, current)):
+                raise RuntimeError("Chrome's password suggestion changed; nothing was selected")
+            press(current)  # Exactly one activation; never retry an uncertain result.
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                current_browser, remaining = chrome_password_suggestion(origin)
+                if current_browser is None or not api.ControlsAreSame(browser, current_browser):
+                    raise RuntimeError("Chrome's site changed after activation; inspect Chrome before trying again")
+                if remaining is None:
+                    return {"message": "Chrome's password suggestion was activated and closed. Check the filled fields before continuing."}
+                time.sleep(.2)
+            raise RuntimeError("Chrome's suggestion did not close after activation; inspect Chrome before trying again")
+        time.sleep(.2)
+    raise RuntimeError("No supported Chrome password suggestion appeared for this site within 30 seconds; nothing was selected")
 
 
 def entry_text(entry):

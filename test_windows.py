@@ -69,6 +69,93 @@ class AutomationLifetimeTests(unittest.TestCase):
 
 
 class WindowsControlsTests(unittest.TestCase):
+    def chrome_form(self, address="https://jobs.example.com/register"):
+        api = Mock()
+        api.ControlsAreSame.side_effect = lambda first, second: first is second
+        address_bar = node("EditControl", "Address and search bar")
+        address_bar.GetPattern.return_value.Value = address
+        suggestion = node("MenuItemControl", "Use strong password disposable-secret")
+        webpage = node("DocumentControl", children=[node("ButtonControl", "Use strong password")])
+        webpage.GetPattern.return_value.Value = address
+        window = node("WindowControl", children=[address_bar, webpage, suggestion])
+        window.ProcessId = 1
+        api.GetRootControl.return_value.GetChildren.return_value = [window]
+        return api, window, address_bar, webpage, suggestion
+
+    def test_chrome_selects_native_suggestion_once_without_returning_password(self):
+        api, window, address_bar, webpage, suggestion = self.chrome_form()
+        def invoke():
+            window.GetChildren.return_value = [address_bar, webpage]
+        suggestion.GetPattern.return_value.Invoke.side_effect = invoke
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"):
+            result = ui.accept_chrome_password("https://jobs.example.com/register")
+        self.assertIn("activated and closed", result["message"])
+        self.assertNotIn("disposable-secret", str(result))
+        suggestion.GetPattern.return_value.Invoke.assert_called_once()
+        webpage.GetChildren.assert_not_called()
+
+    def test_chrome_wrong_site_or_webpage_lookalike_is_never_activated(self):
+        api, window, address_bar, webpage, suggestion = self.chrome_form()
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"), \
+             patch.object(ui.time, "monotonic", side_effect=[0, 0, 31]), \
+             patch.object(ui.time, "sleep"), patch.object(ui, "press") as press:
+            with self.assertRaisesRegex(RuntimeError, "nothing was selected"):
+                ui.accept_chrome_password("https://other.example.com")
+            press.assert_not_called()
+        window.GetChildren.return_value = [address_bar, webpage]
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"):
+            self.assertEqual(ui.chrome_password_suggestion("https://jobs.example.com"), (window, None))
+            address_bar.GetPattern.return_value.Value = "chrome://newtab/"
+            webpage.GetPattern.return_value.Value = "chrome://newtab/"
+            self.assertEqual(ui.chrome_password_suggestion("https://jobs.example.com"), (None, None))
+        webpage.GetChildren.assert_not_called()
+
+    def test_chrome_ambiguous_or_changed_suggestions_are_not_activated(self):
+        api, window, address_bar, webpage, suggestion = self.chrome_form()
+        window.GetChildren.return_value.append(node("MenuItemControl", "Use suggested password another-secret"))
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"), \
+             patch.object(ui, "press") as press:
+            with self.assertRaisesRegex(RuntimeError, "Several Chrome"):
+                ui.accept_chrome_password("jobs.example.com")
+            press.assert_not_called()
+        with patch.object(ui, "chrome_password_suggestion", side_effect=[(window, suggestion), (window, None)]), \
+             patch.object(ui, "press") as press:
+            with self.assertRaisesRegex(RuntimeError, "changed"):
+                ui.accept_chrome_password("jobs.example.com")
+            press.assert_not_called()
+
+    def test_chrome_unconfirmed_activation_is_not_retried(self):
+        api, window, address_bar, webpage, suggestion = self.chrome_form()
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"), \
+             patch.object(ui.time, "monotonic", side_effect=[0, 0, 0, 4]):
+            with self.assertRaisesRegex(RuntimeError, "inspect Chrome"):
+                ui.accept_chrome_password("jobs.example.com")
+        suggestion.GetPattern.return_value.Invoke.assert_called_once()
+
+    def test_chrome_site_change_after_activation_requires_manual_review(self):
+        api, window, address_bar, webpage, suggestion = self.chrome_form()
+        suggestion.GetPattern.return_value.Invoke.side_effect = lambda: setattr(
+            webpage.GetPattern.return_value, "Value", "https://other.example.com")
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"):
+            with self.assertRaisesRegex(RuntimeError, "site changed"):
+                ui.accept_chrome_password("jobs.example.com")
+        suggestion.GetPattern.return_value.Invoke.assert_called_once()
+
+    def test_chrome_uses_full_document_url_when_omnibox_omits_scheme(self):
+        api, window, address_bar, webpage, suggestion = self.chrome_form("http://127.0.0.1:8877/")
+        address_bar.GetPattern.return_value.Value = "127.0.0.1:8877"
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"):
+            self.assertEqual(ui.chrome_password_suggestion("http://127.0.0.1:8877"), (window, suggestion))
+            self.assertEqual(ui.chrome_password_suggestion("https://127.0.0.1:8877"), (None, None))
+        webpage.GetChildren.assert_not_called()
+
     def test_ordinary_reply_confirms_echo_after_invoke_event_error_without_retry(self):
         class EventError(Exception):
             hresult = -2147220991
