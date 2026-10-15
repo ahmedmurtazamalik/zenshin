@@ -501,6 +501,7 @@ def snapshot(app):
             "targets": app["state"]["targets"], "rules": app["state"]["rules"],
             "decision_method": app["state"]["decision_method"],
             "instructions": app["state"]["instructions"],
+            "chrome_password_supported": os.name == "nt",
             "activity": app["state"]["activity"], "previews": app["previews"],
             "unconfirmed": sum(attempt["status"] not in {"sent", "reviewed"}
                                for attempt in app["state"]["attempts"].values()),

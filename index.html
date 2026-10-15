@@ -235,6 +235,19 @@
         <p class="muted help">Starts paused. Saving settings pauses monitoring. Pause takes effect after the current check.</p>
         <div id="previews"><p class="empty">Latest requests will appear here.</p></div>
       </section>
+      <section id="chrome-password-panel" aria-labelledby="chrome-password-heading" hidden>
+        <div class="section-head"><h2 id="chrome-password-heading">Chrome signup assistance</h2><span class="eyebrow">Windows</span></div>
+        <label for="chrome-password-site">Registration site</label>
+        <input id="chrome-password-site" type="text" placeholder="https://jobs.example.com">
+        <button id="chrome-prepare">Open and verify in Chrome</button>
+        <p class="muted help">Optional: open this site in Chrome and check that it has finished loading. This does not intercept Codex's browser tools or resume a stopped attempt.</p>
+        <p id="chrome-prepare-result" class="muted" role="status"></p>
+        <details><summary>Select a password suggestion once</summary>
+        <p class="muted help">Arm this action, then switch to Chrome and open “Use strong password” or “Use suggested password” within 30 seconds. Chrome handles filling and saving the password. This action does not submit the registration.</p>
+        <button id="chrome-password">Accept next suggestion for this site</button>
+        <p id="chrome-password-result" class="muted" role="status"></p>
+        </details>
+      </section>
       <section aria-labelledby="activity-heading">
         <div class="section-head"><h2 id="activity-heading">Activity</h2><span class="eyebrow">Local history</span></div>
         <div id="activity"></div>
@@ -378,6 +391,7 @@
   }
   function renderState(result) {
     state = result;
+    $('chrome-password-panel').hidden = !state.chrome_password_supported;
     monitorProgress = result.progress; progressReceived = Date.now(); renderProgress();
     $('status').textContent = `${state.running ? 'Monitoring' : 'Paused'} · ${state.connected ? 'connected' : 'disconnected'}`;
     $('status').classList.toggle('running', state.running);
@@ -414,14 +428,14 @@
     busy = true;
     operationMessage = message; operationStarted = Date.now(); renderProgress();
     if (control) $(control).setAttribute('data-loading', 'true');
-    for (const id of ['connect', 'refresh', 'more', 'find-target', 'save', 'start']) $(id).disabled = true;
+    for (const id of ['connect', 'refresh', 'more', 'find-target', 'save', 'start', 'chrome-password', 'chrome-prepare']) $(id).disabled = true;
     document.querySelector('main').setAttribute('aria-busy', 'true');
     try { showError(''); await work(); } catch (error) { showError(error.message); } finally {
       busy = false;
       renderProgress();
       if (control) $(control).removeAttribute('data-loading');
       document.querySelector('main').setAttribute('aria-busy', 'false');
-      for (const id of ['connect', 'more', 'find-target', 'save']) $(id).disabled = false;
+      for (const id of ['connect', 'more', 'find-target', 'save', 'chrome-password', 'chrome-prepare']) $(id).disabled = false;
       $('refresh').disabled = !state?.connected;
       updateSelection();
       if (pauseRequested) {
@@ -453,6 +467,24 @@
     else action(async () => renderState(await request('pause')), 'pause', 'Pausing monitoring…');
   };
   $('review').onclick = () => action(async () => renderState(await request('review')), 'review', 'Marking requests reviewed…');
+  $('chrome-prepare').onclick = () => action(async () => {
+    $('chrome-prepare-result').textContent = 'Opening the site in Chrome and checking loading (up to 15 seconds)…';
+    try {
+      const result = await request('chrome-prepare', {site: $('chrome-password-site').value.trim()});
+      $('chrome-prepare-result').textContent = result.message;
+    } catch (error) {
+      $('chrome-prepare-result').textContent = error.message;
+    }
+  }, 'chrome-prepare', 'Preparing the website in Chrome…');
+  $('chrome-password').onclick = () => action(async () => {
+    $('chrome-password-result').textContent = 'Waiting up to 30 seconds. Switch to Chrome and open its password suggestion.';
+    try {
+      const result = await request('chrome-password', {site: $('chrome-password-site').value.trim()});
+      $('chrome-password-result').textContent = result.message;
+    } catch (error) {
+      $('chrome-password-result').textContent = error.message;
+    }
+  }, 'chrome-password', 'Switch to Chrome and open its password suggestion (30 seconds)…');
   action(async () => {
     const response = await fetch('/api/state');
     if (!response.ok) throw new Error('Could not read local settings');
