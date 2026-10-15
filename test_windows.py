@@ -150,6 +150,16 @@ class WindowsControlsTests(unittest.TestCase):
             activate.assert_not_called()
             fill.assert_not_called()
 
+    def test_open_chat_reveals_latest_messages_without_reopening_or_sending(self):
+        bottom = node("ButtonControl", "Scroll to bottom")
+        doc = node("DocumentControl", "Test chat", [bottom])
+        with patch.object(ui, "document", return_value=doc), \
+             patch.object(ui.os, "startfile", create=True) as launch, \
+             patch.object(ui, "press") as press:
+            ui.open_chat("selected", "Test chat")
+            launch.assert_not_called()
+            press.assert_called_once_with(bottom)
+
     def test_navigation_timeout_and_one_time_only_approval(self):
         with patch.object(ui, "document", return_value=None), \
              patch.object(ui.os, "startfile", create=True) as launch, \

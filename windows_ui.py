@@ -91,20 +91,25 @@ def document(name):
 
 
 def open_chat(thread_id, name, on_open=None):
-    if document(name) is not None:
-        return
-    if on_open:
-        on_open()
-    try:
-        os.startfile("codex://threads/" + quote(thread_id, safe=""))
-    except OSError as error:
-        raise RuntimeError("Could not open the selected chat in Codex: " + str(error)) from error
-    deadline = time.monotonic() + 10
-    while time.monotonic() < deadline:
-        if document(name) is not None:
-            return
-        time.sleep(.25)
-    raise RuntimeError("The selected chat did not appear in Codex; check accessibility and open it manually")
+    doc = document(name)
+    if doc is None:
+        if on_open:
+            on_open()
+        try:
+            os.startfile("codex://threads/" + quote(thread_id, safe=""))
+        except OSError as error:
+            raise RuntimeError("Could not open the selected chat in Codex: " + str(error)) from error
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            doc = document(name)
+            if doc is not None:
+                break
+            time.sleep(.25)
+        else:
+            raise RuntimeError("The selected chat did not appear in Codex; check accessibility and open it manually")
+    bottom = matching(doc, "ButtonControl", "Scroll to bottom")
+    if len(bottom) == 1 and bottom[0].IsEnabled and not bottom[0].IsOffscreen:
+        press(bottom[0])
 
 
 def matching(root, role, name):
