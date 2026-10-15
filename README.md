@@ -37,6 +37,22 @@ The progress strip shows the current chat and actual step: reading, opening the 
 
 Optional: `python3 app.py --port 8766 --state /path/to/state.json`.
 
+## Chrome assistance on Windows
+
+Two saved toggles, off by default, enable the existing password and terms helpers. In **Send authorized replies** mode, the monitor looks for a selected chat's completed request about a password or terms and a site in its recent context. Password selection requires an already-open native Chrome suggestion. Terms assistance handles one clearly labeled, unchecked agreement checkbox and leaves marketing opt-ins alone. Each action is journaled before activation, confirmed, and followed by a continuation reply. Uncertainty pauses monitoring and prevents a repeat.
+
+The individual actions passed earlier browser-side live tests. The complete chat handoff remains unreliable on Windows: an accessibility event error can occur after Send succeeds, leaving delivery unconfirmed. The original approval and form-answering features remain available; ordinary chat replies share this delivery limitation.
+
+**Automatically prepare Chrome before AI browsing** and its global Codex hooks have been retired. Zenshin no longer injects preparation instructions or intercepts browser tool calls. The three installed Zenshin hook definitions were removed without changing unrelated hooks. `codex_hook.py` is an inert entry point for already-running Codex sessions that cached those definitions; the app does not import or install it. Old chat-bound preparation calls are rejected.
+
+Optional manual checks remain under **Chrome signup assistance**. **Open and verify in Chrome** opens the supplied URL when needed and checks the full document URL, Reload/no Stop loading, and two stable observations. **Accept next suggestion for this site** waits up to 30 seconds for Chrome's native suggestion and activates it once. These are also available through POST `/api/chrome-prepare` and `/api/chrome-password`, with JSON `{"site":"https://jobs.example.com/register"}` and `Content-Type: application/json`, without a Codex connection.
+
+The site check uses the native document's full URL; it does not infer an origin from the shortened omnibox. Page controls cannot impersonate the native suggestion. Zenshin does not read or log password values, submit registration forms, handle CAPTCHA, or unlock the browser. Unsupported, ambiguous, or unconfirmed controls require review. Readiness does not establish completion of every site's background requests or repair Codex's native URL detector. The redacted detector reproduction was [reported to OpenAI](https://github.com/openai/codex/issues/51524#issuecomment-6189728908).
+
+Windows UI work stays on one persistent MTA thread until server shutdown, following [Microsoft's UI Automation threading guidance](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-threading). The former per-request COM teardown caused an unloaded-DLL crash; no matching crash recurred during the latest 20-minute check. The disposable fixture `demo/signup_probe.py` prints unique page/status URLs per run. Previous diagnostics and isolated test journals remain under `.local`; the latest live result is `.local/chrome-mta-e2e-result.json`.
+
+The next implementation is an explicit request for one browser action with a direct result, while Codex continues normal browsing. **That integration is not implemented.** Its limited scope and verification steps are in [PLAN.md](PLAN.md).
+
 ## Response behavior
 
 AI mode reads the latest eight user/assistant messages plus the request and offered choices. It runs a separate, ephemeral `codex exec` in a read-only temporary directory using the existing CLI sign-in. Its structured decision is `approve`, `continue`, `needs_input`, or `no_response`, with a proposed response and reason. The CLI is instructed not to use tools; any observed tool use causes its decision to be discarded. Conversation content is treated as data, not authorization to expand the standing instructions.
@@ -85,7 +101,7 @@ No credentials are extracted, internal approvals fabricated, or managed restrict
 python3 -m unittest -v
 ```
 
-The 33 tests cover matching, target identity, Pause, persistence, draft preservation, AI classification handling, attempts saved before delivery, duplicate prevention, uncertain delivery, multi-question authorization, ordinary reply journaling, one-time approval restrictions, captured file-access card detection, changed-card/navigation failures, opening selected chats in order, navigation load/timeout behavior, idle browser connections, and readable progress during a slow check with Pause still serialized. Windows cases also cover split UTF-8 pipe messages and EOF, packaged-app identity, placeholder handling, approval context, and confirmation after an Invoke event error. On 14 October 2026 the full suite passed on Windows in 2.109 seconds and Ubuntu in 1.218 seconds.
+The tests cover matching, target identity, Pause, persistence, draft preservation, AI classification handling, attempts saved before delivery, duplicate prevention, uncertain delivery, multi-question authorization, ordinary reply journaling, one-time approval restrictions, captured file-access card detection, changed-card/navigation failures, opening selected chats in order, navigation load/timeout behavior, idle browser connections, and readable progress during a slow check with Pause still serialized. Windows cases also cover split UTF-8 pipe messages and EOF, packaged-app identity, placeholder handling, approval context, confirmation after an Invoke event error, and the Chrome action described above. On 14 October 2026 the 33-test suite passed on Windows in 2.109 seconds and Ubuntu in 1.218 seconds.
 
 On 13 October 2026, authorized live tests in “Approval Helper controlled test” confirmed an AI-selected offered answer, a custom free-text answer using GNOME input, a complete two-question form under one attempt, and an AI-selected ordinary composer reply. These used isolated journals in `/tmp`; the user's monitoring settings were preserved. The existing demo video predates AI mode and these additional desktop paths.
 
