@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import select
 import subprocess
 import tempfile
@@ -452,10 +453,15 @@ def check_desktop(app, ui):
                     else:
                         ui.answer(target["name"], prompt["title"], response, on_progress=notify)
             except Exception as error:
-                attempt["status"] = "uncertain"
-                attempt["error"] = str(error)
-                app["running"] = False
-                preview["status"] = "Unconfirmed — paused; inspect the chat manually"
+                if request.get("conversation") and persisted_reply(
+                        app["connection"], target["id"], request["turn_id"], responses[0]):
+                    attempt.update(status="sent", reply_confirmed_by="app_server")
+                    preview["status"] = "Response delivered"
+                else:
+                    attempt["status"] = "uncertain"
+                    attempt["error"] = str(error)
+                    app["running"] = False
+                    preview["status"] = "Unconfirmed — paused; inspect the chat manually"
             else:
                 attempt["status"] = "sent"
                 preview["status"] = "Response delivered"
@@ -473,6 +479,20 @@ def check_desktop(app, ui):
                 latest = analyze_request(app, thread, {**latest, "name": target["name"]})
             previews.append({**latest, "name": target["name"],
                              "status": latest["status"] + " — no live response control; no response sent"})
+
+
+def persisted_reply(connection, thread_id, turn_id, response):
+    fresh = rpc(connection, "thread/read", {"threadId": thread_id, "includeTurns": True})["thread"]
+    turns = fresh.get("turns", [])
+    original = next((index for index, turn in enumerate(turns) if turn["id"] == turn_id), None)
+    if original is None:
+        return False
+    # Codex's composer linkifies bare URLs and appends a newline on Send.
+    def echo(text):
+        return normalize(re.sub(r"\[(https?://[^\s\]]+)\]\(\1\)", r"\1", text.replace("\\\n", "\n")))
+    return any(item["type"] == "userMessage" and echo("\n".join(
+        part.get("text", "") for part in item.get("content", []))) == echo(response)
+        for turn in turns[original + 1:] for item in turn.get("items", []))
 
 
 def snapshot(app):

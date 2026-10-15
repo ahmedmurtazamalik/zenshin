@@ -200,6 +200,32 @@ class DesktopTests(unittest.TestCase):
             app.verify_desktop_targets(monitor)
             self.assertEqual(read.call_args.args[1], "thread/read")
 
+    def test_ordinary_reply_event_error_confirms_linkified_new_message_without_resending(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state = app.load_state(path)
+            response = "Open https://jobs.example.com/register\nContinue."
+            state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+                         rules=[{"request": "Continue test?", "response": response}])
+            data = thread(text="Continue test?")
+            data["name"] = "Test chat"
+            monitor = {"state": state, "path": path, "running": True, "connection": None, "previews": []}
+            ui = Mock()
+            ui.approval_cards.return_value = []
+            ui.conversation_pending.return_value = True
+            def delivered_then_error(*args, **kwargs):
+                data["turns"].append({"id": "continued", "items": [{"type": "userMessage", "content": [
+                    {"text": "Open [https://jobs.example.com/register](https://jobs.example.com/register)\\\nContinue.\n"}]}]})
+                raise RuntimeError("Event subscriber failed after Send")
+            ui.reply.side_effect = delivered_then_error
+            with patch.object(app, "rpc", return_value={"thread": data}):
+                app.check_desktop(monitor, ui)
+            ui.reply.assert_called_once()
+            self.assertTrue(monitor["running"])
+            attempt = next(iter(app.load_state(path)["attempts"].values()))
+            self.assertEqual(attempt["status"], "sent")
+            self.assertEqual(attempt["reply_confirmed_by"], "app_server")
+
     def test_delivery_is_recorded_before_sending_and_not_repeated_after_restart(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
