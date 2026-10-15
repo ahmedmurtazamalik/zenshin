@@ -3,6 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import ctypes
 import os
+import subprocess
 import time
 from urllib.parse import quote, urlsplit
 
@@ -202,6 +203,66 @@ def chrome_password_suggestion(origin):
     if len(browsers) > 1 or len(matches) > 1:
         raise RuntimeError("Several Chrome windows or password suggestions match this site; leave only one open")
     return (browsers[0] if browsers else None, matches[0] if matches else None)
+
+
+def prepare_chrome_site(address, open_site=True):
+    address = address.strip()
+    origin = site_origin(address)
+    if "://" not in address:
+        address = "https://" + address
+    requested = urlsplit(address)
+    opened, stable_url = False, None
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        browser, _ = chrome_password_suggestion(origin)
+        native = list(nodes(browser, stop_at_documents=True)) if browser else []
+        documents = [control for control in native
+                     if control.ControlTypeName == "DocumentControl" and not control.IsOffscreen]
+        # Chrome's native WebView containers also report DocumentControl, but
+        # expose no URL. Count only actual HTTP(S) page documents.
+        documents = [control for control in documents
+                     if (pattern := control.GetPattern(automation().PatternId.ValuePattern))
+                     and pattern.Value.startswith(("http://", "https://"))]
+        value = documents[0].GetPattern(automation().PatternId.ValuePattern) if len(documents) == 1 else None
+        current_url = value.Value if value else ""
+        current = urlsplit(current_url)
+        same_page = opened or (requested.path in {"", "/"} and not requested.query) or (
+            current.path == requested.path and current.query == requested.query)
+        if browser and same_page:
+            buttons = {control.Name for control in native if control.ControlTypeName == "ButtonControl"
+                       and control.IsEnabled and not control.IsOffscreen}
+            ready = (current_url.startswith(("http://", "https://")) and site_origin(current_url) == origin
+                     and documents[0].IsEnabled
+                     and bool(buttons & {"Reload", "Reload this page"})
+                     and not buttons & {"Stop", "Stop loading"})
+            if ready and stable_url == current_url:
+                return {"message": f"Chrome is on {origin} and has finished loading. You can start a fresh computer-use attempt."}
+            stable_url = current_url if ready else None
+        elif open_site and not opened:
+            chrome = ""
+            for window in automation().GetRootControl().GetChildren():
+                path = process_path(window.ProcessId)
+                if path.lower().endswith("\\chrome.exe"):
+                    chrome = path
+                    break
+            if not chrome:
+                import winreg
+                for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+                    try:
+                        chrome = winreg.QueryValue(hive, r"Software\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe")
+                        if chrome.lower().endswith("\\chrome.exe"):
+                            break
+                        chrome = ""
+                    except OSError:
+                        pass
+            if not chrome:
+                raise RuntimeError("Chrome was not found; open Chrome and try preparing the site again")
+            subprocess.Popen([chrome, address])
+            opened, stable_url = True, None
+        else:
+            stable_url = None
+        time.sleep(.25)
+    raise RuntimeError("Chrome site is not ready: check the address, loading indicator, and any redirects before trying again")
 
 
 def accept_chrome_password(address):

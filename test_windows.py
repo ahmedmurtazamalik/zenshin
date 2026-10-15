@@ -82,6 +82,54 @@ class WindowsControlsTests(unittest.TestCase):
         api.GetRootControl.return_value.GetChildren.return_value = [window]
         return api, window, address_bar, webpage, suggestion
 
+    def test_chrome_preparation_opens_target_once_and_waits_until_loading_finishes(self):
+        from itertools import count
+        api, window, address_bar, webpage, _ = self.chrome_form()
+        stop, reload = node("ButtonControl", "Stop loading"), node("ButtonControl", "Reload")
+        window.GetChildren.side_effect = [[address_bar, webpage, stop],
+                                         [address_bar, webpage, reload], [address_bar, webpage, reload]]
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"), \
+             patch.object(ui, "chrome_password_suggestion", side_effect=[(None, None), (window, None), (window, None), (window, None)]), \
+             patch.object(ui.subprocess, "Popen") as launch, \
+             patch.object(ui.time, "monotonic", side_effect=count()), patch.object(ui.time, "sleep"):
+            result = ui.prepare_chrome_site("https://jobs.example.com/register")
+        launch.assert_called_once_with([r"C:\Chrome\chrome.exe", "https://jobs.example.com/register"])
+        self.assertIn("finished loading", result["message"])
+        webpage.GetChildren.assert_not_called()
+
+    def test_chrome_preparation_preserves_ready_suggestion_and_times_out_on_loading(self):
+        from itertools import count
+        api, window, address_bar, webpage, suggestion = self.chrome_form()
+        window.GetChildren.return_value.append(node("ButtonControl", "Reload"))
+        container = node("DocumentControl")
+        container.GetPattern.return_value = None
+        window.GetChildren.return_value.append(container)
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"), \
+             patch.object(ui.subprocess, "Popen") as launch, \
+             patch.object(ui.time, "monotonic", side_effect=count()), patch.object(ui.time, "sleep"):
+            ui.prepare_chrome_site("https://jobs.example.com/register")
+            launch.assert_not_called()
+            suggestion.GetPattern.return_value.Invoke.assert_not_called()
+            window.GetChildren.return_value.append(node("ButtonControl", "Stop loading"))
+            with self.assertRaisesRegex(RuntimeError, "not ready"):
+                ui.prepare_chrome_site("https://jobs.example.com/register", open_site=False)
+            launch.assert_not_called()
+        webpage.GetChildren.assert_not_called()
+
+    def test_chrome_preparation_opens_requested_path_instead_of_accepting_other_page(self):
+        from itertools import count
+        api, window, _, webpage, _ = self.chrome_form("https://jobs.example.com/other")
+        window.GetChildren.return_value.append(node("ButtonControl", "Reload"))
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"), \
+             patch.object(ui.subprocess, "Popen", side_effect=lambda args: setattr(
+                 webpage.GetPattern.return_value, "Value", args[1])) as launch, \
+             patch.object(ui.time, "monotonic", side_effect=count()), patch.object(ui.time, "sleep"):
+            ui.prepare_chrome_site("https://jobs.example.com/register")
+        launch.assert_called_once_with([r"C:\Chrome\chrome.exe", "https://jobs.example.com/register"])
+
     def test_chrome_selects_native_suggestion_once_without_returning_password(self):
         api, window, address_bar, webpage, suggestion = self.chrome_form()
         def invoke():
