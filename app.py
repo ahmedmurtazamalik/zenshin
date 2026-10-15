@@ -574,6 +574,22 @@ def main():
                 if not 0 < size <= 1_000_000:
                     raise ValueError("Invalid request size")
                 data = json.loads(self.rfile.read(size))
+                if self.path in {"/api/chrome-password", "/api/chrome-prepare"}:
+                    if os.name != "nt":
+                        raise ValueError("Chrome password selection is available on Windows only")
+                    if data.get("thread_id"):
+                        raise ValueError("The automatic Chrome-preparation hook was retired; chat-bound calls are no longer supported")
+                    import windows_ui
+                    try:
+                        def prepare():
+                            result = windows_ui.prepare_chrome_site(data["site"])
+                            if self.path == "/api/chrome-password":
+                                result = windows_ui.accept_chrome_password(data["site"])
+                            return result
+                        result = windows_ui.run(prepare)
+                    except (OSError, RuntimeError) as error:
+                        return self.reply({"error": str(error)}, 503)
+                    return self.reply(result)
                 if self.path == "/api/connect":
                     app["running"] = False
                     cancel_analysis(app)
