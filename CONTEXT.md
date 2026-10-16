@@ -2,7 +2,7 @@
 
 ## Current scope — 15 October 2026
 
-The global Chrome-preparation hooks and toggle have been retired. The original Codex approval/form features and individual Chrome helpers remain. The user requested cleanup only; the future direct single-action integration is not implemented. Use PLAN.md and README.md for current scope and limits. The dated handoff notes below are historical.
+The global Chrome-preparation hooks and toggle remain retired. Direct single-action MCP tools now delegate password selection or an exactly named terms box to the running Zenshin app and return receipts in the calling turn. The refusal-wording detector and browser continuation replies have been removed. Original Windows/Linux Codex approval/form features remain; Chrome actions require Windows. Use PLAN.md and README.md for current scope and limits. The dated handoff notes below are historical.
 
 Handoff saved on 12 October 2026, using the user's Asia/Karachi date. Read AGENTS.md and PLAN.md before continuing.
 

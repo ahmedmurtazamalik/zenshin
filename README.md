@@ -1,108 +1,183 @@
 # Zenshin
 
-**Keep moving forward.**
+**Keep moving forward.** A local companion for Codex that answers authorized desktop requests and performs individual Chrome password and terms actions.
 
-A local Linux and Windows app for reducing repeated Codex permission interruptions. It reads chat identity and history through Codex App Server and can answer **question forms and ordinary continuation requests in the Codex desktop app** through normal accessibility controls.
+Zenshin runs on your computer with a browser-based control page. You choose what it may do. For Chrome actions, Zenshin itself focuses the password field, opens and selects Chrome's generated-password suggestion, or checks the named terms box through Windows accessibility. Codex requests the action and receives a result; ChatGPT Computer Use is not needed for those interactions.
 
-The [v0.1.0 Linux MVP release](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.1.0) remains a Linux-only source distribution. This checkout also implements native Windows support; see [Windows setup and verification](WINDOWS.md). [Release notes](RELEASE_NOTES.md).
+## Download v0.2.0
 
-[Watch the captioned video walkthrough](demo/approval-helper-demo.mp4). [Transcript and chapter guide](demo/README.md). The walkthrough shows real app screens using separate demo settings; no new approval is sent during recording.
+| Platform | Download | Included features |
+| --- | --- | --- |
+| Windows | [Download Windows source ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.0/zenshin-v0.2.0-windows-source.zip) | Codex chat monitoring and native Chrome actions |
+| Linux | [Download Linux source tar.gz](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.0/zenshin-v0.2.0-linux-source.tar.gz) | Codex chat monitoring; Chrome actions are Windows-only |
 
-## Run
+[Release page](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.0) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.0/SHA256SUMS.txt) · [Release notes](RELEASE_NOTES.md)
+
+**These are source downloads, not standalone executables or installers.** Install Python and the Codex CLI first. Python 3.11 is the verified runtime. macOS is not supported.
+
+## What it does
+
+- Answers offered choices, custom text, multi-question forms, ordinary continuation requests, and recognized one-time approval cards in selected Codex desktop chats.
+- Uses exact question/reply rules or AI standing instructions through your signed-in Codex CLI.
+- Offers Preview mode, Start/Pause, saved settings, progress, activity, and a durable attempt journal that prevents duplicate delivery.
+- Provides one-time Codex tool registration, connection checks, and a first-visit tutorial that can be replayed from **Take the tour**.
+- On Windows, exposes `select_chrome_password` and `check_chrome_terms` so Codex can delegate individual Chrome actions and continue in the same turn.
+
+## Before you start
+
+1. Install Python. On Windows, use [Python's official download](https://www.python.org/downloads/windows/) and check that `py -3 --version` works. Python 3.11 was used for verification.
+2. Install and sign into the Codex desktop app for chat monitoring. Install the [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) on the same computer. If you already use npm, you can install it with `npm install -g @openai/codex`.
+3. In a terminal, run:
+
+   ```text
+   codex --version
+   codex login
+   codex login status
+   ```
+
+   Follow the sign-in instructions. See [Codex authentication](https://learn.chatgpt.com/docs/auth) for account setup.
+4. For Chrome actions, use Windows and Google Chrome with its password-generation feature available. The intended page must already be open. Zenshin does not change Chrome settings or sign you into Chrome.
+
+Run Zenshin in your normal signed-in desktop session with the computer unlocked. Native Windows features require native Windows Python and Codex, rather than WSL. AI decisions consume your Codex account's model usage.
+
+## Windows setup
+
+1. Download the Windows ZIP above and choose **Extract All**. Work in the extracted `zenshin-0.2.0` folder, not inside the ZIP.
+2. Open PowerShell in that folder and run:
+
+   ```powershell
+   py -3 -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install -r requirements-windows.txt
+   .\.venv\Scripts\python.exe app.py
+   ```
+
+3. Open [http://127.0.0.1:8765](http://127.0.0.1:8765) in your browser. Keep the terminal running. No virtual-environment activation or PowerShell execution-policy change is needed.
+
+For later launches, run only:
+
+```powershell
+.\.venv\Scripts\python.exe app.py
+```
+
+The Windows dependency is `uiautomation`, which installs `comtypes`. There is no frontend build. [Windows implementation and verification details](WINDOWS.md).
+
+## Linux setup
+
+Download the Linux archive, then extract and launch it:
 
 ```sh
+tar -xzf zenshin-v0.2.0-linux-source.tar.gz
+cd zenshin-0.2.0
 python3 app.py
 ```
 
-Open http://127.0.0.1:8765. Requires Python 3 and a signed-in `codex` CLI. On Linux, desktop mode also requires the system Python `gi` package and AT-SPI. On GNOME Wayland, keyboard fallback also uses a temporary Mutter RemoteDesktop session; these were already installed on the tested machine. Linux needs no pip packages or frontend build. Run outside a filesystem sandbox that prevents Codex from initializing its own runtime or accessing the desktop accessibility bus.
+Open [http://127.0.0.1:8765](http://127.0.0.1:8765). Linux has no pip dependencies or frontend build. Desktop control requires the system Python `gi` package and AT-SPI; on Ubuntu/Debian these are normally provided by `python3-gi` and `gir1.2-atspi-2.0`. Use your desktop's system Python so it can load them. GNOME Wayland custom-text input also requires Mutter RemoteDesktop support. Enable desktop accessibility and run within an unlocked graphical session.
 
-On Windows, use native Python and Codex. Install the Windows desktop dependency once, then run:
+Linux chat navigation still needs a fresh live check with a readable accessibility tree. Chrome password and terms tools are not supported on Linux.
 
-```powershell
-py -3 -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements-windows.txt
-.venv\Scripts\python.exe app.py
-```
+## Set up and use the app
 
-Windows desktop control uses UI Automation Value, Invoke, and Selection patterns. It verifies the installed Codex process, including the `ChatGPT.exe` name used by the Microsoft Store Codex package, and the selected chat document. It does not need keyboard or coordinate input.
+The numbered sidebar takes you through the workflow. The welcome tutorial highlights the controls without changing settings or sending actions. Replay it anytime with **Take the tour**.
 
-1. Connect to Codex and select chats. If a new chat is missing, add its thread ID; the app reads its actual title.
-2. Give selected chats unique titles. In desktop mode, Zenshin opens each selected chat in Codex as needed, one at a time. Multiple visible copies are rejected.
-3. Choose **AI · follow my instructions** and write standing instructions describing what the helper may approve or continue. Alternatively, keep **Match exact questions** for the existing deterministic behavior.
-4. Choose **Preview only** first, or **Send authorized replies** to enable scoped responses, then Start monitoring.
+### 1. Connect to Codex
 
-The app starts paused after restart. Saving changes pauses monitoring. Keep the control window open for its five-second polling. Pause stops future checks after the current check. One response is handled per check. It does not stop Codex work or undo actions.
+Choose **Connect Zenshin tools** to register this installation's MCP bridge with your Codex CLI. Zenshin generates the correct executable, folder, and port arguments. It reuses a matching registration and leaves a different or disabled registration unchanged, with recovery instructions. Other MCP entries and approval settings are preserved.
 
-The progress strip shows the current chat and actual step: reading, opening the chat when needed, finding a request, deciding, sending, and confirming delivery. It keeps AI elapsed time visible between checks and shows a countdown while waiting. Read-only progress updates refresh every second, including during slow desktop actions; checks still run on the five-second schedule. AI progress is indeterminate. Settings changes and reply operations remain serialized.
+Reload Codex's MCP connections or restart Codex. In the working chat, ask:
 
-Optional: `python3 app.py --port 8766 --state /path/to/state.json`.
+> Confirm that Zenshin's select_chrome_password and check_chrome_terms tools are available. Do not call them yet.
 
-## Chrome assistance on Windows
+Use **Copy Codex instructions** and put that guidance in your working chat or its project's `AGENTS.md`, alongside your task authorization. Registration alone does not authorize an action.
 
-Two saved toggles, off by default, enable the existing password and terms helpers. In **Send authorized replies** mode, the monitor looks for a selected chat's completed request about a password or terms and a site in its recent context. Password selection requires an already-open native Chrome suggestion. Terms assistance handles one clearly labeled, unchecked agreement checkbox and leaves marketing opt-ins alone. Each action is journaled before activation, confirmed, and followed by a continuation reply. Uncertainty pauses monitoring and prevents a repeat.
+**Check connection** reports two separate things: whether the tools are registered, and whether Zenshin's chat-history connection responds. Registration does not prove that an existing Codex chat has loaded its tools. A disconnected chat-history connection does not prevent registered Chrome tools from working.
 
-The individual actions passed earlier browser-side live tests. The complete chat handoff remains unreliable on Windows: an accessibility event error can occur after Send succeeds, leaving delivery unconfirmed. The original approval and form-answering features remain available; ordinary chat replies share this delivery limitation.
+If registration fails, expand **Manual setup or troubleshooting** and use the command generated for your installation. Reconnect after moving Zenshin or changing its port.
 
-**Automatically prepare Chrome before AI browsing** and its global Codex hooks have been retired. Zenshin no longer injects preparation instructions or intercepts browser tool calls. The three installed Zenshin hook definitions were removed without changing unrelated hooks. `codex_hook.py` is an inert entry point for already-running Codex sessions that cached those definitions; the app does not import or install it. Old chat-bound preparation calls are rejected.
+### 2. Chrome actions — Windows
 
-Optional manual checks remain under **Chrome signup assistance**. **Open and verify in Chrome** opens the supplied URL when needed and checks the full document URL, Reload/no Stop loading, and two stable observations. **Accept next suggestion for this site** waits up to 30 seconds for Chrome's native suggestion and activates it once. These are also available through POST `/api/chrome-prepare` and `/api/chrome-password`, with JSON `{"site":"https://jobs.example.com/register"}` and `Content-Type: application/json`, without a Codex connection.
+Enable the password action, terms action, or both. In **Monitor**, choose **Send authorized replies**, then **Save changes**.
 
-The site check uses the native document's full URL; it does not infer an origin from the shortened omnibox. Page controls cannot impersonate the native suggestion. Zenshin does not read or log password values, submit registration forms, handle CAPTCHA, or unlock the browser. Unsupported, ambiguous, or unconfirmed controls require review. Readiness does not establish completion of every site's background requests or repair Codex's native URL detector. The redacted detector reproduction was [reported to OpenAI](https://github.com/openai/codex/issues/51524#issuecomment-6189728908).
+- **Password:** Codex supplies the current page URL. Zenshin locates one visible new-password field, focuses it, invokes Chrome's native Suggest password command if needed, and selects the suggestion once. Chrome generates and fills the password. Confirmation/current/old-password fields are excluded from target selection. No password values are returned or logged.
+- **Terms:** Codex supplies the current page URL and the exact checkbox label. Zenshin checks one matching, unchecked agreement box. Marketing opt-ins are excluded.
 
-Windows UI work stays on one persistent MTA thread until server shutdown, following [Microsoft's UI Automation threading guidance](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-threading). The former per-request COM teardown caused an unloaded-DLL crash; no matching crash recurred during the latest 20-minute check. The disposable fixture `demo/signup_probe.py` prints unique page/status URLs per run. Previous diagnostics and isolated test journals remain under `.local`; the latest live result is `.local/chrome-mta-e2e-result.json`.
+Zenshin performs these interactions using Windows UI Automation, without ChatGPT screenshots, coordinate clicks, or keyboard injection. The page must already be open and loaded. The individual actions do not open new Chrome windows, navigate, submit an account, solve CAPTCHA, or bypass a safety refusal or URL-policy stop.
 
-The next implementation is an explicit request for one browser action with a direct result, while Codex continues normal browsing. **That integration is not implemented.** Its limited scope and verification steps are in [PLAN.md](PLAN.md).
+Keep Zenshin running. These tools do not need selected chats or a running chat monitor. **Pause stops chat monitoring only.** To revoke Chrome actions, disable their toggles and save, or save **Preview only** mode.
 
-## Response behavior
+The Chrome section also has manual **Open and verify in Chrome** and **Fill Chrome's suggested password** controls. The first explicitly opens the requested URL; the second performs the native password action on that page.
 
-AI mode reads the latest eight user/assistant messages plus the request and offered choices. It runs a separate, ephemeral `codex exec` in a read-only temporary directory using the existing CLI sign-in. Its structured decision is `approve`, `continue`, `needs_input`, or `no_response`, with a proposed response and reason. The CLI is instructed not to use tools; any observed tool use causes its decision to be discarded. Conversation content is treated as data, not authorization to expand the standing instructions.
+### 3. Chats
 
-Start in **Preview only** to inspect decisions. For example: “Continue formatting this report within my existing instructions. Ask me for missing personal information or a new decision.” You do not need to predict the question's wording. Empty standing instructions cannot start AI monitoring. Existing saved exact-rule settings retain their behavior until you switch methods.
+Choose **Load Codex chats**, then select the conversations to monitor. Give each selected chat a unique title and keep only one visible copy. If a new chat is missing from the list, use **Add a chat by ID**.
 
-An unchanged request, recent context, and instruction set reuse a saved decision, including after restart. New context or changed instructions trigger a new analysis. Calls consume Codex model usage and require working CLI authentication and model access; they are not local/offline inference. Analysis runs without blocking the HTTP server, times out after 60 seconds, and is canceled by Pause or changed settings. Invalid results and CLI failures pause monitoring without sending.
+**Check connection** here sends one read-only request through the existing Codex connection. If disconnected, choose **Load Codex chats** to reconnect. This connection reads identity/history; it does not control another client's approvals through internal IPC.
 
-In AI desktop mode, only `approve` or `continue` can send. Offered answers use their live controls; other authorized responses use guarded text input. Every question in a multi-question form must have an authorized answer before any answer is entered. The attempt journal and delivery confirmation apply to the whole form. AI interpretation can be wrong: use narrow standing instructions and inspect preview decisions before enabling desktop responses.
+### 4. Authorization
 
-Preview mode reads the latest assistant message without sending anything. Historical messages are not proof of a pending request.
+Choose either:
 
-Desktop mode checks structured questions from the newest turn against the live question form. Exact rules match the complete question, normalizing whitespace. Offered choices advance to the next question or submit the last answer immediately; the helper never clicks Send afterward. Custom answers preserve existing drafts, enter text, read it back, then use Next or Send.
+- **AI · follow my instructions:** write narrow standing instructions, such as “Continue formatting this report. Ask me for missing facts or decisions outside that task.” AI examines recent context and the current request; missing facts and uncovered decisions stay for you.
+- **Match exact questions:** save the complete expected question and its reply. Matching normalizes whitespace and otherwise requires the full question.
 
-Ordinary replies require the newest recorded assistant message to be visible, Codex to have stopped, no pending question form, and an empty composer. The helper reads the response back before Send and confirms a new echoed reply. Messages that cannot be matched to visible controls remain previews.
+AI analysis uses your signed-in Codex CLI, times out after 60 seconds, and is canceled by Pause or changed settings. Invalid decisions and CLI failures stop monitoring without sending.
 
-Chromium on this Wayland machine rejects accessibility text editing. After explicit user approval, a GNOME RemoteDesktop keyboard fallback was verified. It creates a temporary session, focuses the selected empty field, checks focus while typing, and stops the session afterward. Keyboard fallback supports single-line responses. Input or confirmation failures preserve the draft and pause monitoring; the helper never retries an uncertain attempt.
+### 5. Monitor
 
-Settings, the latest 100 activity entries, preview fingerprints, and a permanent response-attempt journal are stored in `.local/state.json`. Attempts are saved atomically **before** UI actions. An interrupted or unconfirmed attempt pauses monitoring and blocks that chat after restart. Inspect and resolve the request in Codex, then use **I reviewed the unconfirmed requests**. Reviewed requests still cannot be sent again automatically; future requests can be monitored.
+Start in **Preview only** to inspect suggested chat replies. Choose **Send authorized replies** when your rules or instructions cover the work, then **Start monitoring**.
 
-Desktop documents expose chat titles rather than thread URLs. The app checks selected IDs and titles against App Server and rejects known duplicate titles and multiple visible copies. Keep titles unique. If a selected chat is not displayed, Zenshin opens its `codex://threads/<thread-id>` link through Linux's `xdg-open` and waits up to ten seconds for that chat's document before inspecting requests. This switches the chat in your Codex window; selected chats are checked sequentially. A chat already displayed is left in place. Navigation failure pauses monitoring without sending a response. Preview-only mode does not navigate.
+Keep the control page open for five-second polling. Desktop mode visits selected chats one at a time. An ordinary reply requires a stopped chat and an empty composer. Every answer in a multi-question form must be authorized before any answer is entered. Recognized approval cards permit only **Allow once**.
 
-The automatic navigation flow has regression coverage. Its live check on 14 October was blocked because the running Codex app exposed window frames with no readable accessibility contents, even after temporarily enabling GNOME accessibility. The link launcher returned success, but chat arrival could not be confirmed; monitoring paused without sending. The original desktop settings were restored. Live navigation still needs verification in a Codex session with readable accessibility contents.
+The app starts paused after restart. Saving settings pauses monitoring. Pause stops future checks after the current check; it does not cancel Codex's work or undo an action.
 
-## Verified scope and remaining work
+### 6. Activity
 
-On 12 October 2026, Codex CLI 0.159.3 successfully read existing chats. A separate App Server reported desktop threads as `notLoaded`; its managed daemon socket was absent. App Server is therefore used for identity/history, not to claim control over another client's live approval events.
+Inspect confirmed responses and actions here. Attempts are recorded before desktop interaction, then confirmed against the UI. An uncertain result pauses monitoring and blocks further relevant actions instead of automatically retrying.
 
-The default AT-SPI cache initially returned null window children. Reading the fresh accessibility tree exposed the actual desktop question controls. A separately created controlled chat received `Yes, mark the local test complete.` and reported that the local test was approved. No job application or external action was performed. The first confirmation check paused after submission because it expected a separate Send step; the corrected immediate-choice behavior is covered by a regression test.
+Inspect and resolve the request in Codex or Chrome, then choose **Mark requests reviewed** in Monitor. Reviewing permits future requests; it does not resend the old request.
 
-Newly created desktop chats may be readable by ID before the standard inventory includes them; the app supports adding such chats directly.
+## Settings, updates, and troubleshooting
 
-**Approval-dialog implementation:** Desktop mode detects approval cards by an alert header or the installed file-access card's `Permissions` heading, alongside Deny/Allow once controls. It supplies all accessible card text and the one-time option to the existing AI classifier, or matches that complete text against an exact rule. Only the exact response `Allow once` can activate the card; persistent permission grants are excluded. The attempt is saved first, the card is re-read before clicking, and disappearance in the same chat confirms the UI response. This confirms the approval response, not successful execution of the command or tool. Normal chat replies are blocked while an approval card is visible.
+Settings, the latest 100 activity entries, and the permanent attempt journal are stored in `.local/state.json` inside your extracted folder. Keep this file private; it can contain chat titles, request text, replies, and standing instructions.
 
-**Live verification — 14 October 2026:** In “Approval Helper controlled test,” a real `request_permissions` call requested turn-only read access to one disposable file outside that chat's workspace. Capturing its accessibility tree reproduced the detector bug: its header was a normal `Permissions` section, not an alert. After the fix, Zenshin's normal AI flow selected `Allow once`, journaled the attempt before delivery, clicked the button, confirmed the card disappeared, and recorded `sent`. The test chat then read and reported the file's marker. This used an isolated journal in `/tmp`; the user's monitoring settings were preserved.
+For an update: stop monitoring, disable and save Chrome actions, stop the server with Ctrl+C, back up `.local`, extract the new release, and copy `.local` into the new app folder before launching. Recreate the Windows virtual environment and reinstall its requirements. Reconnect the MCP registration if the installation path changed. Do not delete the old attempt journal to retry uncertain actions.
 
-**Remaining verification:** Actual command-escalation and other tool-card variants still need live checks. Command escalation was rejected before displaying a card because the controlled chat's granular policy disables sandbox approvals. The separate read-only App Server does not own desktop approval events. Different labels or card structures are left untouched. Browser-chat and dot support were explicitly removed from scope by the user.
+| Problem | What to do |
+| --- | --- |
+| `py`, `python3`, or `codex` is not found | Install the prerequisite, reopen your terminal, and restart Zenshin. |
+| Codex cannot find its home or sign-in | Run in your normal user session outside a filesystem sandbox; verify `codex login status`. |
+| Registered, but tools are missing in Codex | Reload MCP connections or restart Codex, then check discovery in the working chat. |
+| A different/disabled Zenshin registration exists | Inspect `codex mcp get zenshin`. If you intend to replace it, run `codex mcp remove zenshin`, then connect again in the app. |
+| Chrome action is disabled | Enable its toggle, select Send authorized replies in Monitor, and save. |
+| No native password suggestion is available | Check Chrome's generation feature and the page's password fields. Zenshin stops on ambiguous fields or unsupported menus. |
+| Chat or action is unconfirmed | Inspect it manually before marking requests reviewed. Do not repeat with a new request ID. |
+| Port 8765 is in use | Stop the other Zenshin instance or launch with `--port 8766`, then register the tools for that port. |
 
-Read-only preview continues to show recorded messages; approval cards are read in desktop mode. To inspect a live card without authorizing it, use desktop AI mode with standing instructions such as “Do not approve anything; leave every request for me.”
-
-No credentials are extracted, internal approvals fabricated, or managed restrictions changed. Protocol reference: [official Codex App Server documentation](https://learn.chatgpt.com/docs/app-server).
-
-## Verify
+For a different port or state location:
 
 ```sh
-python3 -m unittest -v
+python3 app.py --port 8766 --state /path/to/state.json
 ```
 
-The tests cover matching, target identity, Pause, persistence, draft preservation, AI classification handling, attempts saved before delivery, duplicate prevention, uncertain delivery, multi-question authorization, ordinary reply journaling, one-time approval restrictions, captured file-access card detection, changed-card/navigation failures, opening selected chats in order, navigation load/timeout behavior, idle browser connections, and readable progress during a slow check with Pause still serialized. Windows cases also cover split UTF-8 pipe messages and EOF, packaged-app identity, placeholder handling, approval context, confirmation after an Invoke event error, and the Chrome action described above. On 14 October 2026 the 33-test suite passed on Windows in 2.109 seconds and Ubuntu in 1.218 seconds.
+On Windows, replace `python3` with `.\.venv\Scripts\python.exe` and use a Windows path.
 
-On 13 October 2026, authorized live tests in “Approval Helper controlled test” confirmed an AI-selected offered answer, a custom free-text answer using GNOME input, a complete two-question form under one attempt, and an AI-selected ordinary composer reply. These used isolated journals in `/tmp`; the user's monitoring settings were preserved. The existing demo video predates AI mode and these additional desktop paths.
+## Verified scope and limitations
 
-On 14 October 2026, native Windows tests in “Zenshin Windows test” confirmed App Server listing/history, a Unicode AI preview, offered answers, custom Unicode text, a two-question form, an AI-selected ordinary reply, existing-draft preservation, and sequential chat navigation. Tests used separate journals under `.local`. A real Windows approval card could not be produced: the test chat had no permission-request tool and Approve for me resolved its command escalation automatically. One-time card handling is implemented and behavior-tested, but still needs that live verification.
+- On 16 October 2026, real Windows checks verified Codex connection, one delivered and acknowledged approval reply, and Zenshin-owned Chrome password generation/selection plus terms selection on a disposable form. Both password fields were filled and matched; terms was checked and marketing was left unchecked. No account was submitted and the final native Chrome check used no ChatGPT Computer Use.
+- Earlier controlled tests verified Windows/Linux question forms, custom text, multi-question handling, draft preservation, and navigation on Windows. A real Linux file-access Allow once card was verified; real Windows approval cards and other command/tool-card variants still need live checks.
+- Windows reply delivery previously encountered intermittent UI Automation event/confirmation errors. The latest single live reply passed; that does not establish that the intermittent issue is eliminated.
+- Linux navigation can fail when Codex exposes an empty accessibility tree. Unrecognized labels or cards are left untouched. Browser-chat and dot monitoring are outside scope.
+- This is an MVP that depends on the installed Codex/Chrome accessibility controls. Its scoped actions preserve normal permissions; broad standing instructions are not a guarantee of correct AI interpretation.
+
+## Development and tests
+
+Clone the repository instead of downloading an archive if you want to develop it:
+
+```sh
+git clone https://github.com/ahmedmurtazamalik/zenshin.git
+cd zenshin
+git checkout v0.2.0
+```
+
+Run the existing behavior tests with `python3 -m unittest -q`, or `.\.venv\Scripts\python.exe -m unittest -q` on Windows. The 61-test suite passed on Windows before this release. Tests using simulated desktop controls do not replace live UI verification. Read [AGENTS.md](AGENTS.md) before changing code.
+
+[Older captioned walkthrough](demo/approval-helper-demo.mp4) · [Transcript](demo/README.md). This video predates Windows support, Chrome delegation, and the current onboarding UI.

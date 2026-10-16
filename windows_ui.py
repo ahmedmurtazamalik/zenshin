@@ -266,6 +266,53 @@ def prepare_chrome_site(address, open_site=True):
     raise RuntimeError("Chrome site is not ready: check the address, loading indicator, and any redirects before trying again")
 
 
+def open_chrome_password_suggestion(address):
+    origin = site_origin(address)
+    browser, suggestion = chrome_password_suggestion(origin)
+    if suggestion is not None:
+        return
+    if browser is None:
+        raise RuntimeError("The requested Chrome page is not available")
+    api = automation()
+    fields = []
+    for doc in nodes(browser, stop_at_documents=True):
+        if doc.ControlTypeName != "DocumentControl" or doc.IsOffscreen:
+            continue
+        value = doc.GetPattern(api.PatternId.ValuePattern)
+        if not value or not value.Value.startswith(origin + "/"):
+            continue
+        # Inspect field metadata only; never read a password field's value.
+        fields.extend(control for control in nodes(doc)
+                      if control.ControlTypeName == "EditControl" and control.IsPassword
+                      and control.IsEnabled and not control.IsOffscreen
+                      and not re.search(r"confirm|repeat|re-enter|current|old", control.Name, re.I))
+    if len(fields) != 1:
+        raise RuntimeError("Cannot identify one new-password field; inspect Chrome manually")
+    field = fields[0]
+    if not field.SetFocus() or not field.HasKeyboardFocus:
+        raise RuntimeError("Chrome did not focus the new-password field")
+    if chrome_password_suggestion(origin)[1] is not None:
+        return
+    # Invoke Chrome's native context menu, without keyboard or coordinate input.
+    interface = api.uiautomation._AutomationClient.instance().UIAutomationCore.IUIAutomationElement3
+    field.Element.QueryInterface(interface).ShowContextMenu()
+    browser, _ = chrome_password_suggestion(origin)
+    commands = [control for control in nodes(browser, stop_at_documents=True)
+                if control.ControlTypeName == "MenuItemControl" and control.IsEnabled
+                and not control.IsOffscreen and control.Name.casefold().rstrip(".\u2026")
+                in {"suggest password", "suggest strong password"}]
+    if len(commands) != 1:
+        raise RuntimeError("Chrome's native Suggest password command is unavailable; check Chrome manually")
+    prepare_chrome_site(address, open_site=False)
+    press(commands[0])
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        if chrome_password_suggestion(origin)[1] is not None:
+            return
+        time.sleep(.2)
+    raise RuntimeError("Chrome did not open its native password suggestion; check Chrome manually")
+
+
 def accept_chrome_password(address):
     origin = site_origin(address.strip())
     deadline = time.monotonic() + 30
@@ -292,7 +339,7 @@ def accept_chrome_password(address):
     raise RuntimeError("No supported Chrome password suggestion appeared for this site within 30 seconds; nothing was selected")
 
 
-def chrome_signup_request(origin, password=False, terms=False):
+def chrome_signup_request(origin, password=False, terms=False, label=None):
     browser, suggestion = chrome_password_suggestion(origin)
     if password and suggestion is not None:
         return {"kind": "password", "label": "Chrome suggested password"}
@@ -309,13 +356,15 @@ def chrome_signup_request(origin, password=False, terms=False):
         for control in nodes(doc):
             if control.ControlTypeName != "CheckBoxControl" or control.IsOffscreen or not control.IsEnabled:
                 continue
-            label = control.Name
-            if (not re.search(r"\b(?:agree|accept)\b.*\bterms\b|\bterms (?:and|&) conditions\b|\bterms of (?:service|use)\b", label, re.I)
-                    or re.search(r"marketing|newsletter|promotional|offers|updates|subscrib|partners", label, re.I)):
+            if label is not None and control.Name != label:
+                continue
+            text = control.Name
+            if (not re.search(r"\b(?:agree|accept)\b.*\bterms\b|\bterms (?:and|&) conditions\b|\bterms of (?:service|use)\b", text, re.I)
+                    or re.search(r"marketing|newsletter|promotional|offers|updates|subscrib|partners", text, re.I)):
                 continue
             toggle = control.GetPattern(api.PatternId.TogglePattern)
             if toggle and toggle.ToggleState == 0:
-                matches.append({"kind": "terms", "label": label})
+                matches.append({"kind": "terms", "label": text})
     if len(matches) > 1:
         raise RuntimeError("Several terms checkboxes are available; inspect the form manually")
     return matches[0] if matches else None
@@ -323,7 +372,8 @@ def chrome_signup_request(origin, password=False, terms=False):
 
 def perform_chrome_signup_request(origin, request):
     current = chrome_signup_request(origin, password=request["kind"] == "password",
-                                    terms=request["kind"] == "terms")
+                                    terms=request["kind"] == "terms",
+                                    label=request["label"] if request["kind"] == "terms" else None)
     if current != request:
         raise RuntimeError("Chrome's signup control changed; nothing was selected")
     if request["kind"] == "password":

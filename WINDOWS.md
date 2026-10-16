@@ -1,6 +1,6 @@
 # Zenshin on Windows
 
-This checkout implements native Windows preview and desktop modes. The published v0.1.0 archive remains Linux-only; use this checkout for Windows. No executable or installer is bundled.
+Zenshin v0.2.0 includes native Windows preview and desktop modes. Download the Windows source ZIP from the [release page](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.0) and follow the [installation and onboarding guide](README.md). No executable or installer is bundled. The older v0.1.0 archive remains Linux-only.
 
 ## Setup and run
 
@@ -58,8 +58,12 @@ Windows UI Automation calls run on one persistent MTA worker, with its cached cl
 
 The original form and navigation features have the live evidence above. Ordinary chat replies are currently unreliable: Send may succeed before an accessibility event error, and confirmation can still fail. Windows operation of a real Allow once card and other command/tool-card variants remain unverified.
 
-The individual Chrome password and terms actions passed earlier browser-side live tests. Their complete automatic chat handoff has not passed. The global preparation hooks, preparation toggle, callback endpoint, and per-chat preparation bookkeeping have been removed. The existing two action toggles, standalone manual checks, site guards, and attempt journal remain. The future direct individual-action integration has not been built; see [PLAN.md](PLAN.md).
+The individual Chrome password and terms actions passed earlier browser-side live tests. The failed monitor-based handoff has now been replaced with two explicit MCP tools that return results directly to Codex, without navigating Codex or typing continuation replies. Saved action toggles, Preview protection, standalone manual checks, site guards, and the attempt journal remain. The terms tool requires an exact checkbox label. Global preparation hooks and per-chat preparation bookkeeping remain retired; see [setup and operation](README.md#chrome-assistance-on-windows) and [verification scope](PLAN.md).
+
+On 15 October the direct-action version passed 56 tests on Windows (4.105 seconds) and Ubuntu/WSL (2.602 seconds, one Windows-only server test skipped). A real Codex CLI session called both tools, received receipts, and continued through normal approval review using a simulated desktop backend. Native Chrome clicks were not rerun for that integration check. The global MCP entry was added without changing approval settings; existing sessions may need their MCP connection reloaded.
 
 Historical crash, URL-detector, and handoff evidence is preserved in `.local/chrome-url-diagnostics-2026-10-15.json`, `.local/chrome-restart-e2e-result.json`, and `.local/chrome-mta-e2e-result.json`. See [Chrome usage and limits](README.md#chrome-assistance-on-windows).
 
 The older demo is a Linux walkthrough. This checkout supports Windows; the published v0.1.0 archive remains Linux-only. Browser-chat and dot support remain outside the agreed scope.
+
+On 16 October, a direct app test on a disposable local Chrome form verified that Zenshin itself focuses the new-password field, opens Chrome's native Suggest password menu, selects the generated password, and checks the named terms box. Both password fields were filled and matched, terms was checked, and marketing remained unchecked. No ChatGPT Computer Use tools, keyboard injection, screenshots, or coordinate clicks were used. The action still requires the intended page to be open, one identifiable new-password field, and Chrome's generation feature to be available. Evidence: `.local/native-owned-result.json`.

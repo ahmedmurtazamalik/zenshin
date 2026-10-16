@@ -1,24 +1,24 @@
 # Zenshin: individual browser-action handoff
 
-Status: cleanup only. The direct action integration described here is not implemented.
+Status: the direct individual-action MCP integration is implemented.
 
 ## Scope to preserve
 
 Keep Codex chat monitoring, exact rules, AI standing instructions, question-form answers, ordinary replies, Allow once cards, saved settings, Pause, draft protection, and the durable attempt journal. Keep the existing native Chrome password/terms helpers, site checks, and persistent Windows MTA worker.
 
-The mandatory Chrome-preparation toggle, global lifecycle hooks, browser-call interception, and per-chat preparation state are retired. Optional standalone Chrome checks remain. The existing monitor-based browser handoff remains provisional until replaced; its Windows continuation is not reliable.
+The mandatory Chrome-preparation toggle, global lifecycle hooks, browser-call interception, and per-chat preparation state are retired. Optional standalone Chrome checks remain. The former monitor-based browser handoff and its typed continuation have been replaced by direct tool results.
 
-## Next implementation, when requested
+## Implemented behavior
 
 1. Codex uses its normal browser tools and existing permission flow first.
-2. For a capability limitation, Codex explicitly requests one supported Zenshin action: accept Chrome's suggested password for the current site, or check a specific terms agreement checkbox.
-3. A small direct tool interface calls the existing helper. Verify the requested site and user's enabled action, journal before acting, confirm once, and return a result to the calling Codex turn. Do not require a typed continuation message for that handoff.
+2. For a capability limitation, Codex explicitly calls `select_chrome_password` or `check_chrome_terms` with the current site, a stable request ID, and the exact terms label when applicable.
+3. `zenshin_mcp.py` calls the running app's `/api/browser-action`. For passwords, Zenshin itself focuses the new-password field, opens Chrome's native suggestion through Windows UI Automation, and selects it; no ChatGPT Computer Use preparation is required. It requires the saved action toggle and Send authorized replies mode, checks the current page without navigation, journals before acting, confirms once, and returns a receipt to the same turn. Direct actions work without chat monitoring. Pause stops monitoring; action toggles revoke tool authorization. Confirmed request IDs replay receipts; uncertain attempts block future Chrome actions until reviewed.
 4. A safety refusal or URL-policy stop remains a stop. Missing facts, ambiguous controls, or uncertain activation require review. Do not read or return passwords, submit accounts, or accept marketing opt-ins.
 
-Do not build a website navigator, signup orchestrator, generic action framework, refusal-wording detector, or another global pre-tool hook. Do not add scaffolding or new tool endpoints until implementation is requested.
+No website navigator, signup orchestrator, generic action framework, refusal-wording detector, or global pre-tool hook is needed. Chrome actions currently use Windows UI Automation; the original approval/form features remain supported on Windows and Linux.
 
 ## Verification
 
-Prove each action independently on a disposable page using only password-presence/match and checkbox flags. Prove the caller receives the actual action result and can continue. Preserve tests for original Codex approvals/forms, site scope, preview/Pause, and duplicate prevention. A full website signup sequence is not required to establish either action.
+Behavior tests cover both action receipts through a real stdio process and local HTTP endpoint, journal-before-action, retries, exact terms labels, disabled/Preview controls, and uncertain activation. Existing approval/form, site, draft, and Pause regressions remain. A real Codex client can verify discovery and turn continuation using a simulated native backend; this does not establish a new live Chrome result. Browser-side live verification uses the disposable form's presence/match and checkbox flags, never password values. A full signup sequence is unnecessary.
 
-The existing Windows ordinary-reply delivery-confirmation bug is separate work; do not claim it is solved by this cleanup. Follow the verification budget in AGENTS.md.
+The existing Windows ordinary-reply delivery-confirmation bug remains separate work. The individual-action result does not use that path. Follow the verification budget in AGENTS.md.

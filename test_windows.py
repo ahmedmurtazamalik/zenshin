@@ -96,6 +96,7 @@ class ChromeServerTests(unittest.TestCase):
              patch("sys.argv", ["app.py", "--state", str(Path(directory) / "state.json")]), \
              patch("builtins.print"), patch.object(ui, "run", side_effect=lambda operation, *args, **kwargs: operation(*args, **kwargs)), \
              patch.object(ui, "prepare_chrome_site", return_value={"message": "Ready"}) as prepare, \
+             patch.object(ui, "open_chrome_password_suggestion"), \
              patch.object(ui, "accept_chrome_password", return_value={"message": "Selected"}) as accept:
             worker = threading.Thread(target=app.main, daemon=True)
             worker.start()
@@ -202,11 +203,49 @@ class WindowsControlsTests(unittest.TestCase):
         suggestion.GetPattern.return_value.Invoke.side_effect = invoke
         with patch.object(ui, "automation", return_value=api), \
              patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"):
+            ui.open_chrome_password_suggestion("https://jobs.example.com/register")
             result = ui.accept_chrome_password("https://jobs.example.com/register")
         self.assertIn("activated and closed", result["message"])
         self.assertNotIn("disposable-secret", str(result))
         suggestion.GetPattern.return_value.Invoke.assert_called_once()
         webpage.GetChildren.assert_not_called()
+
+    def test_password_action_opens_native_suggestion_without_external_desktop_input(self):
+        api, window, address_bar, webpage, suggestion = self.chrome_form()
+        field = node("EditControl", "New password")
+        field.IsPassword, field.HasKeyboardFocus = True, True
+        confirmation = node("EditControl", "Confirm password")
+        confirmation.IsPassword = True
+        webpage.GetChildren.return_value = [field, confirmation]
+        window.GetChildren.return_value = [address_bar, webpage]
+        command = node("MenuItemControl", "Suggest password\u2026")
+        field.Element.QueryInterface.return_value.ShowContextMenu.side_effect = lambda: window.GetChildren.return_value.append(command)
+        command.GetPattern.return_value.Invoke.side_effect = lambda: setattr(window.GetChildren, "return_value", [address_bar, webpage, suggestion])
+        suggestion.GetPattern.return_value.Invoke.side_effect = lambda: setattr(window.GetChildren, "return_value", [address_bar, webpage])
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"), \
+             patch.object(ui, "prepare_chrome_site"):
+            ui.open_chrome_password_suggestion("https://jobs.example.com/register")
+            ui.accept_chrome_password("https://jobs.example.com/register")
+        field.SetFocus.assert_called_once()
+        field.Element.QueryInterface.return_value.ShowContextMenu.assert_called_once()
+        command.GetPattern.return_value.Invoke.assert_called_once()
+        suggestion.GetPattern.return_value.Invoke.assert_called_once()
+        field.GetPattern.assert_not_called()
+        confirmation.SetFocus.assert_not_called()
+
+    def test_password_preparation_leaves_ambiguous_fields_untouched(self):
+        api, window, address_bar, webpage, _ = self.chrome_form()
+        first, second = node("EditControl", "Password"), node("EditControl", "New password")
+        first.IsPassword = second.IsPassword = True
+        webpage.GetChildren.return_value = [first, second]
+        window.GetChildren.return_value = [address_bar, webpage]
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"):
+            with self.assertRaisesRegex(RuntimeError, "one new-password field"):
+                ui.open_chrome_password_suggestion("https://jobs.example.com/register")
+        first.SetFocus.assert_not_called()
+        second.SetFocus.assert_not_called()
 
     def test_chrome_wrong_site_or_webpage_lookalike_is_never_activated(self):
         api, window, address_bar, webpage, suggestion = self.chrome_form()
@@ -235,7 +274,8 @@ class WindowsControlsTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Several Chrome"):
                 ui.accept_chrome_password("jobs.example.com")
             press.assert_not_called()
-        with patch.object(ui, "chrome_password_suggestion", side_effect=[(window, suggestion), (window, None)]), \
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "chrome_password_suggestion", side_effect=[(window, suggestion), (window, None)]), \
              patch.object(ui, "press") as press:
             with self.assertRaisesRegex(RuntimeError, "changed"):
                 ui.accept_chrome_password("jobs.example.com")
@@ -310,6 +350,22 @@ class WindowsControlsTests(unittest.TestCase):
         with patch.object(ui, "automation", return_value=api), patch.object(ui, "document", return_value=doc):
             ui.reply("Test chat", "Continue?", "Continue the test.")
         send.GetPattern.return_value.Invoke.assert_called_once()
+
+    def test_terms_action_selects_only_the_explicit_label_among_two_agreements(self):
+        api, window, address_bar, webpage, _ = self.chrome_form()
+        window.GetChildren.return_value = [address_bar, webpage]
+        first = node("CheckBoxControl", "I agree to the Terms and Conditions")
+        second = node("CheckBoxControl", "I accept the partner terms of service")
+        for control in (first, second):
+            control.GetPattern.return_value.ToggleState = 0
+        first.GetPattern.return_value.Toggle.side_effect = lambda: setattr(first.GetPattern.return_value, "ToggleState", 1)
+        webpage.GetChildren.return_value = [first, second]
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"):
+            request = ui.chrome_signup_request("https://jobs.example.com", terms=True, label=first.Name)
+            ui.perform_chrome_signup_request("https://jobs.example.com", request)
+        first.GetPattern.return_value.Toggle.assert_called_once()
+        second.GetPattern.return_value.Toggle.assert_not_called()
 
     def test_reply_matches_hyperlinked_request_and_echo_as_paragraphs(self):
         origin = "http://127.0.0.1:8897/"

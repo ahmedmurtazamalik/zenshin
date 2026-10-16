@@ -156,7 +156,7 @@
     :root[data-theme=terminal] .control-bar { border-top: 1px solid #79ef9760; }
     @media (min-width: 1440px) { main { border-left: 1px solid var(--line); border-right: 1px solid var(--line); } }
     @media (max-width: 900px) { .workspace { grid-template-columns: 240px minmax(0, 1fr); } .content { padding: 28px 24px; } header { padding: 0 24px; } .field-row { align-items: flex-start; flex-direction: column; gap: 8px; } }
-    @media (max-width: 620px) { header { height: 68px; padding: 0 16px; } .brand { gap: 10px; } .brand small { display: none; } .brand .mark { width: 29px; height: 36px; flex-shrink: 0; } h1 { font-size: 12px; max-width: 130px; } .badge { font-size: 10px; } .workspace { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid var(--line); padding: 22px 20px; } #threads { max-height: 220px; } .content { padding: 26px 20px; } .rule { grid-template-columns: 1fr; } .control-inner { padding: 14px 16px; gap: 8px; flex-wrap: wrap; } .control-label { flex-basis: 100%; } .control-inner .toolbar { width: 100%; } #saved { flex-basis: 100%; } #pause:disabled { display: none; } main { padding-bottom: 150px; } }
+    @media (max-width: 620px) { header { height: 68px; padding: 0 16px; } .brand { gap: 10px; } .brand small { display: none; } .brand .mark { width: 29px; height: 36px; flex-shrink: 0; } h1 { font-size: 12px; max-width: 130px; } .badge { font-size: 10px; } .workspace { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid var(--line); padding: 22px 20px; } #threads { max-height: 220px; } .content { padding: 26px 20px; } .rule { grid-template-columns: 1fr; } .control-inner { padding: 14px 16px; gap: 8px; flex-wrap: wrap; } .control-label { flex-basis: 100%; } .control-inner .toolbar { width: 100%; } #saved { flex-basis: 100%; } main { padding-bottom: 150px; } }
       .header-tools { display: flex; align-items: center; gap: 18px; }
     #theme { padding: 6px 10px; font-size: 11px; }
     #progress { position: relative; padding: 12px 32px; background: var(--surface); color: var(--accent); border-top: 1px solid var(--line); font-size: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -181,6 +181,34 @@
     @keyframes shimmer { to { background-position: -200% 0; } }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
     @media (max-width: 620px) { header { height: auto; min-height: 84px; padding-top: 12px; padding-bottom: 12px; } .header-tools { flex-direction: column; align-items: flex-end; gap: 8px; } #progress { padding: 12px 16px; } main:has(#progress:not([hidden])) { padding-bottom: 260px; } }
+    .workflow-step { display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left; white-space: normal; background: transparent; border-color: transparent; margin-bottom: 8px; padding: 12px 10px; }
+    .workflow-step[aria-current] { background: var(--selected); border-color: var(--line); }
+    .workflow-step small { margin-top: 5px; font-size: 10px; line-height: 1.5; }
+    .step-number { color: var(--accent); font: 12px/1.5 ui-monospace, monospace; }
+    #workflow { margin: 20px -8px; }
+    #chats-panel #connect { flex: initial; }
+    #chats-panel #chat-search { margin-top: 16px; }
+    #chats-panel #threads { margin-left: 0; margin-right: 0; }
+    #codex-setup code { overflow-wrap: anywhere; }
+    #codex-setup h3 { font-size: 13px; margin: 20px 0 8px; }
+    #codex-setup ol { padding-left: 20px; color: var(--muted); font-size: 12px; line-height: 1.8; }
+    #codex-setup li { padding-left: 4px; margin: 8px 0; }
+    #codex-setup pre { max-height: none; }
+    #chrome-password-panel > label { display: block; margin-bottom: 12px; }
+    #setup-result { line-height: 1.6; }
+    #setup-result[data-ready=true] { color: var(--accent); }
+    dialog { background: transparent; color: var(--text); border: 0; padding: 0; max-width: none; max-height: none; }
+    dialog::backdrop { background: #000b; }
+    #tutorial { position: fixed; inset: 0; width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    #tutorial::backdrop { background: transparent; }
+    #tour-spotlight { position: fixed; border: 2px solid var(--accent); border-radius: 8px; box-shadow: 0 0 0 9999px #000b; pointer-events: none; }
+    .tour-card { position: fixed; width: min(380px, calc(100vw - 32px)); padding: 22px; border: 1px solid var(--accent); border-radius: 10px; background: var(--surface); box-shadow: 0 16px 60px #0006; }
+    .tour-card h2 { font-size: 20px; margin-top: 10px; }
+    .tour-card p { font-size: 13px; }
+    .tour-card .toolbar { justify-content: space-between; }
+    #welcome { width: min(440px, calc(100vw - 32px)); padding: 28px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    #welcome h2 { font-size: 25px; margin-top: 10px; }
+    @media (max-width: 620px) { .header-tools { gap: 6px; } #codex-setup { padding: 16px; } }
   </style>
 </head>
 <body>
@@ -193,15 +221,73 @@
   <path d="M15 57L23 59M14 68H23V85Q26 93 39 93H71M23 85Q20 91 14 93"/>
   <path d="M41 57L33 65L30 66M55 57L52 63M36 63V87H71M36 63H71M36 71H68M36 79H68M53 63V87"/>
 </svg></div><div><h1>Zenshin</h1><small>Keep moving forward · Local control</small></div></div>
-    <div class="header-tools"><span class="badge" id="status">Paused · disconnected</span><select id="theme" aria-label="Color theme"><option value="midnight">Midnight</option><option value="paper">Paper</option><option value="cobalt">Cobalt</option><option value="forest">Forest</option><option value="rose">Rose</option><option value="terminal">Terminal</option></select></div>
+    <div class="header-tools"><button id="replay-tutorial" class="quiet">Take the tour</button><span class="badge" id="status">Paused · chats disconnected</span><select id="theme" aria-label="Color theme"><option value="midnight">Midnight</option><option value="paper">Paper</option><option value="cobalt">Cobalt</option><option value="forest">Forest</option><option value="rose">Rose</option><option value="terminal">Terminal</option></select></div>
   </header>
   <div class="workspace">
-    <aside aria-label="Chat selection">
-      <div class="section-head"><h2>Chats</h2><span class="eyebrow">Sources</span></div>
-      <div class="toolbar"><button id="connect">Connect to Codex</button><button class="quiet" id="refresh" disabled>Refresh</button></div>
+    <aside aria-label="Setup and workflow">
+      <div class="section-head"><h2>Your workflow</h2></div>
+      <p class="muted">Follow these steps to set up and use Zenshin.</p>
+      <nav id="workflow" aria-label="Workflow steps">
+        <button class="workflow-step" data-panel="codex-setup" aria-current="step"><span class="step-number">01</span><span>Connect to Codex<small>One-time setup</small></span></button>
+        <button class="workflow-step" data-panel="chrome-password-panel" hidden><span class="step-number">02</span><span>Chrome actions<small>Choose allowed actions</small></span></button>
+        <button class="workflow-step" data-panel="chats-panel"><span class="step-number">03</span><span>Chats<small>Chat monitoring</small></span></button>
+        <button class="workflow-step" data-panel="authorization-panel"><span class="step-number">04</span><span>Authorization<small>Chat monitoring</small></span></button>
+        <button class="workflow-step" data-panel="monitor-panel"><span class="step-number">05</span><span>Monitor<small>Response mode and previews</small></span></button>
+        <button class="workflow-step" data-panel="activity-panel"><span class="step-number">06</span><span>Activity<small>Results and requests to review</small></span></button>
+      </nav>
+      <p class="muted">Chrome tools: connect, choose actions, then set the response mode and save. Chat monitoring also needs selected chats and authorization.</p>
+    </aside>
+    <div class="content">
+      <div class="page-heading"><span class="eyebrow">Workspace</span><h2>Set up your helper.</h2><p>Connect once, choose what Zenshin may do, then keep moving.</p></div>
+      <section id="codex-setup" aria-labelledby="setup-heading">
+        <div class="section-head"><h2 id="setup-heading">Connect to Codex</h2><span class="eyebrow">One-time setup</span></div>
+        <p class="muted">Give your Codex the tools to request one Chrome password selection or terms checkbox action and receive the result in the same turn.</p>
+        <ol>
+          <li>Install the Codex CLI, sign in with <code>codex login</code>, and keep Zenshin running. Chrome actions require Windows; chat monitoring also works on Linux.</li>
+          <li>Connect once using the button below. This adds the local <code>zenshin</code> MCP entry to your Codex configuration. It leaves other entries and approval settings unchanged.</li>
+          <li>Reload MCP connections or restart Codex. In your working chat, ask it to confirm that <code>select_chrome_password</code> and <code>check_chrome_terms</code> are available, without calling them.</li>
+        </ol>
+        <div class="toolbar"><button id="register-codex" class="primary">Connect Zenshin tools</button><button id="check-codex">Check connection</button></div>
+        <p id="setup-chat-result" class="muted" role="status">Check connection to verify chat access and tool registration separately.</p>
+        <p id="setup-result" class="muted" role="status">Checking registration…</p>
+        <details id="manual-setup"><summary>Manual setup or troubleshooting</summary>
+          <p>Run this command in <span id="setup-shell">your terminal</span> on this computer. It uses this installation's paths and port. Then check registration again.</p>
+          <pre id="setup-command" tabindex="0" aria-label="Registration command"></pre><button id="copy-command">Copy command</button>
+          <p>If Codex is missing, install its CLI and sign in, then restart Zenshin so it can find the CLI. If an old or disabled <code>zenshin</code> entry conflicts, inspect it with <code>codex mcp get zenshin</code>. Remove that entry with <code>codex mcp remove zenshin</code> only if you intend to replace it, then connect again.</p>
+          <p>Registration confirms configuration only. Your working Codex chat must also load the tools. If tools are missing, reload its MCP connections or restart Codex. Keep Zenshin running at this address; reconnect after moving the app or changing its port.</p>
+        </details>
+        <div id="codex-guidance">
+          <h3>Tell Codex when to use Zenshin</h3>
+          <p class="muted">The tools include usage instructions. For consistent use, copy this into your working chat or its project's AGENTS.md, alongside your task authorization.</p>
+          <pre id="setup-instructions" tabindex="0">Use normal browser tools for navigation and other work. Delegate authorized Chrome password generation/selection and terms checkbox actions to Zenshin's select_chrome_password or check_chrome_terms tool. Zenshin handles the complete native interaction, including opening the password suggestion. Do not use Computer Use to prepare or perform these actions. Keep the normal permission flow. Chrome must already show the intended page. Supply the full current page URL, an exact terms checkbox label, and a unique request_id per action. Continue after confirmed success. Reuse the same ID on transport retries; stop for review after an uncertain result. Never delegate safety refusals, URL-policy stops, CAPTCHA, marketing consent, or account submission.</pre>
+          <button id="copy-instructions">Copy Codex instructions</button><span id="copy-result" class="muted" role="status"></span>
+          <p class="muted">Next, open Chrome actions in the sidebar and enable only the actions you want. In Monitor, choose Send authorized replies, then save. Chrome tools work while chat monitoring is paused; no chat selection is required. Registration alone does not authorize actions.</p>
+        </div>
+      </section>
+      <section id="chrome-password-panel" aria-labelledby="chrome-password-heading" hidden>
+        <div class="section-head"><h2 id="chrome-password-heading">Individual Chrome actions</h2><span class="eyebrow">Windows</span></div>
+        <label><input id="auto-password" type="checkbox"> Allow Codex to select Chrome's suggested password</label>
+        <label><input id="auto-terms" type="checkbox"> Allow Codex to check a named terms agreement box</label>
+        <p class="muted help">With the Zenshin MCP server connected, Codex can request one action and receive its confirmed result directly. Enable an action and save Send authorized replies mode once. Chat monitoring can stay paused; Pause stops monitoring only. Disable an action and save to revoke it. Preview mode blocks both tools. Chrome must already show the intended page. Zenshin focuses the new-password field and opens and selects Chrome's native suggestion itself. Marketing opt-ins are excluded. No account is submitted.</p>
+        <label for="chrome-password-site">Registration site</label>
+        <input id="chrome-password-site" type="text" placeholder="https://jobs.example.com">
+        <button id="chrome-prepare">Open and verify in Chrome</button>
+        <p class="muted help">Optional: open this site in Chrome and check that it has finished loading. This does not intercept Codex's browser tools or resume a stopped attempt.</p>
+        <p id="chrome-prepare-result" class="muted" role="status"></p>
+        <details><summary>Fill a suggested password once</summary>
+        <p class="muted help">Zenshin finds one new-password field, focuses it, opens Chrome's native suggestion and selects it. Chrome handles filling the fields. This action does not submit the registration.</p>
+        <button id="chrome-password">Fill Chrome’s suggested password</button>
+        <p id="chrome-password-result" class="muted" role="status"></p>
+        </details>
+      </section>
+      <section id="chats-panel" aria-labelledby="chats-heading" hidden>
+        <div class="section-head"><h2 id="chats-heading">Chats</h2><span class="eyebrow">Chat monitoring</span></div>
+      <div class="toolbar"><button id="connect">Load Codex chats</button><button class="quiet" id="refresh" disabled>Refresh</button><button id="check-chat-connection">Check connection</button></div>
+      <p id="chat-connection-result" class="muted" role="status"></p>
+      <small>Connect here to monitor chat requests. Chrome tools use their separate registration.</small>
       <input type="text" id="chat-search" aria-label="Filter chats" placeholder="Find a chat…">
       <p class="muted" id="selection">No chats selected.</p>
-      <div id="threads"><p class="muted">Connect to load your chats.</p></div>
+      <div id="threads"><p class="muted">Use Load Codex chats to see your chats.</p></div>
       <button class="quiet" id="more" hidden>Load more chats</button>
       <details><summary>Add a chat by ID</summary>
         <p class="muted">Use its Codex thread ID if it hasn't appeared in the list.</p>
@@ -210,11 +296,9 @@
       <details><summary>Supported requests</summary>
         <p class="muted">Question forms, custom answers, and continuation replies in the selected desktop chat. “Allow once” file-access approvals are live-verified; command and other tool cards still need live checks.</p>
       </details>
-    </aside>
-    <div class="content">
-      <div class="page-heading"><span class="eyebrow">Workspace</span><h2>Set up your helper.</h2><p>Select chats, choose what it may answer, then start monitoring.</p></div>
-      <section aria-labelledby="authorization-heading">
-        <div class="section-head"><h2 id="authorization-heading">Authorization</h2><span class="eyebrow">01</span></div>
+      </section>
+      <section id="authorization-panel" aria-labelledby="authorization-heading" hidden>
+        <div class="section-head"><h2 id="authorization-heading">Authorization</h2><span class="eyebrow">Chat monitoring</span></div>
         <div class="field-row"><label for="decision-method">Choose how requests are matched</label><select id="decision-method"><option value="ai">AI · follow my instructions</option><option value="exact">Match exact questions</option></select></div>
         <div id="ai-fields" hidden>
           <label for="instructions">What may the helper approve?</label>
@@ -226,8 +310,8 @@
           <p class="muted" id="rules-empty">No rules yet. Add the question you expect and the reply to send.</p><div id="rules"></div><button id="add">+ Add rule</button>
         </div>
       </section>
-      <section aria-labelledby="monitor-heading">
-        <div class="section-head"><h2 id="monitor-heading">Monitor</h2><span class="eyebrow">02</span></div>
+      <section id="monitor-panel" aria-labelledby="monitor-heading" hidden>
+        <div class="section-head"><h2 id="monitor-heading">Monitor</h2><span class="eyebrow">Response settings</span></div>
         <div class="field-row"><label for="mode">Response mode</label><select id="mode"><option value="preview">Preview only</option><option value="desktop">Send authorized replies</option></select></div>
         <div class="notice"><span class="notice-symbol" aria-hidden="true">↳</span><div><strong id="mode-title">Preview only</strong><span id="mode-description">Inspect suggested responses before enabling delivery.</span></div></div>
         <p id="error" role="alert" hidden></p>
@@ -235,23 +319,7 @@
         <p class="muted help">Starts paused. Saving settings pauses monitoring. Pause takes effect after the current check.</p>
         <div id="previews"><p class="empty">Latest requests will appear here.</p></div>
       </section>
-      <section id="chrome-password-panel" aria-labelledby="chrome-password-heading" hidden>
-        <div class="section-head"><h2 id="chrome-password-heading">Chrome signup assistance</h2><span class="eyebrow">Windows</span></div>
-        <label><input id="auto-password" type="checkbox"> Automatically select Chrome's suggested password</label>
-        <label><input id="auto-terms" type="checkbox"> Automatically accept site terms checkboxes</label>
-        <p class="muted help">While Send authorized replies monitoring is running, these act when a selected chat stops and asks about a password or terms, on a site found in its recent context. Password assistance requires Chrome's suggestion to be open. Terms assistance accepts clearly labeled agreement boxes, leaving marketing opt-ins alone. Codex is notified to continue. Both start off; save changes to apply.</p>
-        <label for="chrome-password-site">Registration site</label>
-        <input id="chrome-password-site" type="text" placeholder="https://jobs.example.com">
-        <button id="chrome-prepare">Open and verify in Chrome</button>
-        <p class="muted help">Optional: open this site in Chrome and check that it has finished loading. This does not intercept Codex's browser tools or resume a stopped attempt.</p>
-        <p id="chrome-prepare-result" class="muted" role="status"></p>
-        <details><summary>Select a password suggestion once</summary>
-        <p class="muted help">Arm this action, then switch to Chrome and open “Use strong password” or “Use suggested password” within 30 seconds. Chrome handles filling and saving the password. This action does not submit the registration.</p>
-        <button id="chrome-password">Accept next suggestion for this site</button>
-        <p id="chrome-password-result" class="muted" role="status"></p>
-        </details>
-      </section>
-      <section aria-labelledby="activity-heading">
+      <section id="activity-panel" aria-labelledby="activity-heading" hidden>
         <div class="section-head"><h2 id="activity-heading">Activity</h2><span class="eyebrow">Local history</span></div>
         <div id="activity"></div>
       </section>
@@ -259,6 +327,19 @@
   </div>
   <div class="control-bar"><div id="progress" role="status" hidden><span class="spinner" aria-hidden="true"></span><span id="progress-text"></span><span id="progress-time" aria-hidden="true"></span><span id="progress-detail" hidden></span><div id="check-steps" aria-hidden="true" hidden><span class="check-step" data-step="reading">Read chats</span><span class="check-step" data-step="inspecting">Find request</span><span class="check-step" data-step="deciding">Decide</span><span class="check-step" data-step="sending">Send</span><span class="check-step" data-step="confirming">Confirm</span></div></div><div class="control-inner"><span class="control-label" id="next-step">Connect to Codex to begin</span><div class="toolbar"><span id="saved" role="status"></span><button id="save">Save changes</button><button class="primary" id="start" disabled>Start monitoring</button><button id="pause" disabled>Pause</button></div></div></div>
 </main>
+<dialog id="welcome" aria-labelledby="welcome-title">
+  <span class="eyebrow">Welcome to Zenshin</span><h2 id="welcome-title">A little guidance to get going.</h2>
+  <p>Take a quick tour of connecting Codex, enabling Chrome tools, and setting up chat monitoring.</p>
+  <p class="muted">The tour highlights your controls without changing settings or sending actions. Replay it anytime with “Take the tour”.</p>
+  <div class="toolbar"><button id="welcome-start" class="primary">Show me around</button><button id="welcome-skip">I'll explore</button></div>
+</dialog>
+<dialog id="tutorial" aria-labelledby="tour-title" aria-describedby="tour-description">
+  <div id="tour-spotlight" aria-hidden="true"></div>
+  <div id="tour-card" class="tour-card">
+    <span class="eyebrow" id="tour-count"></span><h2 id="tour-title"></h2><p id="tour-description"></p>
+    <div class="toolbar"><button id="tour-close" class="quiet">Skip tour</button><div><button id="tour-back">Back</button> <button id="tour-next" class="primary">Next</button></div></div>
+  </div>
+</dialog>
 <script>
   const $ = id => document.getElementById(id);
   function updateFavicon() {
@@ -278,7 +359,118 @@
     if (className) node.className = className;
     return node;
   }
-  function showError(message) { $('error').textContent = message; $('error').hidden = !message; }
+  function showError(message) { $('error').textContent = message; $('error').hidden = !message; if (message) showPanel('monitor-panel'); }
+  let activePanel = 'codex-setup';
+  function showPanel(id, scroll = true) {
+    activePanel = id;
+    for (const button of $('workflow').children) {
+      const active = button.dataset.panel === id;
+      $(button.dataset.panel).hidden = !active;
+      if (active) button.setAttribute('aria-current', 'step'); else button.removeAttribute('aria-current');
+    }
+    if (scroll) $(id).scrollIntoView({block: 'start', behavior: 'instant'});
+  }
+  for (const button of $('workflow').children) button.onclick = () => showPanel(button.dataset.panel);
+  let setupBusy = false;
+  async function loadSetup(register = false) {
+    if (setupBusy) return;
+    setupBusy = true;
+    $('register-codex').disabled = $('check-codex').disabled = true;
+    $('setup-result').textContent = register ? 'Registering Zenshin tools…' : 'Checking registration…';
+    try {
+      const setup = await request('codex-setup', {register});
+      $('setup-command').textContent = setup.command;
+      $('setup-shell').textContent = state?.chrome_password_supported ? 'PowerShell' : 'your terminal';
+      $('setup-result').textContent = setup.message;
+      $('setup-result').dataset.ready = setup.registered;
+      $('register-codex').textContent = setup.registered ? 'Registered · check again' : 'Connect Zenshin tools';
+      $('manual-setup').open = setup.conflict || (!setup.registered && setup.message.startsWith('Could not'));
+    } catch (error) { $('setup-result').textContent = error.message; }
+    finally { setupBusy = false; $('register-codex').disabled = $('check-codex').disabled = false; }
+  }
+  async function copySetup(id) {
+    try {
+      await navigator.clipboard.writeText($(id).textContent);
+      $('copy-result').textContent = ' Copied.';
+    } catch (_) { $('copy-result').textContent = ' Select the text above and copy it manually.'; }
+  }
+  $('register-codex').onclick = () => loadSetup(true);
+  let checkingConnection = false;
+  async function checkConnection(includeTools = false) {
+    if (checkingConnection || setupBusy || busy) return;
+    checkingConnection = true;
+    $('check-codex').disabled = $('check-chat-connection').disabled = true;
+    for (const id of ['setup-chat-result', 'chat-connection-result']) $(id).textContent = 'Checking Codex connection…';
+    try {
+      if (includeTools) await loadSetup();
+      const result = await request('check-connection');
+      const response = await fetch('/api/state');
+      if (!response.ok) throw new Error('Could not refresh connection status');
+      renderState(await response.json());
+      for (const id of ['setup-chat-result', 'chat-connection-result']) $(id).textContent = result.message;
+    } catch (error) {
+      for (const id of ['setup-chat-result', 'chat-connection-result']) $(id).textContent = 'Connection check failed: ' + error.message;
+    } finally {
+      checkingConnection = false;
+      $('check-codex').disabled = $('check-chat-connection').disabled = false;
+    }
+  }
+  $('check-codex').onclick = () => checkConnection(true);
+  $('check-chat-connection').onclick = () => checkConnection();
+  $('copy-command').onclick = () => copySetup('setup-command');
+  $('copy-instructions').onclick = () => copySetup('setup-instructions');
+
+  let tourSteps = [], tourIndex = 0, tourFocus;
+  function rememberTour() { localStorage.setItem('zenshin-tour-v1', 'seen'); }
+  function positionTour() {
+    if (!$('tutorial').open) return;
+    const target = document.querySelector(tourSteps[tourIndex][0]);
+    const rect = target.getBoundingClientRect(), ring = $('tour-spotlight'), card = $('tour-card');
+    Object.assign(ring.style, {left: Math.max(4, rect.left - 5) + 'px', top: Math.max(4, rect.top - 5) + 'px',
+      width: Math.min(rect.width + 10, innerWidth - 8) + 'px', height: Math.min(rect.height + 10, innerHeight - 8) + 'px'});
+    const width = card.offsetWidth, height = card.offsetHeight;
+    const left = rect.right + width + 24 < innerWidth ? rect.right + 16 : Math.max(16, Math.min(rect.left, innerWidth - width - 16));
+    let top = rect.right + width + 24 < innerWidth ? rect.top : rect.bottom + 16;
+    if (top + height > innerHeight - 16) top = rect.top - height - 16;
+    Object.assign(card.style, {left: left + 'px', top: Math.max(16, Math.min(top, innerHeight - height - 16)) + 'px'});
+  }
+  function showTourStep() {
+    const [selector, title, description] = tourSteps[tourIndex];
+    $('tour-count').textContent = `Your guide · ${tourIndex + 1} of ${tourSteps.length}`;
+    $('tour-title').textContent = title; $('tour-description').textContent = description;
+    $('tour-back').disabled = tourIndex === 0;
+    $('tour-next').textContent = tourIndex === tourSteps.length - 1 ? 'Finish' : 'Next';
+    const panel = document.querySelector(selector).closest('.content > section');
+    showPanel(panel ? panel.id : 'monitor-panel', false);
+    document.querySelector(selector).scrollIntoView({block: 'center', behavior: 'instant'});
+    positionTour();
+  }
+  function startTour() {
+    tourFocus = document.activeElement; rememberTour(); $('welcome').close();
+    tourSteps = [
+      ['#register-codex', 'Connect your Codex once', 'Use Connect Zenshin tools to register this installation. Then reload MCP connections or restart Codex. A registered entry still needs to be loaded by your working chat. Manual setup is available here if needed.'],
+      ['#copy-instructions', 'Give Codex the instructions', 'Copy this guidance into the chat doing your work or its project instructions. Tell Codex which task and agreements you authorize. It can then request individual actions and continue after a confirmed result.'],
+      ...(state?.chrome_password_supported ? [['#auto-password', 'Choose your Chrome actions', 'In Chrome actions, enable password selection, terms agreement, or both. Zenshin opens and selects the native password suggestion itself; a terms request names one exact checkbox. Codex delegates these actions without using Computer Use. These actions never submit an account or select marketing consent.']] : []),
+      ['#connect', 'Monitor chat requests', 'Load Codex chats to monitor questions and continuation requests. This is separate from registering the Chrome tools. Select chats with unique titles; desktop monitoring visits each selected chat in turn.'],
+      ['#authorization-panel', 'Define what may be answered', 'For chat monitoring, choose AI and write narrow standing instructions, or save exact question-and-answer rules. Missing facts and new decisions stay for you. AI analysis uses your Codex account.'],
+      ['#mode', 'Preview or allow delivery', 'Preview blocks Chrome actions and only shows suggested chat replies. In Monitor, choose Send authorized replies when ready. Save changes to apply the mode and action toggles. Chrome tools need no selected chat or running monitor.'],
+      ['#save', 'Save, then try Preview', 'Save changes applies your settings and pauses monitoring. For chat monitoring, start in Preview, select a chat and add instructions or a rule, then Start monitoring. Keep this page open for its five-second checks.'],
+      ['#pause', 'You stay in control', 'Pause stops future monitoring checks after the current check. Direct Chrome tools remain available while paused: disable their toggles and save, or save Preview mode, to block them.'],
+      ['#activity-panel', 'Check results and uncertainty', 'Activity records confirmed actions and requests needing review. If delivery is uncertain, inspect Chrome or Codex before marking requests reviewed. Zenshin does not automatically retry an uncertain action. You can replay this guide anytime from Take the tour.']
+    ];
+    tourIndex = 0; $('tutorial').showModal(); showTourStep(); $('tour-next').focus();
+  }
+  function finishTour() { $('tutorial').close(); tourFocus?.focus(); }
+  $('replay-tutorial').onclick = startTour;
+  $('welcome-start').onclick = startTour;
+  $('welcome-skip').onclick = () => { rememberTour(); $('welcome').close(); $('replay-tutorial').focus(); };
+  $('welcome').addEventListener('cancel', rememberTour);
+  $('tutorial').addEventListener('cancel', () => { tourFocus?.focus(); });
+  $('tour-close').onclick = finishTour;
+  $('tour-back').onclick = () => { if (tourIndex > 0) { tourIndex--; showTourStep(); } };
+  $('tour-next').onclick = () => { if (tourIndex === tourSteps.length - 1) finishTour(); else { tourIndex++; showTourStep(); } };
+  window.addEventListener('resize', () => { if ($('tutorial').open) showTourStep(); });
+  window.addEventListener('scroll', positionTour, true);
   function renderProgress() {
     const p = monitorProgress;
     if (p && (p.running || (p.stage === 'error' && state?.error))) {
@@ -330,7 +522,7 @@
     $('threads').replaceChildren();
     const available = new Map([...selected, ...chats.map(chat => [chat.id, chat])]);
     const query = $('chat-search').value.trim().toLowerCase();
-    if (!available.size) $('threads').append(element('p', state?.connected ? 'No chats loaded. Refresh the list or add one by ID.' : 'Connect to Codex to load your chats.', 'muted'));
+    if (!available.size) $('threads').append(element('p', state?.connected ? 'No chats loaded. Refresh the list or add one by ID.' : 'Use Load Codex chats to see your chats.', 'muted'));
     let shown = 0;
     for (const chat of available.values()) {
       const name = chat.name || chat.preview?.slice(0, 100) || chat.id;
@@ -353,10 +545,10 @@
     $('selection').textContent = selected.size ? `${selected.size} chat${selected.size === 1 ? '' : 's'} selected` : 'Select one or more chats to monitor.';
     const ai = $('decision-method').value === 'ai';
     const rows = [...$('rules').children];
-    const authorized = ai ? !!$('instructions').value.trim() : ($('auto-password').checked || $('auto-terms').checked ||
-      rows.length > 0 && rows.every(row => [...row.querySelectorAll('textarea')].every(input => input.value.trim())));
+    const authorized = ai ? !!$('instructions').value.trim() : rows.length > 0 && rows.every(row =>
+      [...row.querySelectorAll('textarea')].every(input => input.value.trim()));
     $('start').disabled = busy || !state?.connected || state.running || !selected.size || !authorized;
-    $('next-step').textContent = !state?.connected ? 'Connect to Codex to begin'
+    $('next-step').textContent = !state?.connected ? 'Choose a sidebar section to begin'
       : !selected.size ? 'Select at least one chat'
       : !authorized ? (ai ? 'Write what the helper may approve' : 'Add a complete question and reply')
       : state.running ? 'Monitoring every 5s · Keep this window open'
@@ -382,7 +574,8 @@
       const head = element('div', undefined, 'entry-head');
       head.append(element('strong', entry.name || 'Selected chat'));
       if (entry.time) head.append(element('small', new Date(entry.time * 1000).toLocaleString()));
-      row.append(head, element('small', ({sent: 'Sent', uncertain: 'Needs your review', sending: 'Sending', reviewed: 'Reviewed'})[entry.status] || entry.status));
+      row.append(head, element('small', entry.kind === 'browser_action' && entry.status === 'sent' ? 'Action confirmed'
+        : ({sent: 'Sent', uncertain: 'Needs your review', sending: 'Sending', reviewed: 'Reviewed'})[entry.status] || entry.status));
       row.append(element('pre', entry.text));
       if (entry.response) row.append(element('p', (entry.status === 'sent' ? 'Sent: ' : 'Suggested reply: ') + entry.response, 'response'));
       if (entry.answers) for (const answer of entry.answers) row.append(element('p', answer.question + ' → ' + (answer.response || 'Needs your answer'), 'muted'));
@@ -393,10 +586,21 @@
     }
   }
   function renderState(result) {
+    const previousConnection = state?.connected;
     state = result;
-    $('chrome-password-panel').hidden = !state.chrome_password_supported;
+    if (previousConnection !== state.connected) {
+      for (const id of ['setup-chat-result', 'chat-connection-result']) $(id).textContent = state.connected
+        ? 'Chat connection: connected. Use Check connection to verify.'
+        : 'Chat connection: not connected. Open Chats and choose Load Codex chats.';
+    }
+    const chromeStep = document.querySelector('[data-panel="chrome-password-panel"]');
+    chromeStep.hidden = !state.chrome_password_supported;
+    let stepNumber = 0;
+    for (const button of $('workflow').children) if (!button.hidden) button.querySelector('.step-number').textContent = String(++stepNumber).padStart(2, '0');
+    if (!state.chrome_password_supported && activePanel === 'chrome-password-panel') activePanel = 'codex-setup';
+    showPanel(activePanel, false);
     monitorProgress = result.progress; progressReceived = Date.now(); renderProgress();
-    $('status').textContent = `${state.running ? 'Monitoring' : 'Paused'} · ${state.connected ? 'connected' : 'disconnected'}`;
+    $('status').textContent = `${state.running ? 'Monitoring' : 'Paused'} · chats ${state.connected ? 'connected' : 'disconnected'}`;
     $('status').classList.toggle('running', state.running);
     $('mode-title').textContent = state.mode === 'desktop' ? 'Authorized replies will be sent' : 'Suggestions only — nothing is sent';
     $('mode-description').textContent = state.mode === 'desktop'
@@ -483,14 +687,14 @@
     }
   }, 'chrome-prepare', 'Preparing the website in Chrome…');
   $('chrome-password').onclick = () => action(async () => {
-    $('chrome-password-result').textContent = 'Waiting up to 30 seconds. Switch to Chrome and open its password suggestion.';
+    $('chrome-password-result').textContent = 'Zenshin is opening and selecting Chrome’s native password suggestion…';
     try {
       const result = await request('chrome-password', {site: $('chrome-password-site').value.trim()});
       $('chrome-password-result').textContent = result.message;
     } catch (error) {
       $('chrome-password-result').textContent = error.message;
     }
-  }, 'chrome-password', 'Switch to Chrome and open its password suggestion (30 seconds)…');
+  }, 'chrome-password', 'Zenshin is filling Chrome’s suggested password…');
   action(async () => {
     const response = await fetch('/api/state');
     if (!response.ok) throw new Error('Could not read local settings');
@@ -501,8 +705,20 @@
     $('instructions').value = result.instructions; showAuthorization(); renderState(result);
     $('auto-password').checked = result.auto_password; $('auto-terms').checked = result.auto_terms; updateSelection();
     if (result.connected) await loadChats();
-  }, null, 'Loading your saved settings…');
-  setInterval(() => { nextCheckAt = Date.now() + 5000; if (state?.running && !busy) action(async () => renderState(await request('poll'))); }, 5000);
+  }, null, 'Loading your saved settings…').then(() => {
+    loadSetup();
+    if (state && !localStorage.getItem('zenshin-tour-v1')) $('welcome').showModal();
+  });
+  setInterval(() => {
+    nextCheckAt = Date.now() + 5000;
+    if (busy) return;
+    if (state?.running) action(async () => renderState(await request('poll')));
+    else if (state?.chrome_password_supported && (state.auto_password || state.auto_terms)) action(async () => {
+      const response = await fetch('/api/state');
+      if (!response.ok) throw new Error('Could not read Chrome action history');
+      renderState(await response.json());
+    }, null, 'Reading Chrome action history…');
+  }, 5000);
   setInterval(() => { renderProgress(); refreshProgress(); }, 1000);
 </script>
 </body>

@@ -7,7 +7,9 @@ import os
 from pathlib import Path
 import re
 import select
+import shlex
 import subprocess
+import sys
 import tempfile
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,6 +19,52 @@ import ai_decision
 
 
 ROOT = Path(__file__).resolve().parent
+
+
+def codex_setup(port, register=False):
+    arguments = ["-B", str(ROOT / "zenshin_mcp.py")]
+    if port != 8765:
+        arguments += ["--port", str(port)]
+    launcher = [sys.executable, *arguments]
+    command = ["codex", "mcp", "add", "zenshin", "--", *launcher]
+    # Display a command that preserves spaces and quotes in installation paths.
+    manual = ("& " + " ".join("'" + part.replace("'", "''") + "'" for part in command)
+              if os.name == "nt" else shlex.join(command))
+    result = {"command": manual, "registered": False, "conflict": False}
+    try:
+        cli = ai_decision.cli_command()
+
+        def run(arguments):
+            process = subprocess.run(cli + arguments, capture_output=True, text=True,
+                                     encoding="utf-8", timeout=15,
+                                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+            if process.returncode:
+                raise RuntimeError(process.stderr.strip()[-1000:] or "Codex command failed")
+            return process.stdout
+
+        def inspect():
+            servers = json.loads(run(["mcp", "list", "--json"]))
+            entry = next((server for server in servers if server["name"] == "zenshin"), None)
+            if entry is None:
+                return
+            transport = entry.get("transport", {})
+            result["registered"] = (entry.get("enabled", True)
+                and os.path.normcase(transport.get("command", "")) == os.path.normcase(sys.executable)
+                and transport.get("args", []) == arguments)
+            result["conflict"] = not result["registered"]
+
+        inspect()
+        if register and not result["registered"] and not result["conflict"]:
+            run(["mcp", "add", "zenshin", "--", *launcher])
+            inspect()
+            if not result["registered"]:
+                raise RuntimeError("Registration could not be verified. Check the manual setup below.")
+        result["message"] = ("Registered for this installation. Reload MCP connections or restart Codex, then confirm both Zenshin tools are available in your working chat."
+            if result["registered"] else "A different or disabled Zenshin registration exists. It was left unchanged. See manual setup below."
+            if result["conflict"] else "Not registered yet. Connect once to make the two tools available to Codex.")
+    except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
+        result["message"] = "Could not check or register Zenshin: " + str(error) + ". Use manual setup below."
+    return result
 
 
 def load_state(path):
@@ -125,7 +173,7 @@ def connect():
     try:
         rpc(connection, "initialize", {"clientInfo": {
             "name": "codex_approval_helper", "title": "Zenshin",
-            "version": "0.1.0"}})
+            "version": "0.2.0"}})
         process.stdin.write(b'{"method":"initialized","params":{}}\n')
         process.stdin.flush()
         return connection
@@ -365,7 +413,6 @@ def check_desktop(app, ui):
 
     previews = []
     app["previews"] = previews
-    selected = []
     for target in app["state"]["targets"]:
         set_progress(app, "reading", target["name"])
         thread = rpc(app["connection"], "thread/read", {
@@ -373,13 +420,6 @@ def check_desktop(app, ui):
         if thread.get("name") != target["name"]:
             app["running"] = False
             raise RuntimeError("The selected chat was renamed; select and save it again")
-        selected.append((target, thread))
-    # Inspect Chrome before opening Codex, which can dismiss its native popup.
-    if os.name == "nt" and (app["state"].get("auto_password") or app["state"].get("auto_terms")):
-        for target, thread in selected:
-            if check_browser_request(app, ui, target, thread):
-                return
-    for target, thread in selected:
         try:
             ui.open_chat(target["id"], target["name"], on_open=lambda: set_progress(
                 app, "opening", target["name"], "Waiting for the selected chat to load in Codex."))
@@ -491,81 +531,62 @@ def check_desktop(app, ui):
                              "status": latest["status"] + " — no live response control; no response sent"})
 
 
-def check_browser_request(app, ui, target, thread):
-    latest = preview_latest(thread, [])
-    if not latest or thread["turns"][-1].get("status") != "completed":
-        return False
-    text = latest["text"].casefold()
-    if not re.search(r"\b(?:please|cannot|can['’]t|unable|manual(?:ly)?|need|must|waiting|enter|fill|accept|check|requires?)\b", text):
-        return False
-    password = app["state"].get("auto_password", False) and "password" in text
-    terms = app["state"].get("auto_terms", False) and bool(re.search(r"\bterms\b|\bcheckbox", text))
-    if not password and not terms:
-        return False
-    recent = analysis_input(thread, latest, "")["messages"]
-    context = "\n".join(message["text"] for message in recent)
-    # Browser navigation URLs often appear only in the last turn's tool calls.
-    context += "\n" + "\n".join(json.dumps(item.get("arguments", {}))
-                                 for item in thread["turns"][-1].get("items", [])
-                                 if item["type"] == "mcpToolCall")
-    if re.search(r"https?://", latest["text"]):
-        context = latest["text"]
-    origins = []
-    for address in re.findall(r"https?://[^\s<>\"'\\]+", context):
-        try:
-            origin = ui.site_origin(address.rstrip(".,;:)]}"))
-        except ValueError:
-            continue
-        if origin not in origins:
-            origins.append(origin)
-    for origin in origins:
-        request = ui.chrome_signup_request(origin, password=password, terms=terms)
-        if not request:
-            continue
-        fingerprint = hashlib.sha256(json.dumps([origin, request], sort_keys=True).encode()).hexdigest()
-        key = thread["id"] + ":" + latest["item_id"] + ":browser:" + fingerprint
-        if key in app["state"]["attempts"]:
-            continue
-        description = ("Select Chrome's suggested password" if request["kind"] == "password"
-                       else "Accept site terms: " + request["label"])
-        completed = ("selected Chrome's suggested password" if request["kind"] == "password"
-                     else "checked the site's terms agreement checkbox")
-        response = f"Zenshin {completed} on {origin}. Continue within the existing task authorization."
-        attempt = {**latest, "name": target["name"], "text": description + " on " + origin,
-                   "response": response, "time": int(time.time()), "status": "sending"}
-        cancel_analysis(app)
-        app["state"]["attempts"][key] = attempt
-        save_state(app["path"], app["state"])
-        try:
-            set_progress(app, "reading", target["name"], "Waiting for Chrome to finish loading.")
-            ui.prepare_chrome_site(origin, open_site=False)
-            set_progress(app, "sending", target["name"], description)
-            ui.perform_chrome_signup_request(origin, request)
-            attempt["browser_completed"] = True
-            save_state(app["path"], app["state"])
-            ui.open_chat(target["id"], target["name"])
-            try:
-                ui.reply(target["name"], latest["text"], response)
-            except Exception:
-                # A Windows provider can report an event error after Send.
-                # Confirm the exact new persisted reply; never send it again.
-                if not persisted_reply(app["connection"], target["id"], latest["turn_id"], response):
-                    raise
-                attempt["reply_confirmed_by"] = "app_server"
-        except Exception as error:
-            attempt.update(status="uncertain", error=str(error))
-            app["running"] = False
-        else:
-            attempt["status"] = "sent"
-            set_progress(app, "done", target["name"], description + "; Codex notified.")
+def browser_action(app, data):
+    if os.name != "nt":
+        raise ValueError("Individual Chrome actions currently require Windows; Codex approvals and forms also support Linux")
+    action = data.get("action")
+    if action not in {"password", "terms"}:
+        raise ValueError("Choose one password or terms action")
+    if app["state"]["mode"] != "desktop" or not app["state"].get("auto_" + action):
+        raise ValueError("Enable this Chrome action and save Send authorized replies mode in Zenshin first")
+    site, request_id, label = data.get("site"), data.get("request_id"), data.get("label", "")
+    if not all(isinstance(value, str) and value.strip() for value in (site, request_id)):
+        raise ValueError("A site URL and stable request_id are required")
+    if not isinstance(label, str) or (action == "terms" and not label.strip()):
+        raise ValueError("Terms actions require the exact checkbox label")
+    import windows_ui
+    origin = windows_ui.site_origin(site)
+    key = "browser:" + request_id
+    identity = {"action": action, "site": site, "label": label}
+    prior = app["state"]["attempts"].get(key)
+    if prior:
+        if prior["request"] != identity:
+            raise ValueError("This request_id belongs to a different browser action")
+        if prior["status"] == "sent":
+            return {**prior["result"], "replayed": True}
+        raise RuntimeError("This action was attempted already; inspect Chrome and review the unconfirmed request, without retrying it")
+    if any(attempt.get("kind") == "browser_action" and attempt["status"] not in {"sent", "reviewed"}
+           for attempt in app["state"]["attempts"].values()):
+        raise RuntimeError("An earlier Chrome action is unconfirmed; inspect Chrome and mark requests reviewed first")
+    description = "Select Chrome's suggested password" if action == "password" else "Check terms: " + label
+    attempt = {"kind": "browser_action", "thread_id": "", "name": "Chrome",
+               "request": identity, "text": description + " on " + origin,
+               "time": int(time.time()), "status": "sending"}
+    app["state"]["attempts"][key] = attempt
+    save_state(app["path"], app["state"])
+    try:
+        def perform():
+            windows_ui.prepare_chrome_site(site, open_site=False)
+            if action == "password":
+                windows_ui.open_chrome_password_suggestion(site)
+            request = windows_ui.chrome_signup_request(origin, password=action == "password",
+                                                       terms=action == "terms", label=label or None)
+            if not request:
+                raise RuntimeError("The requested native password suggestion or unchecked terms box is not available")
+            windows_ui.perform_chrome_signup_request(origin, request)
+        windows_ui.run(perform)
+        result = {"request_id": request_id, "action": action, "site": origin, "confirmed": True,
+                  "message": description + " confirmed. Continue the current task using your normal tools."}
+        attempt.update(status="sent", result=result)
+    except Exception as error:
+        attempt.update(status="uncertain", error=str(error))
+        app["running"] = False
+        raise RuntimeError("Chrome action was not confirmed; do not retry. " + str(error)) from error
+    finally:
         app["state"]["activity"].append(dict(attempt))
         app["state"]["activity"] = app["state"]["activity"][-100:]
-        app["previews"] = [dict(attempt)]
         save_state(app["path"], app["state"])
-        if attempt["status"] == "uncertain":
-            raise RuntimeError("Browser action or Codex continuation was not confirmed: " + attempt["error"])
-        return True
-    return False
+    return result
 
 
 def persisted_reply(connection, thread_id, turn_id, response):
@@ -596,6 +617,20 @@ def snapshot(app):
                                for attempt in app["state"]["attempts"].values()),
             "progress": progress_snapshot(app),
             "error": app["error"]}
+
+
+def check_codex_connection(app):
+    if not app["connection"]:
+        return {"connected": False, "message": "Chat connection: not connected. Open Chats and choose Load Codex chats."}
+    try:
+        rpc(app["connection"], "thread/list", {"limit": 1})
+        return {"connected": True, "message": "Chat connection: connected. Codex responded successfully."}
+    except (OSError, RuntimeError) as error:
+        app["running"] = False
+        cancel_analysis(app)
+        close_connection(app["connection"])
+        app["connection"] = None
+        return {"connected": False, "message": "Chat connection: disconnected. " + str(error) + ". Load Codex chats to reconnect."}
 
 
 def main():
@@ -664,6 +699,15 @@ def main():
                 if not 0 < size <= 1_000_000:
                     raise ValueError("Invalid request size")
                 data = json.loads(self.rfile.read(size))
+                if self.path == "/api/codex-setup":
+                    return self.reply(codex_setup(args.port, register=data.get("register") is True))
+                if self.path == "/api/check-connection":
+                    return self.reply(check_codex_connection(app))
+                if self.path == "/api/browser-action":
+                    try:
+                        return self.reply(browser_action(app, data))
+                    except RuntimeError as error:
+                        return self.reply({"error": str(error)}, 503)
                 if self.path in {"/api/chrome-password", "/api/chrome-prepare"}:
                     if os.name != "nt":
                         raise ValueError("Chrome password selection is available on Windows only")
@@ -674,6 +718,7 @@ def main():
                         def prepare():
                             result = windows_ui.prepare_chrome_site(data["site"])
                             if self.path == "/api/chrome-password":
+                                windows_ui.open_chrome_password_suggestion(data["site"])
                                 result = windows_ui.accept_chrome_password(data["site"])
                             return result
                         result = windows_ui.run(prepare)

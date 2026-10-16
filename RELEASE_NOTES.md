@@ -1,45 +1,52 @@
-# Zenshin v0.1.0 — Linux MVP
+# Zenshin v0.2.0 — Windows support and native Chrome actions
 
-14 October 2026. Prerelease; Linux source distribution, with no bundled Python runtime or desktop dependencies. Windows support is not implemented in this release.
+16 October 2026. MVP source release for Windows and Linux. Requires Python and a signed-in Codex CLI; no standalone executable or installer is bundled.
 
-## Included
+## Downloads
 
-- Local control page with selected Codex chats, saved instructions, preview mode, Start/Pause, activity history, themes, and live check progress.
-- AI interpretation through the signed-in Codex CLI, plus exact-question rules. AI can approve, continue, or leave requests for the user.
-- Desktop offered answers, custom text, multi-question forms, ordinary replies, and one-time approval-card handling.
-- Durable attempts recorded before sending, duplicate prevention, draft preservation, and a pause when delivery cannot be confirmed.
-- Automatic navigation to selected chats through their Codex links, checking chats sequentially and waiting for the correct chat before inspecting requests.
+- [Windows source ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.0/zenshin-v0.2.0-windows-source.zip)
+- [Linux source tar.gz](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.0/zenshin-v0.2.0-linux-source.tar.gz)
+- [SHA-256 checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.0/SHA256SUMS.txt)
 
-## Run on Linux
+Both archives extract into `zenshin-0.2.0`. See the [README](README.md) for prerequisite, installation, onboarding, and update instructions. Archives exclude local settings, credentials, virtual environments, and test journals.
 
-Download `zenshin-v0.1.0-linux-source.tar.gz` from the release assets, then:
+## New since v0.1.0
+
+- Native Windows chat monitoring, question forms, custom text, multi-question forms, ordinary replies, and guarded one-time approval-card handling.
+- Direct `select_chrome_password` and `check_chrome_terms` MCP tools. Zenshin owns the complete native Chrome interaction and returns a confirmed receipt directly to Codex.
+- Zenshin now opens the password suggestion itself using native field focus and Chrome's Suggest password context-menu command. No ChatGPT Computer Use preparation, screenshots, coordinate clicks, or keyboard injection are needed for this action.
+- Numbered sidebar, one-time Connect to Codex setup, generated manual registration command, live connection checks, and a first-visit/replayable tutorial.
+- One persistent Windows UI Automation MTA worker, scoped site checks, durable action journals, and safe handling of uncertain outcomes.
+- Retired global Chrome-preparation hooks and monitor-based browser handoffs. `codex_hook.py` remains an inert compatibility entry point for cached commands.
+
+Existing Linux chat monitoring, exact rules, AI instructions, Preview, Start/Pause, draft protection, duplicate prevention, and activity history remain.
+
+## Quick start
+
+Windows, in the extracted folder:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-windows.txt
+.\.venv\Scripts\python.exe app.py
+```
+
+Linux, in the extracted folder:
 
 ```sh
-tar -xzf zenshin-v0.1.0-linux-source.tar.gz
-cd zenshin-0.1.0
 python3 app.py
 ```
 
-Open http://127.0.0.1:8765. Requires Python 3, a signed-in native `codex` CLI, and working desktop accessibility. Desktop control uses the system Python `gi` package and AT-SPI; the keyboard fallback uses GNOME Mutter RemoteDesktop. There are no pip dependencies or frontend build steps for the Linux version. The app starts paused. Begin with Preview only and narrow standing instructions; keep the control page open for polling.
+Open http://127.0.0.1:8765. Follow Connect to Codex in the sidebar; enable only the actions you authorize. For chat monitoring, load chats, set authorization, and begin in Preview. Keep the server running and the control page open while monitoring.
 
-## Verified behavior and known limitations
+## Verification and known limits
 
-- The 26 automated tests pass on Linux in about one second. Offered choices, custom text, multi-question answers, ordinary replies, and a real file-access `Allow once` approval have live verification from controlled tests.
-- Automatic chat navigation is implemented and regression-tested, but its latest live check could not confirm arrival: the running Codex app exposed empty accessibility contents. It paused without sending. Navigation still needs a live check with readable accessibility contents.
-- Command-escalation and other tool-card variants still need live verification. The controlled chat's policy rejected command escalation before showing a dialog. Managed restrictions are not overridden.
-- Selected chats need unique titles. Multiple visible copies of the same chat are rejected. Desktop automation requires an unlocked desktop with readable controls; it is not a headless service.
-- Browser chats and dots are outside the current scope. The included older demo predates AI mode and the newer desktop paths.
+- The 61-test Windows behavior suite passed. The release ZIP was extracted and checked separately before publication.
+- Real Windows Codex connection and one approval reply passed on 16 October; the chat acknowledged receipt.
+- Zenshin-owned password generation/selection and terms selection passed on a disposable Chrome form. Both password fields matched; terms was checked and marketing stayed unchecked. No account was submitted or password values logged.
+- Chrome actions require Windows, the intended page already open, one identifiable new-password field, and Chrome's native generation feature. They do not submit accounts or bypass safety or URL-policy stops.
+- Pause stops chat monitoring only. Disable Chrome action toggles and save, or save Preview mode, to revoke direct actions.
+- Historical Windows ordinary-reply confirmation failures remain a known intermittent issue despite the latest successful live reply.
+- Real Windows Allow once cards and other command/tool-card variants remain unverified. Linux navigation needs readable accessibility contents and a fresh live verification. No fresh Linux desktop check was performed for this release.
 
-## Continue development on Windows
-
-The [Windows development handoff](https://github.com/ahmedmurtazamalik/zenshin/blob/v0.1.0/WINDOWS.md) is committed in this release and included in its source archive. `WINDOWS.md` is also attached as a separate release asset. It covers native Windows setup, the current portability blockers, the smallest implementation sequence, and the live checks required before claiming Windows support.
-
-Clone the project on the Windows device and start a development branch:
-
-```powershell
-git clone https://github.com/ahmedmurtazamalik/zenshin.git
-cd zenshin
-git switch -c codex/windows-support
-```
-
-Read `AGENTS.md` and `WINDOWS.md` before implementing. The first milestone is working Windows preview mode and one harmless, confirmed question response. The Linux source archive is not a Windows installer.
+The earlier [v0.1.0 Linux MVP](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.1.0) remains available.
