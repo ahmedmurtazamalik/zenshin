@@ -7,7 +7,9 @@ Chrome is required for Chrome password and terms actions.
 Launch Zenshin from the Start menu. Its controls open in a dedicated desktop
 window. Close the window to stop the app. There is no browser tab or console.
 Choose Connect Zenshin tools, then reload MCP connections or restart Codex.
-Select chats, save narrow authorization, and begin in Preview mode.
+New settings default to AI and Send authorized replies. Select chats and
+save narrow authorization before starting monitoring. Saved choices are
+preserved on upgrade.
 Keep the desktop window open while monitoring chats.
 
 Setup checks for Microsoft WebView2 Runtime and installs it if missing.

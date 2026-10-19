@@ -75,9 +75,9 @@ def load_state(path):
         state = json.loads(path.read_text(encoding="utf-8"))
     else:
         state = {"targets": [], "rules": [], "activity": [], "seen": []}
-    state.setdefault("mode", "preview")
+    state.setdefault("mode", "desktop")
     state.setdefault("attempts", {})
-    state.setdefault("decision_method", "exact")
+    state.setdefault("decision_method", "ai")
     state.setdefault("instructions", "")
     state.setdefault("ai_decisions", {})
     state.setdefault("auto_password", False)

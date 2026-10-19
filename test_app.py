@@ -78,6 +78,20 @@ class CodexSetupTests(unittest.TestCase):
             self.assertIn("8879", result["command"])
 
 
+class StateTests(unittest.TestCase):
+    def test_defaults_to_ai_delivery_and_preserves_saved_choices(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state = app.load_state(path)
+            self.assertEqual(state["decision_method"], "ai")
+            self.assertEqual(state["mode"], "desktop")
+            state.update(decision_method="exact", mode="preview")
+            app.save_state(path, state)
+            saved = app.load_state(path)
+            self.assertEqual(saved["decision_method"], "exact")
+            self.assertEqual(saved["mode"], "preview")
+
+
 class PreviewTests(unittest.TestCase):
     def setUp(self):
         self.rule = {"request": "May I submit this application?", "response": "Approved."}
@@ -101,7 +115,8 @@ class PreviewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
             state = app.load_state(path)
-            state.update(targets=[{"id": "selected", "name": "Job search"}], rules=[self.rule])
+            state.update(mode="preview", decision_method="exact",
+                         targets=[{"id": "selected", "name": "Job search"}], rules=[self.rule])
             monitor = {"path": path, "state": state, "running": True,
                        "connection": None, "previews": []}
             with patch.object(app, "rpc", return_value={"thread": thread()}) as read:
@@ -148,7 +163,7 @@ class DesktopTests(unittest.TestCase):
 
     def test_selected_chats_are_opened_in_order_before_inspection(self):
         state = app.load_state(self.empty_state)
-        state.update(mode="desktop", targets=[{"id": "first", "name": "First chat"},
+        state.update(mode="desktop", decision_method="exact", targets=[{"id": "first", "name": "First chat"},
                                              {"id": "second", "name": "Second chat"}])
         monitor = {"state": state, "running": True, "connection": None, "previews": []}
         events = []
@@ -169,7 +184,7 @@ class DesktopTests(unittest.TestCase):
 
     def test_navigation_failure_pauses_before_inspection_or_response(self):
         state = app.load_state(self.empty_state)
-        state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+        state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
                      rules=[{"request": "Continue?", "response": "Yes"}])
         data = thread(text="Continue?")
         data["name"] = "Test chat"
@@ -270,7 +285,7 @@ class DesktopTests(unittest.TestCase):
             path = Path(directory) / "state.json"
             state = app.load_state(path)
             response = "Open https://jobs.example.com/register\nContinue."
-            state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+            state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
                          rules=[{"request": "Continue test?", "response": response}])
             data = thread(text="Continue test?")
             data["name"] = "Test chat"
@@ -295,7 +310,7 @@ class DesktopTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
             state = app.load_state(path)
-            state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+            state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
                          rules=[{"request": "Complete test?", "response": "Yes"}])
             data = thread(text="Complete test?")
             data["name"] = "Test chat"
@@ -321,7 +336,7 @@ class DesktopTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
             state = app.load_state(path)
-            state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+            state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
                          rules=[{"request": "Complete test?", "response": "Yes"}])
             data = thread()
             data["name"] = "Test chat"
@@ -342,7 +357,7 @@ class DesktopTests(unittest.TestCase):
 
     def test_unmatched_request_and_pause_do_not_send(self):
         state = app.load_state(self.empty_state)
-        state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+        state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
                      rules=[{"request": "A different request?", "response": "Yes"}])
         data = thread()
         data["name"] = "Test chat"
@@ -363,7 +378,7 @@ class DesktopTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
             state = app.load_state(path)
-            state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+            state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
                          rules=[{"request": "First?", "response": "Yes"}])
             data = thread(text="First? Second?")
             data["name"] = "Test chat"
@@ -388,7 +403,7 @@ class DesktopTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
             state = app.load_state(path)
-            state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+            state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
                          rules=[{"request": "Continue?", "response": "Yes"}])
             data = thread(text="Continue?")
             data["name"] = "Test chat"
@@ -408,7 +423,7 @@ class DesktopTests(unittest.TestCase):
             path = Path(directory) / "state.json"
             state = app.load_state(path)
             text = "Run local receipt command?\npython3 receipt.py"
-            state.update(mode="desktop", targets=[{"id": "selected", "name": "Test chat"}],
+            state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
                          rules=[{"request": text, "response": "Allow once"}])
             data = thread()
             data["name"] = "Test chat"

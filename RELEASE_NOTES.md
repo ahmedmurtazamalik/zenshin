@@ -1,3 +1,9 @@
+# Zenshin v0.2.5 — AI and authorized replies by default
+
+- New settings default to AI decisions and Send authorized replies.
+- Existing saved decision and response modes are preserved on upgrade.
+- Monitoring still starts paused; Chrome action toggles remain unchanged.
+
 # Zenshin v0.2.4 — Clearer Chrome action setup
 
 - Chrome action toggles now name Zenshin as the app that performs password selection and terms checkbox actions. Codex requests each action through MCP and receives confirmation.

@@ -89,6 +89,7 @@ class BrowserActionTests(unittest.TestCase):
         ui.perform_chrome_signup_request.assert_not_called()
 
     def test_monitor_does_not_interpret_password_refusals_as_browser_requests(self):
+        self.state["decision_method"] = "exact"
         self.state["targets"] = [{"id": "chat", "name": "Job search"}]
         thread = {"name": "Job search", "id": "chat", "turns": [{"id": "turn", "status": "completed", "items": [
             {"type": "agentMessage", "id": "reply", "text": "I cannot enter the password at https://jobs.example.com"}]}]}
