@@ -4,7 +4,32 @@
 
 Zenshin runs on your computer with a browser-based control page. You choose what it may do. For Chrome actions, Zenshin itself focuses the password field, opens and selects Chrome's generated-password suggestion, or checks the named terms box through Windows accessibility. Codex requests the action and receives a result; ChatGPT Computer Use is not needed for those interactions.
 
-## Download v0.2.0
+## Standalone Windows app
+
+The standalone build runs without installing Python or pip packages. Codex desktop, the signed-in Codex CLI, and Chrome (for Chrome actions) are still prerequisites.
+
+1. Download `zenshin-windows-x64.zip` from the build's artifacts or a release where it has been attached, then **Extract All** into a writable folder.
+2. Double-click `Zenshin.exe`. It opens the browser control page. Keep its console window running; close it or press Ctrl+C there to stop Zenshin.
+3. Choose **Connect Zenshin tools**. The standalone app registers its own executable as the MCP bridge; Python is not used.
+
+Settings and the attempt journal remain in `.local/state.json` beside `Zenshin.exe`. For an update, stop the old app and replace the executable in the same folder, preserving `.local`. When moving from a source installation, copy its `.local` folder and remove the old MCP registration with `codex mcp remove zenshin` before connecting the standalone app. Do not run both installations together.
+
+The executable bundles Python bytecode instead of distributing loose `.py` files. It can still be extracted or reverse engineered; packaging does not provide source-code secrecy. This is an unsigned portable application, so Windows may display a publisher warning. Linux currently uses the source setup below.
+
+### Build in this repository
+
+Run the **Standalone Windows app** workflow from GitHub Actions (or push a version tag). It builds on Windows x64, runs the existing tests and a bundled-executable smoke check, and uploads the ZIP plus `SHA256SUMS.txt` as workflow artifacts. It does not publish a release or change repository visibility. Attach these two files to a release when ready. Artifacts and releases in this private repository require repository access; packaging does not make their links public.
+
+To build locally on Windows with Python 3.11:
+
+```powershell
+python -m pip install -r requirements-windows.txt -r requirements-build.txt
+.\build-windows.ps1
+```
+
+The output is `dist/zenshin-windows-x64.zip`. The smoke check runs the executable without Python on PATH, checks bundled assets, saves and reloads settings, and exercises MCP discovery and transport. Native Codex/Chrome interactions still require a live Windows check. `Zenshin.exe --no-browser` suppresses opening the control page, and `--port` / `--state` work as in source mode.
+
+## Source downloads v0.2.0
 
 | Platform | Download | Included features |
 | --- | --- | --- |
@@ -23,7 +48,7 @@ Zenshin runs on your computer with a browser-based control page. You choose what
 - Provides one-time Codex tool registration, connection checks, and a first-visit tutorial that can be replayed from **Take the tour**.
 - On Windows, exposes `select_chrome_password` and `check_chrome_terms` so Codex can delegate individual Chrome actions and continue in the same turn.
 
-## Before you start
+## Before you start (source installation)
 
 1. Install Python. On Windows, use [Python's official download](https://www.python.org/downloads/windows/) and check that `py -3 --version` works. Python 3.11 was used for verification.
 2. Install and sign into the Codex desktop app for chat monitoring. Install the [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) on the same computer. If you already use npm, you can install it with `npm install -g @openai/codex`.

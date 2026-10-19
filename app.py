@@ -19,10 +19,11 @@ import ai_decision
 
 
 ROOT = Path(__file__).resolve().parent
+INSTALL_ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else ROOT
 
 
 def codex_setup(port, register=False):
-    arguments = ["-B", str(ROOT / "zenshin_mcp.py")]
+    arguments = ["--mcp"] if getattr(sys, "frozen", False) else ["-B", str(ROOT / "zenshin_mcp.py")]
     if port != 8765:
         arguments += ["--port", str(port)]
     launcher = [sys.executable, *arguments]
@@ -636,8 +637,13 @@ def check_codex_connection(app):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument("--state", type=Path, default=ROOT / ".local" / "state.json")
+    parser.add_argument("--state", type=Path, default=INSTALL_ROOT / ".local" / "state.json")
+    parser.add_argument("--mcp", action="store_true", help="Run the Codex tool bridge over stdio")
+    parser.add_argument("--no-browser", action="store_true", help="Do not open the control page on standalone startup")
     args = parser.parse_args()
+    if args.mcp:
+        import zenshin_mcp
+        return zenshin_mcp.serve(args.port)
     app = {"path": args.state, "state": load_state(args.state), "running": False,
            "connection": None, "previews": [], "error": ""}
     operations = Lock()
@@ -806,6 +812,9 @@ def main():
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(f"Zenshin: http://127.0.0.1:{args.port}", flush=True)
     print("Starts paused. Keep the control window open to monitor.", flush=True)
+    if getattr(sys, "frozen", False) and not args.no_browser:
+        import webbrowser
+        webbrowser.open(f"http://127.0.0.1:{args.port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

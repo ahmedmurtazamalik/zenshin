@@ -1,0 +1,29 @@
+name: Standalone Windows app
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: x64
+      - run: python -m pip install -r requirements-windows.txt -r requirements-build.txt
+      - run: python -m unittest -q
+      - run: ./build-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zenshin-windows-x64
+          path: |
+            dist/zenshin-windows-x64.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error

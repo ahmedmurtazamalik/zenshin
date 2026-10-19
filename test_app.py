@@ -14,6 +14,21 @@ def thread(thread_id="selected", text="May I submit this application?"):
 
 
 class CodexSetupTests(unittest.TestCase):
+    def test_standalone_registration_uses_executable_bridge_and_custom_port(self):
+        import json
+        import sys
+        arguments = ["--mcp", "--port", "8879"]
+        entry = {"name": "zenshin", "enabled": True,
+                 "transport": {"command": sys.executable, "args": arguments}}
+        with patch.object(sys, "frozen", True, create=True), \
+             patch.object(ai_decision, "cli_command", return_value=["codex"]), \
+             patch.object(app.subprocess, "run", side_effect=[
+                 Mock(returncode=0, stdout="[]"), Mock(returncode=0, stdout=""),
+                 Mock(returncode=0, stdout=json.dumps([entry]))]) as run:
+            self.assertTrue(app.codex_setup(8879, register=True)["registered"])
+            self.assertEqual(run.call_args_list[1].args[0],
+                             ["codex", "mcp", "add", "zenshin", "--", sys.executable, *arguments])
+
     def test_chat_connection_check_reports_disconnected_live_and_failed_connection(self):
         monitor = {"connection": None, "running": False}
         self.assertFalse(app.check_codex_connection(monitor)["connected"])
