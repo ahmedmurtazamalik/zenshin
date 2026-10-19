@@ -11,6 +11,7 @@ DefaultDirName={localappdata}\Programs\Zenshin
 DefaultGroupName=Zenshin
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
+MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist
@@ -28,6 +29,8 @@ Name: desktopicon; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Files]
 Source: "..\dist\Zenshin.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\Zenshin-bridge.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
 Source: "QUICK_START.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
@@ -37,3 +40,29 @@ Name: "{autodesktop}\Zenshin"; Filename: "{app}\Zenshin.exe"; WorkingDir: "{app}
 
 [Run]
 Filename: "{app}\Zenshin.exe"; Description: "Launch Zenshin"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function WebView2Installed: Boolean;
+var
+  Version: String;
+  Key: String;
+begin
+  Key := 'Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+  Result := (RegQueryStringValue(HKLM32, Key, 'pv', Version) and (Version <> '') and (Version <> '0.0.0.0'));
+  if not Result then
+    Result := (RegQueryStringValue(HKCU, Key, 'pv', Version) and (Version <> '') and (Version <> '0.0.0.0'));
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Result := '';
+  if not WebView2Installed then begin
+    ExtractTemporaryFile('MicrosoftEdgeWebview2Setup.exe');
+    if not Exec(ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe'), '/silent /install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+      Result := 'Could not start Microsoft WebView2 setup. Check your internet connection and try again.'
+    else if not WebView2Installed then
+      Result := 'Microsoft WebView2 Runtime could not be installed. Connect to the internet, install WebView2 Runtime from Microsoft, and try again.';
+  end;
+end;

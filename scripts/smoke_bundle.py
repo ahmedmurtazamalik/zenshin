@@ -18,6 +18,7 @@ def check(executable, copy=True):
         installed = root / executable.name if copy else executable
         if copy:
             shutil.copy2(executable, installed)
+            shutil.copy2(executable.with_name("Zenshin-bridge.exe"), root / "Zenshin-bridge.exe")
         environment = dict(os.environ)
         environment.pop("PYTHONPATH", None)
         environment.pop("PYTHONHOME", None)
@@ -72,7 +73,7 @@ def check(executable, copy=True):
                 "name": "check_chrome_terms", "arguments": {
                     "site": "https://example.com", "label": "Terms", "request_id": "bundle-check"}}},
         ]
-        result = subprocess.run([str(installed), "--mcp", "--port", str(port)],
+        result = subprocess.run([str(installed.with_name("Zenshin-bridge.exe")), "--port", str(port)],
                                 input="".join(json.dumps(message) + "\n" for message in messages),
                                 capture_output=True, text=True, timeout=30, cwd=root.parent, env=environment)
         assert result.returncode == 0, result.stderr

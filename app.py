@@ -13,7 +13,7 @@ import sys
 import tempfile
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from threading import Lock
+from threading import Lock, Thread
 
 import ai_decision
 
@@ -23,10 +23,12 @@ INSTALL_ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", F
 
 
 def codex_setup(port, register=False):
-    arguments = ["--mcp"] if getattr(sys, "frozen", False) else ["-B", str(ROOT / "zenshin_mcp.py")]
+    frozen = getattr(sys, "frozen", False)
+    executable = str(Path(sys.executable).with_name("Zenshin-bridge.exe")) if frozen else sys.executable
+    arguments = [] if frozen else ["-B", str(ROOT / "zenshin_mcp.py")]
     if port != 8765:
         arguments += ["--port", str(port)]
-    launcher = [sys.executable, *arguments]
+    launcher = [executable, *arguments]
     command = ["codex", "mcp", "add", "zenshin", "--", *launcher]
     # Display a command that preserves spaces and quotes in installation paths.
     manual = ("& " + " ".join("'" + part.replace("'", "''") + "'" for part in command)
@@ -50,7 +52,7 @@ def codex_setup(port, register=False):
                 return
             transport = entry.get("transport", {})
             result["registered"] = (entry.get("enabled", True)
-                and os.path.normcase(transport.get("command", "")) == os.path.normcase(sys.executable)
+                and os.path.normcase(transport.get("command", "")) == os.path.normcase(executable)
                 and transport.get("args", []) == arguments)
             result["conflict"] = not result["registered"]
 
@@ -639,7 +641,7 @@ def main():
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--state", type=Path, default=INSTALL_ROOT / ".local" / "state.json")
     parser.add_argument("--mcp", action="store_true", help="Run the Codex tool bridge over stdio")
-    parser.add_argument("--no-browser", action="store_true", help="Do not open the control page on standalone startup")
+    parser.add_argument("--no-browser", action="store_true", help="Run the local server without the desktop window")
     args = parser.parse_args()
     if args.mcp:
         import zenshin_mcp
@@ -812,11 +814,21 @@ def main():
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(f"Zenshin: http://127.0.0.1:{args.port}", flush=True)
     print("Starts paused. Keep the control window open to monitor.", flush=True)
-    if getattr(sys, "frozen", False) and not args.no_browser:
-        import webbrowser
-        webbrowser.open(f"http://127.0.0.1:{args.port}")
     try:
-        server.serve_forever()
+        if getattr(sys, "frozen", False) and not args.no_browser:
+            import webview
+            worker = Thread(target=server.serve_forever, daemon=True)
+            worker.start()
+            try:
+                webview.create_window("Zenshin", f"http://127.0.0.1:{args.port}",
+                                      width=1200, height=850, min_size=(850, 600))
+                webview.start(gui="edgechromium", private_mode=False,
+                              storage_path=str(args.state.parent / "webview"))
+            finally:
+                server.shutdown()
+                worker.join()
+        else:
+            server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
@@ -830,4 +842,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        if getattr(sys, "frozen", False) and os.name == "nt":
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None, str(error), "Zenshin could not start", 0x10)
+            sys.exit(1)
+        raise

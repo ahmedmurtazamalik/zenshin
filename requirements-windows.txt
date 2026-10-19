@@ -1,1 +1,2 @@
 uiautomation==2.0.29
+pywebview==6.2.1

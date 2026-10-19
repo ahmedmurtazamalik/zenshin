@@ -4,11 +4,18 @@ Zenshin includes Python and its Windows accessibility dependencies.
 Install and sign in to Codex desktop and the Codex CLI before use.
 Chrome is required for Chrome password and terms actions.
 
-Launch Zenshin from the Start menu. Its control page opens in your browser.
-Keep the console window running. Close it or press Ctrl+C to stop the app.
+Launch Zenshin from the Start menu. Its controls open in a dedicated desktop
+window. Close the window to stop the app. There is no browser tab or console.
 Choose Connect Zenshin tools, then reload MCP connections or restart Codex.
 Select chats, save narrow authorization, and begin in Preview mode.
-Keep the browser control page open while monitoring chats.
+Keep the desktop window open while monitoring chats.
+
+Setup checks for Microsoft WebView2 Runtime and installs it if missing.
+Internet access is needed for that step. Portable ZIP users must install
+WebView2 Runtime first and keep Zenshin-bridge.exe beside Zenshin.exe.
+
+When upgrading from v0.2.1/v0.2.2, run codex mcp remove zenshin once, then
+connect again: tools now use the separate Zenshin-bridge.exe.
 
 Stop Zenshin before installing an update. Re-run the installer to update it.
 Settings and the permanent attempt journal are stored in .local\state.json

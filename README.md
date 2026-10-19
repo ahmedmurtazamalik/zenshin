@@ -2,29 +2,31 @@
 
 **Keep moving forward.** A local companion for Codex that answers authorized desktop requests and performs individual Chrome password and terms actions.
 
-Zenshin runs on your computer with a browser-based control page. You choose what it may do. For Chrome actions, Zenshin itself focuses the password field, opens and selects Chrome's generated-password suggestion, or checks the named terms box through Windows accessibility. Codex requests the action and receives a result; ChatGPT Computer Use is not needed for those interactions.
+Zenshin runs on your computer with a dedicated Windows desktop window (or a browser control page when running from source). You choose what it may do. For Chrome actions, Zenshin itself focuses the password field, opens and selects Chrome's generated-password suggestion, or checks the named terms box through Windows accessibility. Codex requests the action and receives a result; ChatGPT Computer Use is not needed for those interactions.
 
-## Windows release v0.2.2
+## Windows release v0.2.3
 
-[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.2/Zenshin-Setup-0.2.2-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.2) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.2/SHA256SUMS.txt)
+[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.3/Zenshin-Setup-0.2.3-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.3) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.3/SHA256SUMS.txt)
 
 1. Run the installer. It installs for your Windows account without administrator access and adds a Start Menu shortcut. A desktop shortcut is optional.
-2. Launch **Zenshin** from the Start Menu. The control page opens in your browser. Keep the console window running; close it or press Ctrl+C to stop Zenshin.
+2. Launch **Zenshin** from the Start Menu. The controls open in a dedicated desktop window, without a browser tab or console. Close the window to stop Zenshin.
 3. Choose **Connect Zenshin tools**, then reload MCP connections or restart Codex.
 
-Python and accessibility dependencies are bundled. Codex desktop, the signed-in Codex CLI, and Chrome (for Chrome actions) are still prerequisites. The installation includes a setup guide with prerequisite, migration, and uninstall instructions.
+Python and accessibility dependencies are bundled. The installer checks for Microsoft WebView2 Runtime and installs it if missing; internet access is needed for that step. Codex desktop, the signed-in Codex CLI, and Chrome (for Chrome actions) are still prerequisites. The installation includes a setup guide with prerequisite, migration, and uninstall instructions.
 
 The default installation is `%LOCALAPPDATA%\Programs\Zenshin`. Settings and the permanent attempt journal live in `.local/state.json` inside that folder. Stop Zenshin before re-running the installer to update. Updates and uninstall preserve `.local`; uninstall through **Windows Settings → Apps**. To remove the Codex tool registration, run `codex mcp remove zenshin`.
 
+When upgrading from v0.2.1/v0.2.2, run `codex mcp remove zenshin` once and connect again: the desktop app now uses a separate `Zenshin-bridge.exe` for Codex tools.
+
 When moving from a portable/source installation, stop it, copy its `.local` folder into the installed folder before launching, remove the old MCP registration, and connect again. Do not run both installations together.
 
-The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.2/zenshin-windows-x64.zip) remains available: extract it into a writable folder and launch `Zenshin.exe`. It stores settings beside the executable.
+The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.3/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
 
 This is an unsigned application; Windows may display a publisher warning. It bundles Python bytecode, which can still be extracted or reverse engineered. Downloads in this private repository require repository access. Linux uses the source setup below.
 
 ### Build in this repository
 
-Run the **Windows release build** workflow from GitHub Actions (or push a version tag). It tests and builds on Windows x64, checks the portable executable, and verifies silent installation, Start Menu shortcut, installed-app startup/assets/settings/MCP, reinstall preservation, and uninstall preservation. It uploads the installer, portable ZIP, and checksums as artifacts. Publishing a release is a separate step.
+Run the **Windows release build** workflow from GitHub Actions (or push a version tag). It tests and builds on Windows x64, checks the portable executable, and verifies silent installation, Start Menu shortcut, installed-app startup/assets/settings/MCP, desktop-window rendering and normal close, reinstall preservation, and uninstall preservation. It uploads the installer, portable ZIP, and checksums as artifacts. Publishing a release is a separate step.
 
 To build locally on Windows with Python 3.11 and Inno Setup 6 installed in its default location:
 
@@ -33,7 +35,7 @@ python -m pip install -r requirements-windows.txt -r requirements-build.txt
 .\build-windows.ps1
 ```
 
-Outputs are in `dist/`. Native Codex/Chrome interactions still require a live Windows check. `Zenshin.exe --no-browser` suppresses opening the control page; `--port` and `--state` work as in source mode.
+Outputs are in `dist/`. Native Codex/Chrome interactions still require a live Windows check. `Zenshin.exe --no-browser` runs the local server without a window; `--port` and `--state` work as in source mode.
 
 ## Source downloads v0.2.0
 

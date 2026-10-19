@@ -1,14 +1,21 @@
-param([string]$Version = '0.2.2')
+param([string]$Version = '0.2.3')
 $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
 try {
-    python -m PyInstaller --noconfirm --clean --onefile --name Zenshin `
+    python -m PyInstaller --noconfirm --clean --onefile --windowed --name Zenshin `
         --add-data 'index.html:.' --add-data 'assets:assets' `
         --collect-all uiautomation --collect-submodules comtypes app.py
     if ($LASTEXITCODE -ne 0) { throw 'Standalone build failed' }
+    python -m PyInstaller --noconfirm --clean --onefile --name Zenshin-bridge zenshin_mcp.py
+    if ($LASTEXITCODE -ne 0) { throw 'MCP bridge build failed' }
     python scripts/smoke_bundle.py dist/Zenshin.exe
     if ($LASTEXITCODE -ne 0) { throw 'Standalone smoke check failed' }
-    Compress-Archive -Path dist/Zenshin.exe -DestinationPath dist/zenshin-windows-x64.zip -Force
+    Compress-Archive -Path dist/Zenshin.exe, dist/Zenshin-bridge.exe, packaging/QUICK_START.txt -DestinationPath dist/zenshin-windows-x64.zip -Force
+    Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile dist/MicrosoftEdgeWebview2Setup.exe
+    $signature = Get-AuthenticodeSignature dist/MicrosoftEdgeWebview2Setup.exe
+    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
+        throw 'WebView2 bootstrapper must have a valid Microsoft signature'
+    }
     & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$Version" packaging/windows.iss
     if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
     ./scripts/smoke-installer.ps1 -Version $Version
