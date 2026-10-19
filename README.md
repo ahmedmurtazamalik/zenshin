@@ -4,30 +4,36 @@
 
 Zenshin runs on your computer with a browser-based control page. You choose what it may do. For Chrome actions, Zenshin itself focuses the password field, opens and selects Chrome's generated-password suggestion, or checks the named terms box through Windows accessibility. Codex requests the action and receives a result; ChatGPT Computer Use is not needed for those interactions.
 
-## Standalone Windows app
+## Windows release v0.2.2
 
-The standalone build runs without installing Python or pip packages. Codex desktop, the signed-in Codex CLI, and Chrome (for Chrome actions) are still prerequisites.
+[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.2/Zenshin-Setup-0.2.2-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.2) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.2/SHA256SUMS.txt)
 
-1. Download `zenshin-windows-x64.zip` from the build's artifacts or a release where it has been attached, then **Extract All** into a writable folder.
-2. Double-click `Zenshin.exe`. It opens the browser control page. Keep its console window running; close it or press Ctrl+C there to stop Zenshin.
-3. Choose **Connect Zenshin tools**. The standalone app registers its own executable as the MCP bridge; Python is not used.
+1. Run the installer. It installs for your Windows account without administrator access and adds a Start Menu shortcut. A desktop shortcut is optional.
+2. Launch **Zenshin** from the Start Menu. The control page opens in your browser. Keep the console window running; close it or press Ctrl+C to stop Zenshin.
+3. Choose **Connect Zenshin tools**, then reload MCP connections or restart Codex.
 
-Settings and the attempt journal remain in `.local/state.json` beside `Zenshin.exe`. For an update, stop the old app and replace the executable in the same folder, preserving `.local`. When moving from a source installation, copy its `.local` folder and remove the old MCP registration with `codex mcp remove zenshin` before connecting the standalone app. Do not run both installations together.
+Python and accessibility dependencies are bundled. Codex desktop, the signed-in Codex CLI, and Chrome (for Chrome actions) are still prerequisites. The installation includes a setup guide with prerequisite, migration, and uninstall instructions.
 
-The executable bundles Python bytecode instead of distributing loose `.py` files. It can still be extracted or reverse engineered; packaging does not provide source-code secrecy. This is an unsigned portable application, so Windows may display a publisher warning. Linux currently uses the source setup below.
+The default installation is `%LOCALAPPDATA%\Programs\Zenshin`. Settings and the permanent attempt journal live in `.local/state.json` inside that folder. Stop Zenshin before re-running the installer to update. Updates and uninstall preserve `.local`; uninstall through **Windows Settings → Apps**. To remove the Codex tool registration, run `codex mcp remove zenshin`.
+
+When moving from a portable/source installation, stop it, copy its `.local` folder into the installed folder before launching, remove the old MCP registration, and connect again. Do not run both installations together.
+
+The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.2/zenshin-windows-x64.zip) remains available: extract it into a writable folder and launch `Zenshin.exe`. It stores settings beside the executable.
+
+This is an unsigned application; Windows may display a publisher warning. It bundles Python bytecode, which can still be extracted or reverse engineered. Downloads in this private repository require repository access. Linux uses the source setup below.
 
 ### Build in this repository
 
-Run the **Standalone Windows app** workflow from GitHub Actions (or push a version tag). It builds on Windows x64, runs the existing tests and a bundled-executable smoke check, and uploads the ZIP plus `SHA256SUMS.txt` as workflow artifacts. It does not publish a release or change repository visibility. Attach these two files to a release when ready. Artifacts and releases in this private repository require repository access; packaging does not make their links public.
+Run the **Windows release build** workflow from GitHub Actions (or push a version tag). It tests and builds on Windows x64, checks the portable executable, and verifies silent installation, Start Menu shortcut, installed-app startup/assets/settings/MCP, reinstall preservation, and uninstall preservation. It uploads the installer, portable ZIP, and checksums as artifacts. Publishing a release is a separate step.
 
-To build locally on Windows with Python 3.11:
+To build locally on Windows with Python 3.11 and Inno Setup 6 installed in its default location:
 
 ```powershell
 python -m pip install -r requirements-windows.txt -r requirements-build.txt
 .\build-windows.ps1
 ```
 
-The output is `dist/zenshin-windows-x64.zip`. The smoke check runs the executable without Python on PATH, checks bundled assets, saves and reloads settings, and exercises MCP discovery and transport. Native Codex/Chrome interactions still require a live Windows check. `Zenshin.exe --no-browser` suppresses opening the control page, and `--port` / `--state` work as in source mode.
+Outputs are in `dist/`. Native Codex/Chrome interactions still require a live Windows check. `Zenshin.exe --no-browser` suppresses opening the control page; `--port` and `--state` work as in source mode.
 
 ## Source downloads v0.2.0
 

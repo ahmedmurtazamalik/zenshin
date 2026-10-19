@@ -1,4 +1,4 @@
-name: Standalone Windows app
+name: Windows release build
 
 on:
   workflow_dispatch:
@@ -25,5 +25,6 @@ jobs:
           name: zenshin-windows-x64
           path: |
             dist/zenshin-windows-x64.zip
+            dist/Zenshin-Setup-*-windows-x64.exe
             dist/SHA256SUMS.txt
           if-no-files-found: error

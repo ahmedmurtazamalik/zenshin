@@ -1,22 +1,23 @@
 """Check the packaged executable's assets, persistent settings, and MCP entry point."""
 
+import argparse
 import json
 import os
 from pathlib import Path
 import shutil
 import socket
 import subprocess
-import sys
 import tempfile
 import time
 from urllib.request import Request, urlopen
 
 
-def check(executable):
+def check(executable, copy=True):
     with tempfile.TemporaryDirectory(prefix="zenshin bundle ") as directory:
         root = Path(directory)
-        installed = root / executable.name
-        shutil.copy2(executable, installed)
+        installed = root / executable.name if copy else executable
+        if copy:
+            shutil.copy2(executable, installed)
         environment = dict(os.environ)
         environment.pop("PYTHONPATH", None)
         environment.pop("PYTHONHOME", None)
@@ -52,7 +53,7 @@ def check(executable):
                                           headers={"Content-Type": "application/json"})
                         with urlopen(request, timeout=5) as response:
                             assert response.status == 200
-                        assert (root / ".local/state.json").is_file(), "Settings must live beside the executable"
+                        assert (installed.parent / ".local/state.json").is_file(), "Settings must live beside the executable"
                     else:
                         assert state["instructions"] == "Bundle persistence check", "Settings lost on restart"
                 finally:
@@ -85,4 +86,8 @@ def check(executable):
 
 
 if __name__ == "__main__":
-    check(Path(sys.argv[1]).resolve())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("executable", type=Path)
+    parser.add_argument("--installed", action="store_true", help="Check the installed file in place")
+    args = parser.parse_args()
+    check(args.executable.resolve(), copy=not args.installed)

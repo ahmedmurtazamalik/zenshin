@@ -1,3 +1,4 @@
+param([string]$Version = '0.2.2')
 $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
 try {
@@ -8,7 +9,11 @@ try {
     python scripts/smoke_bundle.py dist/Zenshin.exe
     if ($LASTEXITCODE -ne 0) { throw 'Standalone smoke check failed' }
     Compress-Archive -Path dist/Zenshin.exe -DestinationPath dist/zenshin-windows-x64.zip -Force
-    (Get-FileHash dist/zenshin-windows-x64.zip -Algorithm SHA256).Hash.ToLower() + '  zenshin-windows-x64.zip' |
+    & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$Version" packaging/windows.iss
+    if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
+    ./scripts/smoke-installer.ps1 -Version $Version
+    Get-FileHash dist/zenshin-windows-x64.zip, "dist/Zenshin-Setup-$Version-windows-x64.exe" -Algorithm SHA256 |
+        ForEach-Object { $_.Hash.ToLower() + '  ' + (Split-Path $_.Path -Leaf) } |
         Set-Content -Encoding ascii dist/SHA256SUMS.txt
 } finally {
     Pop-Location

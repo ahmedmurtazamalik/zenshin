@@ -1,0 +1,30 @@
+ZENSHIN - WINDOWS SETUP
+
+Zenshin includes Python and its Windows accessibility dependencies.
+Install and sign in to Codex desktop and the Codex CLI before use.
+Chrome is required for Chrome password and terms actions.
+
+Launch Zenshin from the Start menu. Its control page opens in your browser.
+Keep the console window running. Close it or press Ctrl+C to stop the app.
+Choose Connect Zenshin tools, then reload MCP connections or restart Codex.
+Select chats, save narrow authorization, and begin in Preview mode.
+Keep the browser control page open while monitoring chats.
+
+Stop Zenshin before installing an update. Re-run the installer to update it.
+Settings and the permanent attempt journal are stored in .local\state.json
+inside the installation folder. The installer preserves them on upgrades;
+uninstall also leaves them in place. Keep this file private.
+
+To move from a portable/source installation, stop the old app and copy its
+.local folder into the new installation folder before launching. Never run
+both installations together. Run codex mcp remove zenshin to remove the old
+tool registration, then choose Connect Zenshin tools in the new app.
+
+Uninstall through Windows Settings > Apps. To remove the Codex tool
+registration as well, run codex mcp remove zenshin. Back up .local before
+manually deleting it; deleting the journal can permit duplicate actions.
+
+This unsigned app may display a Windows publisher warning. The installer
+does not install Codex, sign you in, or enable Chrome actions automatically.
+Pause stops chat monitoring only; disable Chrome actions and save to revoke
+them. Native actions require your normal, unlocked Windows desktop session.
