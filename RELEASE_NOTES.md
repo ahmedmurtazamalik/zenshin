@@ -1,3 +1,10 @@
+# Zenshin v0.2.4 — Clearer Chrome action setup
+
+- Chrome action toggles now name Zenshin as the app that performs password selection and terms checkbox actions. Codex requests each action through MCP and receives confirmation.
+- Setup, Chrome actions, and the tour explain that the guidance prompt is pasted once per Codex chat, without repeating it for each action. Project instructions remain an alternative.
+- Removed the manual registration URL field, Open and verify button, and manual password button. Codex supplies the current page URL with each MCP request.
+- Chrome action execution and authorization behavior are unchanged.
+
 # Zenshin v0.2.0 — Windows support and native Chrome actions
 
 16 October 2026. MVP source release for Windows and Linux. Requires Python and a signed-in Codex CLI; no standalone executable or installer is bundled.

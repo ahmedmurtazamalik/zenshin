@@ -4,9 +4,9 @@
 
 Zenshin runs on your computer with a dedicated Windows desktop window (or a browser control page when running from source). You choose what it may do. For Chrome actions, Zenshin itself focuses the password field, opens and selects Chrome's generated-password suggestion, or checks the named terms box through Windows accessibility. Codex requests the action and receives a result; ChatGPT Computer Use is not needed for those interactions.
 
-## Windows release v0.2.3
+## Windows release v0.2.4
 
-[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.3/Zenshin-Setup-0.2.3-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.3) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.3/SHA256SUMS.txt)
+[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.4/Zenshin-Setup-0.2.4-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.4) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.4/SHA256SUMS.txt)
 
 1. Run the installer. It installs for your Windows account without administrator access and adds a Start Menu shortcut. A desktop shortcut is optional.
 2. Launch **Zenshin** from the Start Menu. The controls open in a dedicated desktop window, without a browser tab or console. Close the window to stop Zenshin.
@@ -20,7 +20,7 @@ When upgrading from v0.2.1/v0.2.2, run `codex mcp remove zenshin` once and conne
 
 When moving from a portable/source installation, stop it, copy its `.local` folder into the installed folder before launching, remove the old MCP registration, and connect again. Do not run both installations together.
 
-The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.3/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
+The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.4/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
 
 This is an unsigned application; Windows may display a publisher warning. It bundles Python bytecode, which can still be extracted or reverse engineered. Downloads in this private repository require repository access. Linux uses the source setup below.
 
@@ -137,7 +137,7 @@ Zenshin performs these interactions using Windows UI Automation, without ChatGPT
 
 Keep Zenshin running. These tools do not need selected chats or a running chat monitor. **Pause stops chat monitoring only.** To revoke Chrome actions, disable their toggles and save, or save **Preview only** mode.
 
-The Chrome section also has manual **Open and verify in Chrome** and **Fill Chrome's suggested password** controls. The first explicitly opens the requested URL; the second performs the native password action on that page.
+For consistent use, paste the instructions from **Setup** once per Codex chat, alongside your task authorization, or save them in the project's AGENTS.md. You do not need to repeat the prompt for each action. Codex requests the action and supplies the current page URL; Zenshin performs it in Chrome. There is no manual URL field or site-opening/password button in the Chrome section.
 
 ### 3. Chats
 

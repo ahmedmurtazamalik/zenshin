@@ -1,4 +1,4 @@
-param([string]$Version = '0.2.3')
+param([string]$Version = '0.2.4')
 $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
 try {

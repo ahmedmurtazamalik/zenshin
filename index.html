@@ -258,7 +258,7 @@
         </details>
         <div id="codex-guidance">
           <h3>Tell Codex when to use Zenshin</h3>
-          <p class="muted">The tools include usage instructions. For consistent use, copy this into your working chat or its project's AGENTS.md, alongside your task authorization.</p>
+          <p class="muted">The connected tools include usage instructions. For consistent use, paste this prompt once per Codex chat, alongside your task authorization; you do not need to repeat it for each action. Alternatively, save it in the project's AGENTS.md for chats in that project.</p>
           <pre id="setup-instructions" tabindex="0">Use normal browser tools for navigation and other work. Delegate authorized Chrome password generation/selection and terms checkbox actions to Zenshin's select_chrome_password or check_chrome_terms tool. Zenshin handles the complete native interaction, including opening the password suggestion. Do not use Computer Use to prepare or perform these actions. Keep the normal permission flow. Chrome must already show the intended page. Supply the full current page URL, an exact terms checkbox label, and a unique request_id per action. Continue after confirmed success. Reuse the same ID on transport retries; stop for review after an uncertain result. Never delegate safety refusals, URL-policy stops, CAPTCHA, marketing consent, or account submission.</pre>
           <button id="copy-instructions">Copy Codex instructions</button><span id="copy-result" class="muted" role="status"></span>
           <p class="muted">Next, open Chrome actions in the sidebar and enable only the actions you want. In Monitor, choose Send authorized replies, then save. Chrome tools work while chat monitoring is paused; no chat selection is required. Registration alone does not authorize actions.</p>
@@ -266,19 +266,11 @@
       </section>
       <section id="chrome-password-panel" aria-labelledby="chrome-password-heading" hidden>
         <div class="section-head"><h2 id="chrome-password-heading">Individual Chrome actions</h2><span class="eyebrow">Windows</span></div>
-        <label><input id="auto-password" type="checkbox"> Allow Codex to select Chrome's suggested password</label>
-        <label><input id="auto-terms" type="checkbox"> Allow Codex to check a named terms agreement box</label>
-        <p class="muted help">With the Zenshin MCP server connected, Codex can request one action and receive its confirmed result directly. Enable an action and save Send authorized replies mode once. Chat monitoring can stay paused; Pause stops monitoring only. Disable an action and save to revoke it. Preview mode blocks both tools. Chrome must already show the intended page. Zenshin focuses the new-password field and opens and selects Chrome's native suggestion itself. Marketing opt-ins are excluded. No account is submitted.</p>
-        <label for="chrome-password-site">Registration site</label>
-        <input id="chrome-password-site" type="text" placeholder="https://jobs.example.com">
-        <button id="chrome-prepare">Open and verify in Chrome</button>
-        <p class="muted help">Optional: open this site in Chrome and check that it has finished loading. This does not intercept Codex's browser tools or resume a stopped attempt.</p>
-        <p id="chrome-prepare-result" class="muted" role="status"></p>
-        <details><summary>Fill a suggested password once</summary>
-        <p class="muted help">Zenshin finds one new-password field, focuses it, opens Chrome's native suggestion and selects it. Chrome handles filling the fields. This action does not submit the registration.</p>
-        <button id="chrome-password">Fill Chrome’s suggested password</button>
-        <p id="chrome-password-result" class="muted" role="status"></p>
-        </details>
+        <label><input id="auto-password" type="checkbox"> Allow Zenshin to select Chrome's suggested password</label>
+        <label><input id="auto-terms" type="checkbox"> Allow Zenshin to check a named terms agreement box</label>
+        <p class="muted help">Codex requests the action through the connected Zenshin tools; Zenshin performs it in Chrome and returns confirmation. Zenshin focuses the new-password field and opens and selects Chrome's native suggestion. Chrome generates and fills the password. Zenshin also checks the exact terms agreement box named in the request.</p>
+        <p class="muted help">In Setup, copy the Codex instructions and paste them once per chat, alongside your task authorization. You do not need to repeat the prompt for each action. Codex supplies the current page URL with each request; there is no URL to enter here. Chrome must already show the intended page.</p>
+        <p class="muted help">Enable an action and save Send authorized replies mode once. Keep Zenshin running. Chat monitoring can stay paused; Pause stops monitoring only. Disable an action and save to revoke it. Preview mode blocks both tools. Marketing opt-ins are excluded. No account is submitted.</p>
       </section>
       <section id="chats-panel" aria-labelledby="chats-heading" hidden>
         <div class="section-head"><h2 id="chats-heading">Chats</h2><span class="eyebrow">Chat monitoring</span></div>
@@ -449,7 +441,7 @@
     tourFocus = document.activeElement; rememberTour(); $('welcome').close();
     tourSteps = [
       ['#register-codex', 'Connect your Codex once', 'Use Connect Zenshin tools to register this installation. Then reload MCP connections or restart Codex. A registered entry still needs to be loaded by your working chat. Manual setup is available here if needed.'],
-      ['#copy-instructions', 'Give Codex the instructions', 'Copy this guidance into the chat doing your work or its project instructions. Tell Codex which task and agreements you authorize. It can then request individual actions and continue after a confirmed result.'],
+      ['#copy-instructions', 'Give Codex the instructions once per chat', 'Paste this guidance once per Codex chat, or save it in the project instructions. You do not need to repeat it for each action. Tell Codex which task and agreements you authorize. Codex requests each action; Zenshin performs it in Chrome and returns confirmation.'],
       ...(state?.chrome_password_supported ? [['#auto-password', 'Choose your Chrome actions', 'In Chrome actions, enable password selection, terms agreement, or both. Zenshin opens and selects the native password suggestion itself; a terms request names one exact checkbox. Codex delegates these actions without using Computer Use. These actions never submit an account or select marketing consent.']] : []),
       ['#connect', 'Monitor chat requests', 'Load Codex chats to monitor questions and continuation requests. This is separate from registering the Chrome tools. Select chats with unique titles; desktop monitoring visits each selected chat in turn.'],
       ['#authorization-panel', 'Define what may be answered', 'For chat monitoring, choose AI and write narrow standing instructions, or save exact question-and-answer rules. Missing facts and new decisions stay for you. AI analysis uses your Codex account.'],
@@ -636,14 +628,14 @@
     busy = true;
     operationMessage = message; operationStarted = Date.now(); renderProgress();
     if (control) $(control).setAttribute('data-loading', 'true');
-    for (const id of ['connect', 'refresh', 'more', 'find-target', 'save', 'start', 'chrome-password', 'chrome-prepare']) $(id).disabled = true;
+    for (const id of ['connect', 'refresh', 'more', 'find-target', 'save', 'start']) $(id).disabled = true;
     document.querySelector('main').setAttribute('aria-busy', 'true');
     try { showError(''); await work(); } catch (error) { showError(error.message); } finally {
       busy = false;
       renderProgress();
       if (control) $(control).removeAttribute('data-loading');
       document.querySelector('main').setAttribute('aria-busy', 'false');
-      for (const id of ['connect', 'more', 'find-target', 'save', 'chrome-password', 'chrome-prepare']) $(id).disabled = false;
+      for (const id of ['connect', 'more', 'find-target', 'save']) $(id).disabled = false;
       $('refresh').disabled = !state?.connected;
       updateSelection();
       if (pauseRequested) {
@@ -677,24 +669,6 @@
     else action(async () => renderState(await request('pause')), 'pause', 'Pausing monitoring…');
   };
   $('review').onclick = () => action(async () => renderState(await request('review')), 'review', 'Marking requests reviewed…');
-  $('chrome-prepare').onclick = () => action(async () => {
-    $('chrome-prepare-result').textContent = 'Opening the site in Chrome and checking loading (up to 15 seconds)…';
-    try {
-      const result = await request('chrome-prepare', {site: $('chrome-password-site').value.trim()});
-      $('chrome-prepare-result').textContent = result.message;
-    } catch (error) {
-      $('chrome-prepare-result').textContent = error.message;
-    }
-  }, 'chrome-prepare', 'Preparing the website in Chrome…');
-  $('chrome-password').onclick = () => action(async () => {
-    $('chrome-password-result').textContent = 'Zenshin is opening and selecting Chrome’s native password suggestion…';
-    try {
-      const result = await request('chrome-password', {site: $('chrome-password-site').value.trim()});
-      $('chrome-password-result').textContent = result.message;
-    } catch (error) {
-      $('chrome-password-result').textContent = error.message;
-    }
-  }, 'chrome-password', 'Zenshin is filling Chrome’s suggested password…');
   action(async () => {
     const response = await fetch('/api/state');
     if (!response.ok) throw new Error('Could not read local settings');
