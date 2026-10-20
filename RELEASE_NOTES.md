@@ -1,3 +1,9 @@
+# Zenshin v0.2.7 — Zenshin app icon
+
+- The Windows executable, app window, Start Menu and desktop shortcuts, and installer now use the existing Zenshin logo.
+- The icon includes sizes from 16 to 256 pixels for Windows display scaling.
+- On v0.2.6, choose Check for updates, then Install update to upgrade in place. Settings and MCP registration repair use the existing update flow.
+
 # Zenshin v0.2.6 — Visible chat reads and in-app updates
 
 - Chat history reads wait up to 60 seconds and show a loading bar, elapsed time, and actual received bytes, including an explicit no-data-yet state.

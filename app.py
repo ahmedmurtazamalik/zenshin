@@ -868,7 +868,7 @@ def main():
             try:
                 window = webview.create_window("Zenshin", f"http://127.0.0.1:{args.port}",
                                       width=1200, height=850, min_size=(850, 600))
-                webview.start(gui="edgechromium", private_mode=False,
+                webview.start(gui="edgechromium", private_mode=False, icon=str(ROOT / "assets" / "zenshin.ico"),
                               storage_path=str(args.state.parent / "webview"))
             finally:
                 server.shutdown()

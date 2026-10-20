@@ -4,7 +4,7 @@ Push-Location $PSScriptRoot
 try {
     if (!$Version) { $Version = python -c "import updates; print(updates.VERSION)" }
     if ($LASTEXITCODE -ne 0 -or $Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid release version' }
-    python -m PyInstaller --noconfirm --clean --onefile --windowed --name Zenshin `
+    python -m PyInstaller --noconfirm --clean --onefile --windowed --name Zenshin --icon assets/zenshin.ico `
         --add-data 'index.html:.' --add-data 'assets:assets' `
         --collect-all uiautomation --collect-submodules comtypes app.py
     if ($LASTEXITCODE -ne 0) { throw 'Standalone build failed' }

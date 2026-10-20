@@ -19,6 +19,7 @@ OutputBaseFilename=Zenshin-Setup-{#AppVersion}-windows-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\assets\zenshin.ico
 UninstallDisplayIcon={app}\Zenshin.exe
 InfoBeforeFile=QUICK_START.txt
 CloseApplications=yes
