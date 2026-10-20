@@ -27,16 +27,22 @@ def check_window_icons(window, icon_path):
         handle = user.SendMessageW(window.NativeWindowHandle, 0x7F, kind, 0)  # WM_GETICON
         assert handle, f"Window has no {name} icon"
         actual = Icon.FromHandle(IntPtr(handle))
-        expected = Icon(str(icon_path), actual.Size)
-        actual_bitmap, expected_bitmap = actual.ToBitmap(), expected.ToBitmap()
+        source = Icon(str(icon_path))
+        expected = Icon(source, actual.Size) if kind == 0 else source.Clone()
+        expected_native = Icon.FromHandle(expected.Handle)
+        actual_bitmap, expected_bitmap = actual.ToBitmap(), expected_native.ToBitmap()
         try:
-            assert all(actual_bitmap.GetPixel(x, y).ToArgb() == expected_bitmap.GetPixel(x, y).ToArgb()
-                       for x in range(actual.Width) for y in range(actual.Height)), f"Window {name} icon is not the Zenshin logo"
+            assert actual.Size == expected.Size, f"Window {name} icon size is {actual.Size}, expected {expected.Size}"
+            differences = sum(actual_bitmap.GetPixel(x, y).ToArgb() != expected_bitmap.GetPixel(x, y).ToArgb()
+                              for x in range(actual.Width) for y in range(actual.Height))
+            assert not differences, f"Window {name} icon ({actual.Size}) differs from Zenshin at {differences} pixels"
         finally:
             actual_bitmap.Dispose()
             expected_bitmap.Dispose()
             actual.Dispose()
+            expected_native.Dispose()
             expected.Dispose()
+            source.Dispose()
 
 
 def check(executable, installer=None):
