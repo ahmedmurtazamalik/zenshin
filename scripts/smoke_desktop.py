@@ -1,5 +1,6 @@
 """Open the installed Windows desktop UI, check its controls, and close it normally."""
 
+import os
 from pathlib import Path
 import socket
 import subprocess
@@ -22,10 +23,16 @@ def check(executable, installer=None):
             # A loaded MCP bridge must not prevent replacing the executable.
             bridge = subprocess.Popen([str(executable.with_name("Zenshin-bridge.exe"))],
                                       stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            # Reproduce an update started by a onefile app that exits before restart.
+            # The old app's extraction directory is gone by the time Setup reopens it.
+            environment = dict(os.environ, _PYI_ARCHIVE_FILE=str(executable),
+                               _PYI_APPLICATION_HOME_DIR=str(Path(directory) / "removed-parent-runtime"),
+                               _PYI_PARENT_PROCESS_LEVEL="1")
+            environment.pop("PYINSTALLER_RESET_ENVIRONMENT", None)
             process = subprocess.Popen([str(installer), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/SP-",
                                         "/NORESTART", "/CLOSEAPPLICATIONS", "/FORCECLOSEAPPLICATIONS",
                                         "/UPDATE=1", f"/DIR={executable.parent}", f"/PORT={port}",
-                                        f"/STATE={state_path}"])
+                                        f"/STATE={state_path}"], env=environment)
         else:
             process = subprocess.Popen([str(executable), "--port", str(port), "--state", str(state_path)])
         try:
