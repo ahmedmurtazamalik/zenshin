@@ -2,13 +2,14 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
 import tempfile
 from urllib.request import Request, urlopen
 
-VERSION = "0.2.7"
+VERSION = "0.2.8"
 REPOSITORY = "ahmedmurtazamalik/zenshin"
 RELEASES = f"https://github.com/{REPOSITORY}/releases/download/"
 
@@ -64,4 +65,5 @@ def launch_installer(installer, install_root, port, state_path):
     # Inno Setup owns replacement and reopening; never uninstall or delete user data.
     subprocess.Popen([str(installer), "/SILENT", "/SP-", "/NORESTART", "/CLOSEAPPLICATIONS",
                       "/FORCECLOSEAPPLICATIONS", "/UPDATE=1", f"/DIR={install_root}",
-                      f"/PORT={port}", f"/STATE={state_path}"], close_fds=True)
+                      f"/PORT={port}", f"/STATE={state_path}"], close_fds=True,
+                     env={**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"})

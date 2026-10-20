@@ -1,3 +1,10 @@
+# Zenshin v0.2.8 — Fix restart after in-app updates
+
+- Reset PyInstaller's inherited runtime when starting the installer and when the installer reopens Zenshin. The updated app extracts its own runtime instead of reusing the old app's deleted temporary folder.
+- The installer also repairs this restart problem when an update is started by v0.2.6 or v0.2.7.
+- Keep the Zenshin icon, saved settings, and existing MCP registration repair flow.
+- If the previous update displayed a missing Python DLL error, dismiss it and launch Zenshin again. Then check for updates and install this release. No uninstall is needed.
+
 # Zenshin v0.2.7 — Zenshin app icon
 
 - The Windows executable, app window, Start Menu and desktop shortcuts, and installer now use the existing Zenshin logo.

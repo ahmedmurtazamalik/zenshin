@@ -49,6 +49,7 @@ class UpdateTests(unittest.TestCase):
             self.assertIn("/DIR=C:/App With Spaces", [arg.replace("\\", "/") for arg in arguments])
             self.assertIn("/PORT=8879", arguments)
             self.assertIn("/UPDATE=1", arguments)
+            self.assertEqual(launch.call_args.kwargs["env"]["PYINSTALLER_RESET_ENVIRONMENT"], "1")
 
     def test_bad_checksum_removes_download_and_does_not_launch(self):
         release = {"name": "setup.exe", "url": "installer", "checksums": "checksums"}

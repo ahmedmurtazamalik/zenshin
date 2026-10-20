@@ -45,6 +45,16 @@ Filename: "{app}\Zenshin.exe"; Parameters: "--repair-registration"; Description:
 Filename: "{app}\Zenshin.exe"; Parameters: "--repair-registration --port {param:PORT|8765} --state ""{param:STATE|{app}\.local\state.json}"""; Flags: nowait; Check: IsUpdate
 
 [Code]
+function SetEnvironmentVariable(Name, Value: String): Boolean;
+  external 'SetEnvironmentVariableW@kernel32.dll stdcall';
+
+function InitializeSetup: Boolean;
+begin
+  // Older updaters pass their onefile runtime to Setup. Reopen independently
+  // after that app exits and its extraction directory has been removed.
+  Result := SetEnvironmentVariable('PYINSTALLER_RESET_ENVIRONMENT', '1');
+end;
+
 function IsUpdate: Boolean;
 begin
   Result := ExpandConstant('{param:UPDATE|0}') = '1';
