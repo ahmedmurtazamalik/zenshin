@@ -1,4 +1,4 @@
-# Zenshin v0.2.11 — Fix Windows taskbar and Start Menu icons
+# Zenshin v0.2.12 — Fix Windows taskbar and Start Menu icons
 
 - Install a permanent Zenshin icon file and assign it explicitly to Start Menu and desktop shortcuts.
 - Give the app process and shortcuts the same stable Windows app identity so the taskbar associates the running window with the Zenshin shortcut.

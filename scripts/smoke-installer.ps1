@@ -13,7 +13,14 @@ function Assert-ZenshinShortcut {
     if (!(Test-Path $shortcut)) { throw 'Start Menu shortcut is missing' }
     $iconPath = Join-Path $installDir 'zenshin.ico'
     $link = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
-    if ($link.IconLocation -ne "$iconPath,0") { throw 'Start Menu shortcut does not use the installed Zenshin icon' }
+    # Updating from the app expands Windows short paths; compare the icon file,
+    # not the spelling of its parent directory.
+    $linkIconPath = ($link.IconLocation -replace ',0$', '').Trim('"')
+    if ([IO.Path]::GetFileName($linkIconPath) -ne 'zenshin.ico' -or !(Test-Path -LiteralPath $linkIconPath) -or
+        (Get-FileHash -LiteralPath $linkIconPath).Hash -ne (Get-FileHash -LiteralPath $iconPath).Hash) {
+        throw "Start Menu shortcut has the wrong icon: $($link.IconLocation)"
+    }
+    Write-Output "Shortcut icon verified: $($link.IconLocation)"
     $item = (New-Object -ComObject Shell.Application).NameSpace((Split-Path $shortcut)).ParseName((Split-Path $shortcut -Leaf))
     if ($item.ExtendedProperty('System.AppUserModel.ID') -ne 'Zenshin.Desktop') { throw 'Start Menu shortcut has the wrong application identity' }
     Add-Type -AssemblyName System.Drawing
