@@ -17,7 +17,7 @@ output{display:block;padding:16px;background:#eef4ee}</style>
 <h1>Zenshin real chat signup probe</h1>
 <p>Disposable local form. Test checkboxes only. No account is submitted.</p>
 <form onsubmit="event.preventDefault()">
-<label>Test email<input autocomplete="username" value="zenshin-auto-probe@example.invalid"></label>
+<label>Test email<input autocomplete="username" value="zenshin-__RUN_ID__@example.invalid"></label>
 <label>New password<input id="password" type="password" autocomplete="new-password" autofocus></label>
 <label>Confirm password<input id="confirm" type="password" autocomplete="new-password"></label>
 <label><input id="terms" type="checkbox" required>I agree to the Terms and Conditions</label>
@@ -25,18 +25,23 @@ output{display:block;padding:16px;background:#eef4ee}</style>
 <button type="button" onclick="check()">Check filled fields</button></form>
 <output id="result"></output>
 <script>
+let previousFlags='';
 function check(){
   const p=document.getElementById('password'),c=document.getElementById('confirm');
   const flags={passwordFilled:!!p.value,confirmationFilled:!!c.value,
     match:!!p.value&&p.value===c.value,length:p.value.length,
     terms:document.getElementById('terms').checked,
     marketing:document.getElementById('marketing').checked};
-  document.getElementById('result').textContent=JSON.stringify(flags);
+  const serialized=JSON.stringify(flags);
+  if(serialized===previousFlags)return;
+  previousFlags=serialized;
+  document.getElementById('result').textContent=serialized;
   fetch('__STATUS_PATH__',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify(flags)}).catch(()=>{});
 }
 document.querySelector('form').addEventListener('input',check);
 document.querySelector('form').addEventListener('change',check);
+setInterval(check,250);
 check();
 </script></html>"""
 
@@ -45,7 +50,7 @@ def make_server(port=8897):
     run_id = uuid4().hex
     page_path = f"/run/{run_id}"
     status_path = page_path + "/status"
-    page = PAGE.replace("__STATUS_PATH__", status_path).encode()
+    page = PAGE.replace("__STATUS_PATH__", status_path).replace("__RUN_ID__", run_id).encode()
     observation = dict(passwordFilled=False, confirmationFilled=False, match=False,
                        length=0, terms=False, marketing=False)
     ready = False

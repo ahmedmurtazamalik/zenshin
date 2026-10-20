@@ -523,20 +523,25 @@ def browser_action(app, data):
     save_state(app["path"], app["state"])
     try:
         def perform():
+            set_progress(app, "opening", "Chrome", "Checking the requested Chrome page.")
             windows_ui.prepare_chrome_site(site, open_site=False)
             if action == "password":
+                set_progress(app, "inspecting", "Chrome", "Opening Chrome's native password suggestion.")
                 windows_ui.open_chrome_password_suggestion(site)
             request = windows_ui.chrome_signup_request(origin, password=action == "password",
                                                        terms=action == "terms", label=label or None)
             if not request:
                 raise RuntimeError("The requested native password suggestion or unchecked terms box is not available")
+            set_progress(app, "confirming", "Chrome", "Selecting and verifying the authorized Chrome action.")
             windows_ui.perform_chrome_signup_request(origin, request)
         windows_ui.run(perform)
         result = {"request_id": request_id, "action": action, "site": origin, "confirmed": True,
                   "message": description + " confirmed. Continue the current task using your normal tools."}
         attempt.update(status="sent", result=result)
+        set_progress(app, "done", "Chrome", description + " confirmed.")
     except Exception as error:
         attempt.update(status="uncertain", error=str(error))
+        set_progress(app, "error", "Chrome", str(error))
         raise RuntimeError("Chrome action was not confirmed; do not retry. " + str(error)) from error
     finally:
         app["state"]["activity"].append(dict(attempt))
@@ -626,12 +631,16 @@ def main():
 
         def reply(self, value, status=200):
             body = json.dumps(value).encode()
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Cache-Control", "no-store")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+                # A timed-out client must not pause an already completed action.
+                pass
 
         def valid_host(self):
             return self.headers.get("Host") in {

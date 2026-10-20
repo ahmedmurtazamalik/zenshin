@@ -96,7 +96,8 @@ def call_tool(port, name, arguments):
                       data=json.dumps({**arguments, "action": action}).encode(),
                       headers={"Content-Type": "application/json"})
     try:
-        with urlopen(request, timeout=55) as response:
+        # Native page readiness, suggestion and confirmation can exceed one minute.
+        with urlopen(request, timeout=120) as response:
             return json.load(response)
     except HTTPError as error:
         with error:

@@ -1,4 +1,5 @@
 import json
+from http.client import RemoteDisconnected
 from pathlib import Path
 import socket
 import subprocess
@@ -169,6 +170,22 @@ class BrowserActionTests(unittest.TestCase):
                 self.assertIn("do not retry", replies[6]["content"][0]["text"])
                 self.assertEqual(ui.perform_chrome_signup_request.call_count, 2)
                 self.assertEqual(len(app.load_state(self.path)["attempts"]), 3)
+                # A client can time out after the native action has completed.
+                end_headers = app.BaseHTTPRequestHandler.end_headers
+                def disconnected_headers(handler):
+                    if handler.path == "/api/browser-action":
+                        raise ConnectionResetError("Test client disconnected before response headers")
+                    return end_headers(handler)
+                with patch.object(app.BaseHTTPRequestHandler, "end_headers", autospec=True,
+                                  side_effect=disconnected_headers):
+                    with self.assertRaises(RemoteDisconnected):
+                        urlopen(Request(f"http://127.0.0.1:{port}/api/browser-action",
+                                        data=json.dumps({**self.request, "request_id": "disconnected-client"}).encode(),
+                                        headers={"Content-Type": "application/json"}), timeout=2)
+                with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=2) as response:
+                    current = json.load(response)
+                self.assertTrue(current["running"])
+                self.assertEqual(current["activity"][-1]["status"], "sent")
                 close.assert_not_called()
             finally:
                 if servers:

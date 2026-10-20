@@ -75,6 +75,8 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
+  Locator, Services, Processes, Process: Variant;
+  Index: Integer;
 begin
   Result := '';
   if not WebView2Installed then begin
@@ -83,5 +85,20 @@ begin
       Result := 'Could not start Microsoft WebView2 setup. Check your internet connection and try again.'
     else if not WebView2Installed then
       Result := 'Microsoft WebView2 Runtime could not be installed. Connect to the internet, install WebView2 Runtime from Microsoft, and try again.';
+  end;
+  if Result = '' then begin
+    // Restart Manager can close the Python child but leave its onefile loader
+    // holding Codex's MCP pipes open. Close the whole installed bridge tree.
+    Locator := CreateOleObject('WbemScripting.SWbemLocator');
+    Services := Locator.ConnectServer('', 'root\CIMV2');
+    Processes := Services.ExecQuery(
+      'SELECT ExecutablePath, ProcessId FROM Win32_Process WHERE Name = ''Zenshin-bridge.exe''');
+    for Index := 0 to Processes.Count - 1 do begin
+      Process := Processes.ItemIndex(Index);
+      if not VarIsNull(Process.ExecutablePath) then
+        if CompareText(Process.ExecutablePath, ExpandConstant('{app}\Zenshin-bridge.exe')) = 0 then
+          Exec(ExpandConstant('{sys}\taskkill.exe'), '/PID ' + IntToStr(Process.ProcessId) + ' /T /F',
+            '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    end;
   end;
 end;

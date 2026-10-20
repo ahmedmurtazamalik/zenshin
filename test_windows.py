@@ -105,9 +105,17 @@ class ChromeServerTests(unittest.TestCase):
         suggestion = node("MenuItemControl", "Use strong password disposable-secret")
         webpage = node("DocumentControl", children=[node("ButtonControl", "Use strong password")])
         webpage.GetPattern.return_value.Value = address
+        password = node("EditControl", "New password")
+        password.IsPassword = True
+        password.GetPattern.return_value.DocumentRange.textRange.CompareEndpoints.return_value = -1
+        password.GetPattern.return_value.DocumentRange.textRange.Clone.return_value.CompareEndpoints.return_value = -1
+        webpage.GetChildren.return_value.append(password)
         window = node("WindowControl", children=[address_bar, webpage, suggestion])
         window.ProcessId = 1
         api.GetRootControl.return_value.GetChildren.return_value = [window]
+        windows = patch.object(ui, "chrome_windows", return_value=[window])
+        windows.start()
+        self.addCleanup(windows.stop)
         return api, window, address_bar, webpage, suggestion
 
     def test_chrome_preparation_opens_target_once_and_waits_until_loading_finishes(self):
@@ -146,6 +154,16 @@ class ChromeServerTests(unittest.TestCase):
             launch.assert_not_called()
         webpage.GetChildren.assert_not_called()
 
+    def test_chrome_preparation_waits_for_initial_accessibility_elements(self):
+        from itertools import count
+        api, window, _, _, _ = self.chrome_form()
+        api.comtypes.COMError = OSError
+        window.GetChildren.return_value.append(node("ButtonControl", "Reload"))
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "chrome_password_suggestion", side_effect=[OSError("Chrome page opening"), (window, None), (window, None)]), \
+             patch.object(ui.time, "monotonic", side_effect=count()), patch.object(ui.time, "sleep"):
+            self.assertIn("finished loading", ui.prepare_chrome_site("https://jobs.example.com/register")["message"])
+
     def test_chrome_preparation_opens_requested_path_instead_of_accepting_other_page(self):
         from itertools import count
         api, window, _, webpage, _ = self.chrome_form("https://jobs.example.com/other")
@@ -167,10 +185,41 @@ class ChromeServerTests(unittest.TestCase):
              patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"):
             ui.open_chrome_password_suggestion("https://jobs.example.com/register")
             result = ui.accept_chrome_password("https://jobs.example.com/register")
-        self.assertIn("activated and closed", result["message"])
+        self.assertIn("remained filled", result["message"])
         self.assertNotIn("disposable-secret", str(result))
         suggestion.GetPattern.return_value.Invoke.assert_called_once()
-        webpage.GetChildren.assert_not_called()
+        field = webpage.GetChildren.return_value[-1]
+        field.GetPattern.assert_called_with(api.PatternId.TextPattern)
+        field.GetPattern.return_value.DocumentRange.GetText.assert_not_called()
+
+    def test_closed_password_popup_requires_fields_to_remain_filled(self):
+        from itertools import count
+        for filled in ([False], [True, False]):
+            with self.subTest(filled=filled):
+                api, window, _, _, suggestion = self.chrome_form()
+                samples = iter(filled)
+                last = False
+                def password_filled(*_args):
+                    nonlocal last
+                    last = next(samples, last)
+                    return last
+                with patch.object(ui, "automation", return_value=api), \
+                     patch.object(ui, "chrome_password_suggestion", side_effect=[(window, suggestion), (window, suggestion)] + [(window, None)] * 10), \
+                     patch.object(ui, "chrome_password_filled", side_effect=password_filled, create=True), \
+                     patch.object(ui, "press") as activate, \
+                     patch.object(ui.time, "monotonic", side_effect=count(0, .6)), \
+                     patch.object(ui.time, "sleep"):
+                    with self.assertRaisesRegex(RuntimeError, "filled"):
+                        ui.accept_chrome_password("https://jobs.example.com/register")
+                activate.assert_called_once_with(suggestion)
+
+    def test_empty_password_embedded_object_is_not_filled(self):
+        api, window, _, webpage, _ = self.chrome_form()
+        field = webpage.GetChildren.return_value[-1]
+        extent = field.GetPattern.return_value.DocumentRange.textRange
+        extent.Clone.return_value.CompareEndpoints.return_value = 0
+        with patch.object(ui, "automation", return_value=api):
+            self.assertFalse(ui.chrome_password_filled(window, "https://jobs.example.com"))
 
     def test_password_action_opens_native_suggestion_without_external_desktop_input(self):
         api, window, address_bar, webpage, suggestion = self.chrome_form()
@@ -178,6 +227,8 @@ class ChromeServerTests(unittest.TestCase):
         field.IsPassword, field.HasKeyboardFocus = True, True
         confirmation = node("EditControl", "Confirm password")
         confirmation.IsPassword = True
+        for control in (field, confirmation):
+            control.GetPattern.return_value.DocumentRange.textRange.Clone.return_value.CompareEndpoints.return_value = -1
         webpage.GetChildren.return_value = [field, confirmation]
         window.GetChildren.return_value = [address_bar, webpage]
         command = node("MenuItemControl", "Suggest password\u2026")
@@ -193,7 +244,8 @@ class ChromeServerTests(unittest.TestCase):
         field.Element.QueryInterface.return_value.ShowContextMenu.assert_called_once()
         command.GetPattern.return_value.Invoke.assert_called_once()
         suggestion.GetPattern.return_value.Invoke.assert_called_once()
-        field.GetPattern.assert_not_called()
+        field.GetPattern.assert_called_with(api.PatternId.TextPattern)
+        confirmation.GetPattern.assert_called_with(api.PatternId.TextPattern)
         confirmation.SetFocus.assert_not_called()
 
     def test_password_preparation_leaves_ambiguous_fields_untouched(self):
@@ -248,7 +300,7 @@ class ChromeServerTests(unittest.TestCase):
         with patch.object(ui, "automation", return_value=api), \
              patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"), \
              patch.object(ui.time, "monotonic", side_effect=[0, 0, 0, 4]):
-            with self.assertRaisesRegex(RuntimeError, "inspect Chrome"):
+            with self.assertRaisesRegex(RuntimeError, "did not remain filled"):
                 ui.accept_chrome_password("jobs.example.com")
         suggestion.GetPattern.return_value.Invoke.assert_called_once()
 

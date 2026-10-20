@@ -1,3 +1,13 @@
+# Zenshin v0.2.13 — Faster Chrome actions and reliable MCP updates
+
+- Find Chrome windows directly instead of scanning unrelated desktop apps. In five planned live cases, password actions took 7.0–8.4 seconds and terms actions took 3.4–4.5 seconds.
+- Confirm that protected password fields remain filled after accepting Chrome's suggestion. An empty field or a closed suggestion alone no longer counts as success; password values are never read.
+- Show native Chrome action progress, allow up to 120 seconds for the MCP response, and keep monitoring running if a client disconnects after an action.
+- Close the complete old MCP bridge process tree during installation so stale processes cannot hold Codex's connection open after an update.
+- Preserve the existing Zenshin icons, settings, action history, and automatic Codex guidance. Install through Check for updates without uninstalling first.
+
+Verification: all 72 behavior tests passed. Five disposable Chrome forms passed both actions through Zenshin MCP on the first attempt: 10 actions, zero retries, and one receipt per action in 71 seconds. Both password fields remained filled and matched, terms stayed checked, and marketing stayed unchecked. No account was submitted. The Windows release build also checks installation, update restart, old MCP pipe closure, fresh bridge startup, icons, and settings preservation.
+
 # Zenshin v0.2.12 — Fix Windows taskbar and Start Menu icons
 
 - Install a permanent Zenshin icon file and assign it explicitly to Start Menu and desktop shortcuts.

@@ -168,11 +168,36 @@ def site_origin(address):
     return f"{parsed.scheme}://{parsed.hostname.lower()}{suffix}"
 
 
+def chrome_windows():
+    # The desktop UIA sibling walker can stall on unrelated applications.
+    # Enumerate native windows first and ask UIA only about visible Chrome ones.
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    callback_type = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+    user32.EnumWindows.argtypes = [callback_type, ctypes.c_void_p]
+    user32.IsWindowVisible.argtypes = [ctypes.c_void_p]
+    user32.GetWindowThreadProcessId.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
+    handles = []
+    def collect(handle, _):
+        handles.append(handle)
+        return True
+    if not user32.EnumWindows(callback_type(collect), None):
+        raise ctypes.WinError(ctypes.get_last_error())
+    for handle in handles:
+        if not user32.IsWindowVisible(handle):
+            continue
+        identity = ctypes.c_ulong()
+        user32.GetWindowThreadProcessId(handle, ctypes.byref(identity))
+        if process_path(identity.value).lower().endswith("\\chrome.exe"):
+            window = automation().ControlFromHandle(handle)
+            if window is not None:
+                yield window
+
+
 def chrome_password_suggestion(origin):
     matches, browsers = [], []
     api = automation()
-    for window in api.GetRootControl().GetChildren():
-        if window.IsOffscreen or not process_path(window.ProcessId).lower().endswith("\\chrome.exe"):
+    for window in chrome_windows():
+        if window.IsOffscreen:
             continue
         # Browser chrome only: never inspect webpage controls or password fields.
         native = list(nodes(window, stop_at_documents=True))
@@ -215,8 +240,13 @@ def prepare_chrome_site(address, open_site=True):
     opened, stable_url = False, None
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
-        browser, _ = chrome_password_suggestion(origin)
-        native = list(nodes(browser, stop_at_documents=True)) if browser else []
+        try:
+            browser, _ = chrome_password_suggestion(origin)
+            native = list(nodes(browser, stop_at_documents=True)) if browser else []
+        except automation().comtypes.COMError:
+            # Chrome can replace its accessibility elements while a page opens.
+            time.sleep(.25)
+            continue
         documents = [control for control in native
                      if control.ControlTypeName == "DocumentControl" and not control.IsOffscreen]
         # Chrome's native WebView containers also report DocumentControl, but
@@ -313,6 +343,35 @@ def open_chrome_password_suggestion(address):
     raise RuntimeError("Chrome did not open its native password suggestion; check Chrome manually")
 
 
+def chrome_password_filled(browser, origin):
+    api = automation()
+    fields = []
+    for doc in nodes(browser, stop_at_documents=True):
+        if doc.ControlTypeName != "DocumentControl" or doc.IsOffscreen:
+            continue
+        value = doc.GetPattern(api.PatternId.ValuePattern)
+        if not value or not value.Value.startswith(origin + "/"):
+            continue
+        fields.extend(control for control in nodes(doc)
+                      if control.ControlTypeName == "EditControl" and control.IsPassword
+                      and control.IsEnabled and not control.IsOffscreen
+                      and not re.search(r"current|old", control.Name, re.I))
+    if not fields:
+        return False
+    for field in fields:
+        text = field.GetPattern(api.PatternId.TextPattern)
+        if not text:
+            return False
+        # Chrome exposes one embedded-object unit even for an empty field.
+        # Check beyond that unit without fetching password text/value.
+        extent = text.DocumentRange.textRange
+        content = extent.Clone()
+        content.MoveEndpointByUnit(0, 0, 1)
+        if content.CompareEndpoints(0, extent, 1) >= 0:
+            return False
+    return True
+
+
 def accept_chrome_password(address):
     origin = site_origin(address.strip())
     deadline = time.monotonic() + 30
@@ -331,10 +390,13 @@ def accept_chrome_password(address):
                 current_browser, remaining = chrome_password_suggestion(origin)
                 if current_browser is None or not api.ControlsAreSame(browser, current_browser):
                     raise RuntimeError("Chrome's site changed after activation; inspect Chrome before trying again")
-                if remaining is None:
-                    return {"message": "Chrome's password suggestion was activated and closed. Check the filled fields before continuing."}
+                if remaining is None and chrome_password_filled(current_browser, origin):
+                    time.sleep(.3)
+                    if chrome_password_filled(current_browser, origin):
+                        return {"message": "Chrome's generated password fields remained filled after acceptance."}
+                    break
                 time.sleep(.2)
-            raise RuntimeError("Chrome's suggestion did not close after activation; inspect Chrome before trying again")
+            raise RuntimeError("Chrome's password fields did not remain filled after selection; do not retry this action")
         time.sleep(.2)
     raise RuntimeError("No supported Chrome password suggestion appeared for this site within 30 seconds; nothing was selected")
 

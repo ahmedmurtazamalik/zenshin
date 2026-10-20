@@ -1,12 +1,15 @@
 """Open the installed Windows desktop UI, check its controls, and close it normally."""
 
 import ctypes
+import json
 import os
 from pathlib import Path
+import queue
 import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from urllib.request import urlopen
 
@@ -53,9 +56,19 @@ def check(executable, installer=None):
         state_path = Path(directory) / "state.json"
         bridge = None
         if installer:
-            # A loaded MCP bridge must not prevent replacing the executable.
+            # Initialize the Python worker before updating its onefile executable.
             bridge = subprocess.Popen([str(executable.with_name("Zenshin-bridge.exe"))],
-                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+            bridge_lines = queue.Queue()
+            def read_bridge():
+                for line in bridge.stdout:
+                    bridge_lines.put(line)
+                bridge_lines.put(None)
+            threading.Thread(target=read_bridge, daemon=True).start()
+            initialize = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}) + "\n"
+            bridge.stdin.write(initialize)
+            bridge.stdin.flush()
+            assert json.loads(bridge_lines.get(timeout=10))["result"]["serverInfo"]["name"] == "zenshin"
             # Reproduce an update started by a onefile app that exits before restart.
             # The old app's extraction directory is gone by the time Setup reopens it.
             environment = dict(os.environ, _PYI_ARCHIVE_FILE=str(executable),
@@ -85,6 +98,11 @@ def check(executable, installer=None):
             check_window_icons(window, executable.with_name("zenshin.ico"))
             if bridge:
                 assert bridge.wait(timeout=10) is not None, "Installer left the old MCP bridge running"
+                assert bridge_lines.get(timeout=10) is None, "Old MCP pipes stayed open after update"
+                fresh = subprocess.run([str(executable.with_name("Zenshin-bridge.exe"))], input=initialize,
+                                       capture_output=True, text=True, timeout=10)
+                assert fresh.returncode == 0, fresh.stderr
+                assert json.loads(fresh.stdout)["result"]["serverInfo"]["name"] == "zenshin"
             with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=5) as response:
                 assert response.status == 200
             window.GetWindowPattern().Close()
