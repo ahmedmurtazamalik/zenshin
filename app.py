@@ -774,6 +774,10 @@ def main():
     print("Starts paused. Keep the control window open to monitor.", flush=True)
     try:
         if getattr(sys, "frozen", False) and not args.no_browser:
+            import ctypes
+            set_app_id = ctypes.OleDLL("shell32").SetCurrentProcessExplicitAppUserModelID
+            set_app_id.argtypes = [ctypes.c_wchar_p]
+            set_app_id("Zenshin.Desktop")
             import webview
             worker = Thread(target=server.serve_forever, daemon=True)
             worker.start()

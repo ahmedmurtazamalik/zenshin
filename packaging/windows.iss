@@ -20,7 +20,7 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 SetupIconFile=..\assets\zenshin.ico
-UninstallDisplayIcon={app}\Zenshin.exe
+UninstallDisplayIcon={app}\zenshin.ico
 InfoBeforeFile=QUICK_START.txt
 CloseApplications=yes
 CloseApplicationsFilter=Zenshin.exe,Zenshin-bridge.exe
@@ -30,15 +30,16 @@ RestartApplications=no
 Name: desktopicon; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Files]
+Source: "..\assets\zenshin.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\Zenshin.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\Zenshin-bridge.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
 Source: "QUICK_START.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Zenshin"; Filename: "{app}\Zenshin.exe"; WorkingDir: "{app}"
+Name: "{group}\Zenshin"; Filename: "{app}\Zenshin.exe"; WorkingDir: "{app}"; IconFilename: "{app}\zenshin.ico"; AppUserModelID: "Zenshin.Desktop"
 Name: "{group}\Zenshin setup guide"; Filename: "{app}\QUICK_START.txt"
-Name: "{autodesktop}\Zenshin"; Filename: "{app}\Zenshin.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\Zenshin"; Filename: "{app}\Zenshin.exe"; WorkingDir: "{app}"; IconFilename: "{app}\zenshin.ico"; AppUserModelID: "Zenshin.Desktop"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\Zenshin.exe"; Parameters: "--repair-registration"; Description: "Launch Zenshin and connect Codex tools"; Flags: nowait postinstall skipifsilent; Check: not IsUpdate

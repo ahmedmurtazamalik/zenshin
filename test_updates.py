@@ -16,6 +16,7 @@ def response(body):
 
 
 class UpdateTests(unittest.TestCase):
+    @patch.object(updates, "VERSION", "0.2.9")
     def test_latest_release_compares_numeric_versions_and_requires_assets(self):
         tag = "v0.2.10"
         name = "Zenshin-Setup-0.2.10-windows-x64.exe"
