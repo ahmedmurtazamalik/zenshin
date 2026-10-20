@@ -4,9 +4,9 @@
 
 Zenshin runs on your computer with a dedicated Windows desktop window (or a browser control page when running from source). You choose what it may do. For Chrome actions, Zenshin itself focuses the password field, opens and selects Chrome's generated-password suggestion, or checks the named terms box through Windows accessibility. Codex requests the action and receives a result; ChatGPT Computer Use is not needed for those interactions.
 
-## Windows release v0.2.5
+## Windows release v0.2.6
 
-[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.5/Zenshin-Setup-0.2.5-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.5) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.5/SHA256SUMS.txt)
+[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.6/Zenshin-Setup-0.2.6-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.6) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.6/SHA256SUMS.txt)
 
 1. Run the installer. It installs for your Windows account without administrator access and adds a Start Menu shortcut. A desktop shortcut is optional.
 2. Launch **Zenshin** from the Start Menu. The controls open in a dedicated desktop window, without a browser tab or console. Close the window to stop Zenshin.
@@ -15,13 +15,13 @@ Zenshin runs on your computer with a dedicated Windows desktop window (or a brow
 
 Python and accessibility dependencies are bundled. The installer checks for Microsoft WebView2 Runtime and installs it if missing; internet access is needed for that step. Use Windows 10 or later on x64. Codex desktop is required for chat monitoring; the signed-in Codex CLI is required for the Codex connection and AI decisions. Chrome is required for Chrome actions. The installation includes a setup guide with prerequisite, migration, and uninstall instructions.
 
-The default installation is `%LOCALAPPDATA%\Programs\Zenshin`. Settings and the permanent attempt journal live in `.local/state.json` inside that folder. New settings default to **AI** and **Send authorized replies**. Upgrades preserve your saved choices. Stop Zenshin before re-running the installer to update. Updates and uninstall preserve `.local`; uninstall through **Windows Settings → Apps**. To remove the Codex tool registration, run `codex mcp remove zenshin`.
+The default installation is `%LOCALAPPDATA%\Programs\Zenshin`. Settings and the permanent attempt journal live in `.local/state.json` inside that folder. New settings default to **AI** and **Send authorized replies**. Upgrades preserve your saved choices. Use **Check for updates → Install update** in Connect to Codex. Zenshin downloads and checksum-verifies the installer, pauses monitoring, upgrades in place, reopens, and replaces an old MCP registration automatically. No uninstall is needed. Codex may need an MCP reload or restart afterward. Updates and uninstall preserve `.local`; uninstall through **Windows Settings → Apps**. To remove the Codex tool registration, run `codex mcp remove zenshin`.
 
-When upgrading from v0.2.1/v0.2.2, run `codex mcp remove zenshin` once and connect again: the desktop app now uses a separate `Zenshin-bridge.exe` for Codex tools.
+To get this updater from v0.2.5 or earlier, close Zenshin and run the v0.2.6 installer once over the existing installation. Launch it from the installer to repair the old tool registration automatically. If updating manually later, re-run the installer; do not uninstall first.
 
-When moving from a portable/source installation, stop it, copy its `.local` folder into the installed folder before launching, remove the old MCP registration, and connect again. Do not run both installations together.
+When moving from a portable/source installation, stop it, copy its `.local` folder into the installed folder before launching, choose Connect Zenshin tools to replace the old registration. Do not run both installations together.
 
-The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.5/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
+The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.6/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
 
 This is an unsigned application; Windows may display a publisher warning. It bundles Python bytecode, which can still be extracted or reverse engineered. The repository and release downloads are public. Linux uses the source setup below.
 
@@ -38,9 +38,9 @@ python -m pip install -r requirements-windows.txt -r requirements-build.txt
 
 Outputs are in `dist/`. Native Codex/Chrome interactions still require a live Windows check. `Zenshin.exe --no-browser` runs the local server without a window; `--port` and `--state` work as in source mode.
 
-## Source downloads v0.2.5
+## Source downloads v0.2.6
 
-[Source ZIP](https://github.com/ahmedmurtazamalik/zenshin/archive/refs/tags/v0.2.5.zip) · [Source tar.gz](https://github.com/ahmedmurtazamalik/zenshin/archive/refs/tags/v0.2.5.tar.gz)
+[Source ZIP](https://github.com/ahmedmurtazamalik/zenshin/archive/refs/tags/v0.2.6.zip) · [Source tar.gz](https://github.com/ahmedmurtazamalik/zenshin/archive/refs/tags/v0.2.6.tar.gz)
 
 Both archives contain the same source for Windows and Linux, extracted into `zenshin-0.2.5`. They require Python and the Codex CLI; they do not contain the Windows executables or installer. Python 3.11 is the verified Windows build runtime. The release's `SHA256SUMS.txt` covers the Windows installer and portable ZIP, not these GitHub-generated source archives. macOS is not supported.
 
@@ -201,7 +201,7 @@ On Windows, replace `python3` with `.\.venv\Scripts\python.exe` and use a Window
 
 ## Verified scope and limitations
 
-- On 19 October 2026, the v0.2.5 Windows x64 release workflow passed all 63 tests in about 3 seconds, plus portable/installed-app startup, bundled assets, settings persistence, MCP discovery/transport, desktop-window rendering and normal close, reinstall, and uninstall checks. These packaging checks do not exercise live Codex or Chrome actions.
+- On 19 October 2026, the v0.2.6 Windows x64 release workflow passed all 63 tests in about 3 seconds, plus portable/installed-app startup, bundled assets, settings persistence, MCP discovery/transport, desktop-window rendering and normal close, reinstall, and uninstall checks. These packaging checks do not exercise live Codex or Chrome actions.
 - On 16 October 2026, real Windows checks verified Codex connection, one delivered and acknowledged approval reply, and Zenshin-owned Chrome password generation/selection plus terms selection on a disposable form. Both password fields were filled and matched; terms was checked and marketing was left unchecked. No account was submitted and the final native Chrome check used no ChatGPT Computer Use.
 - Earlier controlled tests verified Windows/Linux question forms, custom text, multi-question handling, draft preservation, and navigation on Windows. A real Linux file-access Allow once card was verified; real Windows approval cards and other command/tool-card variants still need live checks.
 - Windows reply delivery previously encountered intermittent UI Automation event/confirmation errors. The latest single live reply passed; that does not establish that the intermittent issue is eliminated.
@@ -217,8 +217,8 @@ git clone https://github.com/ahmedmurtazamalik/zenshin.git
 cd zenshin
 ```
 
-The clone follows the current default branch. To inspect the released source instead, run `git checkout v0.2.5`.
+The clone follows the current default branch. To inspect the released source instead, run `git checkout v0.2.6`.
 
-Install the source prerequisites above, then run the existing behavior tests with `python3 -m unittest -q`, or `.\.venv\Scripts\python.exe -m unittest -q` on Windows. The v0.2.5 suite contains 63 tests: all passed on Windows; the local Linux run passed with one Windows-only test skipped. Tests using simulated desktop controls do not replace live UI verification. Read [AGENTS.md](AGENTS.md) before changing code.
+Install the source prerequisites above, then run the existing behavior tests with `python3 -m unittest -q`, or `.\.venv\Scripts\python.exe -m unittest -q` on Windows. The v0.2.6 suite contains 63 tests: all passed on Windows; the local Linux run passed with one Windows-only test skipped. Tests using simulated desktop controls do not replace live UI verification. Read [AGENTS.md](AGENTS.md) before changing code.
 
 [Older captioned walkthrough](demo/approval-helper-demo.mp4) · [Transcript](demo/README.md). This video predates Windows support, Chrome delegation, and the current onboarding UI.

@@ -22,6 +22,7 @@ WizardStyle=modern
 UninstallDisplayIcon={app}\Zenshin.exe
 InfoBeforeFile=QUICK_START.txt
 CloseApplications=yes
+CloseApplicationsFilter=Zenshin.exe,Zenshin-bridge.exe
 RestartApplications=no
 
 [Tasks]
@@ -39,9 +40,15 @@ Name: "{group}\Zenshin setup guide"; Filename: "{app}\QUICK_START.txt"
 Name: "{autodesktop}\Zenshin"; Filename: "{app}\Zenshin.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\Zenshin.exe"; Description: "Launch Zenshin"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Zenshin.exe"; Parameters: "--repair-registration"; Description: "Launch Zenshin and connect Codex tools"; Flags: nowait postinstall skipifsilent; Check: not IsUpdate
+Filename: "{app}\Zenshin.exe"; Parameters: "--repair-registration --port {param:PORT|8765} --state ""{param:STATE|{app}\.local\state.json}"""; Flags: nowait; Check: IsUpdate
 
 [Code]
+function IsUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:UPDATE|0}') = '1';
+end;
+
 function WebView2Installed: Boolean;
 var
   Version: String;

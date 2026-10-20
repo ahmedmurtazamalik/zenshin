@@ -63,11 +63,25 @@ class CodexSetupTests(unittest.TestCase):
                              ["codex", "mcp", "add", "zenshin", "--", sys.executable, *arguments])
             self.assertEqual(run.call_count, 4)
 
-    def test_conflicting_registration_is_preserved_and_cli_failure_has_manual_fallback(self):
+    def test_connect_replaces_old_registration_and_verifies_new_bridge(self):
+        import json
+        import sys
+        executable = str(Path(sys.executable).with_name("Zenshin-bridge.exe"))
+        old = {"name": "zenshin", "enabled": False, "transport": {"command": "old/Zenshin.exe", "args": ["--mcp"]}}
+        new = {"name": "zenshin", "transport": {"command": executable, "args": []}}
+        with patch.object(sys, "frozen", True, create=True), \
+             patch.object(ai_decision, "cli_command", return_value=["codex"]), \
+             patch.object(app.subprocess, "run", side_effect=[
+                 Mock(returncode=0, stdout=json.dumps([old])), Mock(returncode=0, stdout=""),
+                 Mock(returncode=0, stdout=json.dumps([new]))]) as run:
+            self.assertTrue(app.codex_setup(8765, register=True)["registered"])
+            self.assertEqual(run.call_args_list[1].args[0], ["codex", "mcp", "add", "zenshin", "--", executable])
+
+    def test_registration_check_preserves_conflict_and_cli_failure_has_manual_fallback(self):
         with patch.object(ai_decision, "cli_command", return_value=["codex"]), \
              patch.object(app.subprocess, "run", return_value=Mock(returncode=0,
                  stdout='[{"name":"zenshin","transport":{"command":"old-python","args":[]}}]')) as run:
-            result = app.codex_setup(8765, register=True)
+            result = app.codex_setup(8765)
             self.assertTrue(result["conflict"])
             self.assertFalse(result["registered"])
             self.assertEqual(run.call_count, 1)
@@ -141,6 +155,33 @@ class PreviewTests(unittest.TestCase):
     def test_connection_rejects_mutating_operations(self):
         with self.assertRaises(ValueError):
             app.rpc({}, "turn/start", {})
+
+
+class ReadProgressTests(unittest.TestCase):
+    def test_read_reports_waiting_and_received_data_then_clears_on_completion(self):
+        connection = {"process": Mock(), "next_id": 0, "buffer": b""}
+        monitor = {"running": True, "connection": connection}
+        snapshots = []
+        chunks = iter([b'{"id":1,"result":', b'{"thread":{}}}\n'])
+
+        def receive(*args):
+            snapshots.append(app.progress_snapshot(monitor)["read"])
+            return next(chunks)
+
+        with patch.object(app, "pipe_ready", return_value=True), \
+             patch.object(app.os, "read", side_effect=receive):
+            self.assertEqual(app.rpc(connection, "thread/read", {}), {"thread": {}})
+        self.assertEqual(snapshots[0]["bytes"], 0)
+        self.assertEqual(snapshots[0]["timeout"], 60)
+        self.assertGreater(snapshots[1]["bytes"], 0)
+        self.assertIsNone(app.progress_snapshot(monitor)["read"])
+
+    def test_timeout_clears_loading_status(self):
+        connection = {"process": Mock(), "next_id": 0, "buffer": b""}
+        with patch.object(app.time, "monotonic", side_effect=[0, 61]):
+            with self.assertRaisesRegex(RuntimeError, "within 60 seconds"):
+                app.rpc(connection, "thread/read", {})
+        self.assertIsNone(connection["pending_read"])
 
 
 class DesktopTests(unittest.TestCase):

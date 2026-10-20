@@ -16,6 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock, Thread
 
 import ai_decision
+import updates
 
 
 ROOT = Path(__file__).resolve().parent
@@ -57,13 +58,13 @@ def codex_setup(port, register=False):
             result["conflict"] = not result["registered"]
 
         inspect()
-        if register and not result["registered"] and not result["conflict"]:
+        if register and not result["registered"]:
             run(["mcp", "add", "zenshin", "--", *launcher])
             inspect()
             if not result["registered"]:
                 raise RuntimeError("Registration could not be verified. Check the manual setup below.")
         result["message"] = ("Registered for this installation. Reload MCP connections or restart Codex, then confirm both Zenshin tools are available in your working chat."
-            if result["registered"] else "A different or disabled Zenshin registration exists. It was left unchanged. See manual setup below."
+            if result["registered"] else "An old or disabled Zenshin registration exists. Connect Zenshin tools to replace it."
             if result["conflict"] else "Not registered yet. Connect once to make the two tools available to Codex.")
     except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
         result["message"] = "Could not check or register Zenshin: " + str(error) + ". Use manual setup below."
@@ -144,25 +145,31 @@ def rpc(connection, method, params):
     process.stdin.flush()
     # Reading persisted chat history can take longer than a connection check.
     timeout = 60 if method == "thread/read" else 10
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if b"\n" not in connection["buffer"]:
-            if not pipe_ready(process.stdout):
+    pending = {"started": time.monotonic(), "timeout": timeout, "bytes": 0}
+    connection["pending_read"] = pending if method == "thread/read" else None
+    deadline = pending["started"] + timeout
+    try:
+        while time.monotonic() < deadline:
+            if b"\n" not in connection["buffer"]:
+                if not pipe_ready(process.stdout):
+                    continue
+                chunk = os.read(process.stdout.fileno(), 65536)
+                if not chunk:
+                    connection["errors"].seek(0)
+                    detail = connection["errors"].read().decode(errors="replace")[-1500:]
+                    raise RuntimeError("Codex App Server exited. " + detail.strip())
+                pending["bytes"] += len(chunk)
+                connection["buffer"] += chunk
                 continue
-            chunk = os.read(process.stdout.fileno(), 65536)
-            if not chunk:
-                connection["errors"].seek(0)
-                detail = connection["errors"].read().decode(errors="replace")[-1500:]
-                raise RuntimeError("Codex App Server exited. " + detail.strip())
-            connection["buffer"] += chunk
-            continue
-        line, connection["buffer"] = connection["buffer"].split(b"\n", 1)
-        message = json.loads(line)
-        if message.get("id") == request_id and "method" not in message:
-            if "error" in message:
-                raise RuntimeError(message["error"]["message"])
-            return message["result"]
-    raise RuntimeError(f"Codex App Server did not respond within {timeout} seconds ({method})")
+            line, connection["buffer"] = connection["buffer"].split(b"\n", 1)
+            message = json.loads(line)
+            if message.get("id") == request_id and "method" not in message:
+                if "error" in message:
+                    raise RuntimeError(message["error"]["message"])
+                return message["result"]
+        raise RuntimeError(f"Codex App Server did not respond within {timeout} seconds ({method})")
+    finally:
+        connection["pending_read"] = None
 
 
 def connect():
@@ -178,7 +185,7 @@ def connect():
     try:
         rpc(connection, "initialize", {"clientInfo": {
             "name": "codex_approval_helper", "title": "Zenshin",
-            "version": "0.2.0"}})
+            "version": updates.VERSION}})
         process.stdin.write(b'{"method":"initialized","params":{}}\n')
         process.stdin.flush()
         return connection
@@ -209,9 +216,12 @@ def set_progress(app, stage, chat="", detail="", started=None):
 def progress_snapshot(app):
     progress = app.get("progress", {})
     stage = progress.get("stage", "waiting" if app["running"] else "paused")
-    if not app["running"] and stage != "error":
+    if not app["running"] and stage not in {"error", "updating"}:
         stage = "paused"
-    return {"running": app["running"], "stage": stage,
+    pending = (app.get("connection") or {}).get("pending_read")
+    read = ({"elapsed": max(0, time.monotonic() - pending["started"]),
+             "timeout": pending["timeout"], "bytes": pending["bytes"]} if pending else None)
+    return {"running": app["running"], "stage": stage, "read": read,
             "chat": progress.get("chat", ""), "detail": progress.get("detail", ""),
             "steps": progress.get("steps", []),
             "elapsed": max(0, time.monotonic() - progress.get("started", time.monotonic()))}
@@ -610,6 +620,8 @@ def persisted_reply(connection, thread_id, turn_id, response):
 
 def snapshot(app):
     return {"connected": app["connection"] is not None, "running": app["running"],
+            "version": updates.VERSION,
+            "updates_supported": os.name == "nt" and getattr(sys, "frozen", False),
             "mode": app["state"].get("mode", "preview"),
             "targets": app["state"]["targets"], "rules": app["state"]["rules"],
             "decision_method": app["state"]["decision_method"],
@@ -642,6 +654,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--state", type=Path, default=INSTALL_ROOT / ".local" / "state.json")
+    parser.add_argument("--repair-registration", action="store_true", help="Replace old Zenshin tool registration after installation")
     parser.add_argument("--mcp", action="store_true", help="Run the Codex tool bridge over stdio")
     parser.add_argument("--no-browser", action="store_true", help="Run the local server without the desktop window")
     args = parser.parse_args()
@@ -651,6 +664,8 @@ def main():
     app = {"path": args.state, "state": load_state(args.state), "running": False,
            "connection": None, "previews": [], "error": ""}
     operations = Lock()
+    window = None
+    repair_registration = args.repair_registration
 
     class Handler(BaseHTTPRequestHandler):
         # Browsers may pre-open an idle socket; do not let it block all requests.
@@ -699,6 +714,7 @@ def main():
                 self.handle_operation()
 
         def handle_operation(self):
+            nonlocal repair_registration
             origin = self.headers.get("Origin")
             if (not self.valid_host() or self.headers.get("Content-Type") != "application/json"
                     or origin not in {None, f"http://127.0.0.1:{args.port}",
@@ -710,7 +726,35 @@ def main():
                     raise ValueError("Invalid request size")
                 data = json.loads(self.rfile.read(size))
                 if self.path == "/api/codex-setup":
-                    return self.reply(codex_setup(args.port, register=data.get("register") is True))
+                    result = codex_setup(args.port, register=repair_registration or data.get("register") is True)
+                    if result["registered"]:
+                        repair_registration = False
+                    return self.reply(result)
+                if self.path == "/api/check-update":
+                    try:
+                        return self.reply(updates.latest_release())
+                    except (OSError, RuntimeError, ValueError, KeyError) as error:
+                        return self.reply({"error": str(error)}, 503)
+                if self.path == "/api/install-update":
+                    if not window or not getattr(sys, "frozen", False) or os.name != "nt":
+                        raise ValueError("Automatic updates require the Windows desktop app.")
+                    release = updates.latest_release()
+                    if not release["available"]:
+                        return self.reply({"message": "Zenshin is already up to date."})
+                    app["running"] = False
+                    cancel_analysis(app)
+                    set_progress(app, "updating", detail="Downloading the latest Windows installer.")
+                    try:
+                        installer = updates.download_installer(release, lambda detail: set_progress(
+                            app, "updating", detail=detail))
+                        updates.launch_installer(installer, INSTALL_ROOT, args.port, args.state.resolve())
+                    except (OSError, RuntimeError, ValueError, KeyError) as error:
+                        app["error"] = str(error)
+                        set_progress(app, "error", detail=str(error))
+                        return self.reply(snapshot(app), 503)
+                    self.reply({"message": "Installing update. Zenshin will close and reopen automatically."})
+                    window.destroy()
+                    return
                 if self.path == "/api/check-connection":
                     return self.reply(check_codex_connection(app))
                 if self.path == "/api/browser-action":
@@ -822,7 +866,7 @@ def main():
             worker = Thread(target=server.serve_forever, daemon=True)
             worker.start()
             try:
-                webview.create_window("Zenshin", f"http://127.0.0.1:{args.port}",
+                window = webview.create_window("Zenshin", f"http://127.0.0.1:{args.port}",
                                       width=1200, height=850, min_size=(850, 600))
                 webview.start(gui="edgechromium", private_mode=False,
                               storage_path=str(args.state.parent / "webview"))

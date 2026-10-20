@@ -1,3 +1,12 @@
+# Zenshin v0.2.6 — Visible chat reads and in-app updates
+
+- Chat history reads wait up to 60 seconds and show a loading bar, elapsed time, and actual received bytes, including an explicit no-data-yet state.
+- Check for updates and Install update download the latest Windows installer, verify its SHA-256 checksum, pause monitoring, upgrade in place, and reopen Zenshin.
+- Installation replaces old or disabled Zenshin MCP registrations automatically. Connect Zenshin tools can also repair them directly; other MCP entries are preserved.
+- Settings and the permanent attempt journal survive upgrades. Uninstalling before updating is unnecessary.
+- From v0.2.5 or earlier, close Zenshin and run this installer once; launch from the installer to repair registration. Future releases can use the update button.
+- Codex may still need an MCP reload or restart after an update. Automatic installation is available in the Windows desktop app; source installations can check release availability.
+
 # Zenshin v0.2.5 — AI and authorized replies by default
 
 - New settings default to AI decisions and Send authorized replies.

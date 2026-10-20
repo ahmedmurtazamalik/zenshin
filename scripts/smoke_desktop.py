@@ -11,18 +11,28 @@ from urllib.request import urlopen
 import uiautomation as ui
 
 
-def check(executable):
+def check(executable, installer=None):
     with tempfile.TemporaryDirectory(prefix="zenshin desktop ") as directory:
         with socket.socket() as reservation:
             reservation.bind(("127.0.0.1", 0))
             port = reservation.getsockname()[1]
-        process = subprocess.Popen([str(executable), "--port", str(port),
-                                    "--state", str(Path(directory) / "state.json")])
+        state_path = Path(directory) / "state.json"
+        bridge = None
+        if installer:
+            # A loaded MCP bridge must not prevent replacing the executable.
+            bridge = subprocess.Popen([str(executable.with_name("Zenshin-bridge.exe"))],
+                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            process = subprocess.Popen([str(installer), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/SP-",
+                                        "/NORESTART", "/CLOSEAPPLICATIONS", "/FORCECLOSEAPPLICATIONS",
+                                        "/UPDATE=1", f"/DIR={executable.parent}", f"/PORT={port}",
+                                        f"/STATE={state_path}"])
+        else:
+            process = subprocess.Popen([str(executable), "--port", str(port), "--state", str(state_path)])
         try:
             deadline = time.monotonic() + 45
             window = ui.WindowControl(Name="Zenshin", searchDepth=1)
             while not window.Exists(.2, .1):
-                assert process.poll() is None, "Desktop app exited before opening its window"
+                assert process.poll() in (None, 0) if installer else process.poll() is None, "Desktop app exited before opening its window"
                 if time.monotonic() >= deadline:
                     raise RuntimeError("Desktop window did not appear")
                 time.sleep(.1)
@@ -31,13 +41,28 @@ def check(executable):
                 skip.GetInvokePattern().Invoke()
             assert window.ButtonControl(Name="Save changes", searchDepth=25).Exists(10, .2), "Control page did not render"
             assert window.ButtonControl(Name="Start monitoring", searchDepth=25).Exists(2, .2), "Monitor controls missing"
+            assert window.ButtonControl(Name="Check for updates", searchDepth=25).Exists(2, .2), "Update control missing"
+            if bridge:
+                assert bridge.wait(timeout=10) is not None, "Installer left the old MCP bridge running"
             with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=5) as response:
                 assert response.status == 200
             window.GetWindowPattern().Close()
             assert process.wait(timeout=15) == 0, "Desktop window did not shut down cleanly"
-            with socket.socket() as probe:
-                assert probe.connect_ex(("127.0.0.1", port)) != 0, "Server survived closing its window"
+            deadline = time.monotonic() + 15
+            while True:
+                with socket.socket() as probe:
+                    if probe.connect_ex(("127.0.0.1", port)) != 0:
+                        break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("Server survived closing its window")
+                time.sleep(.1)
         finally:
+            if bridge:
+                if bridge.poll() is None:
+                    bridge.terminate()
+                bridge.wait(timeout=10)
+                bridge.stdin.close()
+                bridge.stdout.close()
             if process.poll() is None:
                 subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
                                stdout=subprocess.DEVNULL, timeout=10)
@@ -46,4 +71,4 @@ def check(executable):
 
 
 if __name__ == "__main__":
-    check(Path(sys.argv[1]).resolve())
+    check(Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else None)

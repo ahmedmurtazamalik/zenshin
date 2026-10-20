@@ -1,7 +1,9 @@
-param([string]$Version = '0.2.5')
+param([string]$Version = '')
 $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
 try {
+    if (!$Version) { $Version = python -c "import updates; print(updates.VERSION)" }
+    if ($LASTEXITCODE -ne 0 -or $Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid release version' }
     python -m PyInstaller --noconfirm --clean --onefile --windowed --name Zenshin `
         --add-data 'index.html:.' --add-data 'assets:assets' `
         --collect-all uiautomation --collect-submodules comtypes app.py

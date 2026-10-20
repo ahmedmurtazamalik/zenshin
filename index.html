@@ -164,6 +164,7 @@
     #progress[data-stage=waiting]::after, #progress[data-stage=done]::after, #progress[data-stage=error]::after { display: none; }
     #progress[data-stage=waiting] .spinner, #progress[data-stage=done] .spinner, #progress[data-stage=error] .spinner { display: none; }
     #progress-time { margin-left: auto; font: 11px ui-monospace, monospace; color: var(--muted); font-variant-numeric: tabular-nums; }
+    #read-progress { flex-basis: 100%; width: 100%; height: 6px; accent-color: var(--accent); }
     #progress-detail { flex-basis: 100%; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #check-steps { display: flex; gap: 16px; flex-wrap: wrap; flex-basis: 100%; }
     .check-step { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
@@ -249,11 +250,13 @@
         </ol>
         <div class="toolbar"><button id="register-codex" class="primary">Connect Zenshin tools</button><button id="check-codex">Check connection</button></div>
         <p id="setup-chat-result" class="muted" role="status">Check connection to verify chat access and tool registration separately.</p>
+        <div class="toolbar"><button id="check-update">Check for updates</button><button id="install-update" hidden>Install update</button></div>
+        <p id="update-result" class="muted" role="status"></p>
         <p id="setup-result" class="muted" role="status">Checking registration…</p>
         <details id="manual-setup"><summary>Manual setup or troubleshooting</summary>
           <p>Run this command in <span id="setup-shell">your terminal</span> on this computer. It uses this installation's paths and port. Then check registration again.</p>
           <pre id="setup-command" tabindex="0" aria-label="Registration command"></pre><button id="copy-command">Copy command</button>
-          <p>If Codex is missing, install its CLI and sign in, then restart Zenshin so it can find the CLI. If an old or disabled <code>zenshin</code> entry conflicts, inspect it with <code>codex mcp get zenshin</code>. Remove that entry with <code>codex mcp remove zenshin</code> only if you intend to replace it, then connect again.</p>
+          <p>If Codex is missing, install its CLI and sign in, then restart Zenshin so it can find the CLI. If an old or disabled <code>zenshin</code> entry conflicts, inspect it with <code>codex mcp get zenshin</code>. Choose Connect Zenshin tools to replace the old entry automatically.</p>
           <p>Registration confirms configuration only. Your working Codex chat must also load the tools. If tools are missing, reload its MCP connections or restart Codex. Keep Zenshin running at this address; reconnect after moving the app or changing its port.</p>
         </details>
         <div id="codex-guidance">
@@ -317,7 +320,7 @@
       </section>
     </div>
   </div>
-  <div class="control-bar"><div id="progress" role="status" hidden><span class="spinner" aria-hidden="true"></span><span id="progress-text"></span><span id="progress-time" aria-hidden="true"></span><span id="progress-detail" hidden></span><div id="check-steps" aria-hidden="true" hidden><span class="check-step" data-step="reading">Read chats</span><span class="check-step" data-step="inspecting">Find request</span><span class="check-step" data-step="deciding">Decide</span><span class="check-step" data-step="sending">Send</span><span class="check-step" data-step="confirming">Confirm</span></div></div><div class="control-inner"><span class="control-label" id="next-step">Connect to Codex to begin</span><div class="toolbar"><span id="saved" role="status"></span><button id="save">Save changes</button><button class="primary" id="start" disabled>Start monitoring</button><button id="pause" disabled>Pause</button></div></div></div>
+  <div class="control-bar"><div id="progress" role="status" hidden><span class="spinner" aria-hidden="true"></span><span id="progress-text"></span><span id="progress-time" aria-hidden="true"></span><progress id="read-progress" aria-label="Waiting for Codex chat history" hidden></progress><span id="progress-detail" hidden></span><div id="check-steps" aria-hidden="true" hidden><span class="check-step" data-step="reading">Read chats</span><span class="check-step" data-step="inspecting">Find request</span><span class="check-step" data-step="deciding">Decide</span><span class="check-step" data-step="sending">Send</span><span class="check-step" data-step="confirming">Confirm</span></div></div><div class="control-inner"><span class="control-label" id="next-step">Connect to Codex to begin</span><div class="toolbar"><span id="saved" role="status"></span><button id="save">Save changes</button><button class="primary" id="start" disabled>Start monitoring</button><button id="pause" disabled>Pause</button></div></div></div>
 </main>
 <dialog id="welcome" aria-labelledby="welcome-title">
   <span class="eyebrow">Welcome to Zenshin</span><h2 id="welcome-title">A little guidance to get going.</h2>
@@ -386,6 +389,27 @@
       $('copy-result').textContent = ' Copied.';
     } catch (_) { $('copy-result').textContent = ' Select the text above and copy it manually.'; }
   }
+  $('check-update').onclick = () => action(async () => {
+    $('install-update').hidden = true;
+    $('update-result').textContent = 'Checking the latest release...';
+    try {
+      const release = await request('check-update');
+      $('update-result').textContent = release.available
+        ? `Zenshin ${release.version} is available (installed: ${state.version}). Installation preserves settings and repairs the Codex tool registration. Codex may need an MCP reload afterward.`
+        : `Zenshin ${state.version} is up to date.`;
+      $('install-update').hidden = !release.available || !state.updates_supported;
+      if (release.available && !state.updates_supported) $('update-result').textContent += ' Download the Windows installer from GitHub Releases to update this source installation.';
+    } catch (error) { $('update-result').textContent = 'Update check failed: ' + error.message; }
+  }, 'check-update', 'Checking for updates...');
+  $('install-update').onclick = () => action(async () => {
+    $('install-update').disabled = true;
+    $('update-result').textContent = 'Downloading and verifying the update. Monitoring will pause; Zenshin will close and reopen automatically.';
+    try {
+      const result = await request('install-update');
+      $('update-result').textContent = result.message;
+    } catch (error) { $('update-result').textContent = 'Update failed: ' + error.message; }
+    finally { $('install-update').disabled = false; }
+  }, 'install-update', 'Downloading and verifying update...');
   $('register-codex').onclick = () => loadSetup(true);
   let checkingConnection = false;
   async function checkConnection(includeTools = false) {
@@ -465,11 +489,12 @@
   window.addEventListener('scroll', positionTour, true);
   function renderProgress() {
     const p = monitorProgress;
-    if (p && (p.running || (p.stage === 'error' && state?.error))) {
+    $('read-progress').hidden = !p?.read;
+    if (p && (p.running || p.stage === 'updating' || (p.stage === 'error' && state?.error))) {
       const titles = {reading: 'Reading chats', opening: 'Opening chat in Codex', inspecting: 'Checking for a request',
         deciding: p.detail === 'Using a saved decision.' ? 'Using saved decision' : state?.decision_method === 'ai' ? 'AI deciding' : 'Matching your rule',
         sending: 'Sending answer', confirming: 'Confirming delivery',
-        waiting: 'Waiting for next check', done: 'Check complete', error: 'Check failed'};
+        updating: 'Updating Zenshin', waiting: 'Waiting for next check', done: 'Check complete', error: 'Check failed'};
       $('progress').hidden = false; $('progress').dataset.stage = p.stage;
       const title = (titles[p.stage] || 'Checking chats') + (p.chat ? ' · ' + p.chat : '');
       if ($('progress-text').textContent !== title) $('progress-text').textContent = title;
@@ -478,7 +503,7 @@
         : `${Math.floor(p.elapsed + (Date.now() - progressReceived) / 1000)}s elapsed`;
       $('progress-detail').textContent = p.detail;
       $('progress-detail').hidden = !p.detail;
-      $('check-steps').hidden = false;
+      $('check-steps').hidden = p.stage === 'updating';
       for (const step of $('check-steps').children) {
         step.classList.toggle('active', step.dataset.step === p.stage);
         step.classList.toggle('complete', p.steps.includes(step.dataset.step) && step.dataset.step !== p.stage);
@@ -489,6 +514,15 @@
       $('progress-time').textContent = `${Math.floor((Date.now() - operationStarted) / 1000)}s elapsed`;
       $('progress-detail').hidden = true; $('check-steps').hidden = true;
     } else $('progress').hidden = true;
+    if (p?.read) {
+      const elapsed = Math.floor(p.read.elapsed + (Date.now() - progressReceived) / 1000);
+      $('progress').hidden = false;
+      $('progress-time').textContent = `${elapsed}s elapsed / ${p.read.timeout}s timeout`;
+      $('progress-detail').hidden = false;
+      $('progress-detail').textContent = p.read.bytes
+        ? `Waiting for full chat history response; ${p.read.bytes.toLocaleString()} bytes received from Codex.`
+        : 'Waiting for Codex chat history; no response data yet.';
+    }
   }
   async function refreshProgress() {
     if (progressBusy || (!state?.running && !busy)) return;
@@ -628,14 +662,14 @@
     busy = true;
     operationMessage = message; operationStarted = Date.now(); renderProgress();
     if (control) $(control).setAttribute('data-loading', 'true');
-    for (const id of ['connect', 'refresh', 'more', 'find-target', 'save', 'start']) $(id).disabled = true;
+    for (const id of ['connect', 'refresh', 'more', 'find-target', 'save', 'start', 'check-update', 'install-update']) $(id).disabled = true;
     document.querySelector('main').setAttribute('aria-busy', 'true');
     try { showError(''); await work(); } catch (error) { showError(error.message); } finally {
       busy = false;
       renderProgress();
-      if (control) $(control).removeAttribute('data-loading');
+      if (control) { $(control).removeAttribute('data-loading'); $(control).disabled = false; }
       document.querySelector('main').setAttribute('aria-busy', 'false');
-      for (const id of ['connect', 'more', 'find-target', 'save']) $(id).disabled = false;
+      for (const id of ['connect', 'more', 'find-target', 'save', 'check-update', 'install-update']) $(id).disabled = false;
       $('refresh').disabled = !state?.connected;
       updateSelection();
       if (pauseRequested) {
