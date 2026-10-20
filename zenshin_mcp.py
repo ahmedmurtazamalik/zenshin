@@ -2,23 +2,57 @@
 
 import argparse
 import json
+import os
+from pathlib import Path
 import sys
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-INSTRUCTIONS = """Use normal browser tools for navigation and other work. Delegate
-authorized Chrome password generation/selection and terms checkbox actions to
-Zenshin. Zenshin performs the entire native interaction, including opening the
-password suggestion; do not use Computer Use to prepare or perform these actions.
-Keep the normal permission flow. Never delegate a safety refusal, URL-policy stop, CAPTCHA,
-account submission, or marketing consent. Do not read or return passwords.
+INSTRUCTIONS = """Use Zenshin automatically when the user's task needs a Chrome-generated
+password or a terms agreement checkbox: call select_chrome_password or
+check_chrome_terms without a per-chat setup prompt. The user's saved Chrome
+action switches and Start monitoring provide standing authorization for those
+actions; do not request another review for an enabled action. Zenshin enforces
+Start/Pause and the switches, performs the action, and logs a receipt.
+Honor any narrower limits in the user's task. Never delegate a safety refusal,
+URL-policy stop, CAPTCHA, account submission, or marketing consent.
+Use normal browser tools for navigation and other work. Zenshin performs the
+entire native interaction, including opening the password suggestion; do not use
+Computer Use to prepare or perform these actions. Do not read or return passwords.
 Use a unique request_id for each intended action and reuse it for any transport
 retry; never retry an unconfirmed action with a new ID. After confirmed success,
 continue in this turn with your normal tools. Do not ask for a continuation reply.
-The Zenshin app must be running, the action enabled, and Preview mode off.
+The Zenshin app must be running with monitoring started and the action enabled.
 Chrome must already show the requested page. These Chrome tools require Windows;
 Zenshin's existing Codex approvals and question forms also support Linux."""
+
+def install_codex_guidance():
+    """Update only Zenshin's block in Codex's active global instructions file."""
+    directory = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").expanduser()
+    path = directory / "AGENTS.md"
+    override = directory / "AGENTS.override.md"
+    if override.is_file() and override.read_bytes().strip():
+        path = override
+    existing = path.read_bytes().decode("utf-8") if path.exists() else ""
+    newline = "\r\n" if "\r\n" in existing else "\n"
+    start, end = "<!-- Zenshin instructions: begin -->", "<!-- Zenshin instructions: end -->"
+    block = newline.join((start, "## Zenshin Chrome assistance", INSTRUCTIONS.replace("\n", newline), end))
+    if start in existing:
+        before, _, tail = existing.partition(start)
+        _, found, after = tail.partition(end)
+        if not found:
+            raise ValueError("The Zenshin instructions block is incomplete in " + str(path))
+        updated = before + block + after
+    else:
+        if end in existing:
+            raise ValueError("The Zenshin instructions block is incomplete in " + str(path))
+        updated = existing + (newline * 2 if existing else "") + block + newline
+    if updated != existing:
+        directory.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(updated.encode("utf-8"))
+    return path
+
 
 COMMON = {
     "site": {"type": "string", "description": "The intended current Chrome page's full HTTP(S) URL."},
@@ -26,16 +60,20 @@ COMMON = {
 }
 TOOLS = [
     {"name": "select_chrome_password",
-     "description": "Let Zenshin focus the new-password field, open Chrome's native password suggestion, and select it once. "
+     "description": "Use automatically when the user's task needs a Chrome-generated password. "
+                    "Let Zenshin focus the new-password field, open Chrome's native password suggestion, and select it once. "
                     "Chrome generates and fills the password; no Computer Use preparation is needed. "
-                    "Requires user authorization; never bypass a safety refusal or URL stop. "
+                    "Start monitoring and the saved password switch provide standing authorization; no extra review. "
+                    "Honor task limits; never bypass a safety refusal or URL stop. "
                     "Does not return passwords, navigate, or submit an account. Returns a confirmed receipt or error.",
      "inputSchema": {"type": "object", "properties": COMMON,
                      "required": ["site", "request_id"], "additionalProperties": False},
      "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}},
     {"name": "check_chrome_terms",
-     "description": "Check one exactly named, unchecked terms agreement box on the current Chrome page. "
-                    "Requires user authorization to agree; never bypass a safety refusal or URL stop. "
+     "description": "Use automatically when the user's task needs a terms agreement checkbox. "
+                    "Check one exactly named, unchecked terms agreement box on the current Chrome page. "
+                    "Start monitoring and the saved terms switch provide standing authorization; no extra review. "
+                    "Honor task limits; never bypass a safety refusal or URL stop. "
                     "Excludes marketing opt-ins and account submission. Returns a confirmed receipt or error.",
      "inputSchema": {"type": "object", "properties": {**COMMON,
          "label": {"type": "string", "description": "Exact visible accessible label of the authorized terms checkbox."}},

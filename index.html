@@ -8,12 +8,12 @@
   <script>document.documentElement.dataset.theme = localStorage.getItem('helper-theme') || 'midnight';</script>
   <style>
     @font-face { font-family: 'Space Grotesk'; src: url('/assets/space-grotesk.ttf') format('truetype'); font-weight: 300 700; font-display: swap; }
-    :root { color-scheme: dark; font-family: 'Space Grotesk', sans-serif; --theme-font: 'Space Grotesk', sans-serif; color: var(--text); background: var(--bg); font-size: 14px; --bg: #141416; --surface: #171719; --field: #1b1b1f; --button: #222226; --hover: #303035; --selected: #29272a; --text: #e4e4e7; --line: #36363e; --muted: #a3a3af; --accent: #e8bb7d; --primary: #e4e4e7; --primary-text: #18181b; --error-bg: #402324; --error-text: #f1b2b2; --review: #332b22; }
-    :root[data-theme=paper] { color-scheme: light; --bg: #f5f1e9; --surface: #ede8de; --field: #fffcf5; --button: #e7e0d4; --hover: #dcd3c3; --selected: #e6d9c1; --text: #29271f; --line: #cbc3b5; --muted: #6d675c; --accent: #855819; --primary: #29271f; --primary-text: #fffaf0; --error-bg: #f7dedb; --error-text: #8b2929; --review: #eee0c7; }
-    :root[data-theme=cobalt] { --bg: #101a31; --surface: #14213b; --field: #192a48; --button: #203555; --hover: #2b456b; --selected: #284467; --text: #e5edff; --line: #354e73; --muted: #a2b6d9; --accent: #80bfff; --primary: #9bcaff; --primary-text: #10213a; --review: #303349; }
-    :root[data-theme=forest] { --bg: #12201b; --surface: #172920; --field: #1c3027; --button: #243b30; --hover: #304d3d; --selected: #2a4738; --text: #e3eee4; --line: #3b5547; --muted: #a1b8a8; --accent: #b8d994; --primary: #b8d994; --primary-text: #18251b; --review: #353b28; }
-    :root[data-theme=rose] { color-scheme: light; --bg: #faf0f1; --surface: #f1e3e7; --field: #fff9fa; --button: #ead3dc; --hover: #dfbdca; --selected: #eed0dc; --text: #402936; --line: #d7b9c6; --muted: #806371; --accent: #a03c68; --primary: #8e365b; --primary-text: #fff7fa; --error-bg: #f7d9d9; --error-text: #8b2929; --review: #f0decf; }
-    :root[data-theme=terminal] { --bg: #0b110d; --surface: #0f1812; --field: #142019; --button: #19291e; --hover: #233b2a; --selected: #1d3425; --text: #d5f1dc; --line: #304f38; --muted: #90b899; --accent: #79ef97; --primary: #79ef97; --primary-text: #0c2112; --review: #303821; }
+    :root { color-scheme: dark; font-family: 'Space Grotesk', sans-serif; --theme-font: 'Space Grotesk', sans-serif; color: var(--text); background: var(--bg); font-size: 14px; --bg: #141416; --surface: #171719; --field: #1b1b1f; --button: #222226; --hover: #303035; --selected: #29272a; --text: #e4e4e7; --line: #36363e; --muted: #a3a3af; --accent: #e8bb7d; --primary: #e4e4e7; --primary-text: #18181b; --error-bg: #402324; --error-text: #f1b2b2; }
+    :root[data-theme=paper] { color-scheme: light; --bg: #f5f1e9; --surface: #ede8de; --field: #fffcf5; --button: #e7e0d4; --hover: #dcd3c3; --selected: #e6d9c1; --text: #29271f; --line: #cbc3b5; --muted: #6d675c; --accent: #855819; --primary: #29271f; --primary-text: #fffaf0; --error-bg: #f7dedb; --error-text: #8b2929; }
+    :root[data-theme=cobalt] { --bg: #101a31; --surface: #14213b; --field: #192a48; --button: #203555; --hover: #2b456b; --selected: #284467; --text: #e5edff; --line: #354e73; --muted: #a2b6d9; --accent: #80bfff; --primary: #9bcaff; --primary-text: #10213a; }
+    :root[data-theme=forest] { --bg: #12201b; --surface: #172920; --field: #1c3027; --button: #243b30; --hover: #304d3d; --selected: #2a4738; --text: #e3eee4; --line: #3b5547; --muted: #a1b8a8; --accent: #b8d994; --primary: #b8d994; --primary-text: #18251b; }
+    :root[data-theme=rose] { color-scheme: light; --bg: #faf0f1; --surface: #f1e3e7; --field: #fff9fa; --button: #ead3dc; --hover: #dfbdca; --selected: #eed0dc; --text: #402936; --line: #d7b9c6; --muted: #806371; --accent: #a03c68; --primary: #8e365b; --primary-text: #fff7fa; --error-bg: #f7d9d9; --error-text: #8b2929; }
+    :root[data-theme=terminal] { --bg: #0b110d; --surface: #0f1812; --field: #142019; --button: #19291e; --hover: #233b2a; --selected: #1d3425; --text: #d5f1dc; --line: #304f38; --muted: #90b899; --accent: #79ef97; --primary: #79ef97; --primary-text: #0c2112; }
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
     body { margin: 0; }
@@ -80,14 +80,6 @@
     textarea { width: 100%; min-height: 92px; resize: vertical; line-height: 1.7; font-size: 13px; }
     #instructions { min-height: 180px; margin-top: 10px; padding: 16px; }
     .help { margin-top: 10px; max-width: 620px; }
-    .rule { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-    .rule label { display: block; color: var(--muted); }
-    .rule textarea { display: block; margin-top: 8px; }
-    .rule button { justify-self: start; grid-column: 1 / -1; background: transparent; border-color: transparent; padding: 0; color: var(--muted); }
-    .notice { border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; background: var(--surface); margin-bottom: 20px; }
-    .notice-symbol { color: var(--accent); font: 16px ui-monospace, monospace; padding-top: 2px; }
-    .notice strong { font-size: 12px; font-weight: 500; }
-    #mode-description { display: block; color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 4px; }
     .empty { border: 1px dashed var(--line); border-radius: 6px; padding: 28px 20px; text-align: center; color: var(--muted); font-size: 12px; margin: 0; }
     .entry { padding: 18px 0; border-bottom: 1px solid var(--line); }
     .entry:last-child { border-bottom: 0; }
@@ -102,7 +94,6 @@
     .control-label { color: var(--muted); font: 11px ui-monospace, monospace; }
     #saved { font-size: 11px; color: var(--accent); }
     #error { background: var(--error-bg); border: 1px solid #704044; color: var(--error-text); border-radius: 6px; padding: 12px 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
-    #review-panel { padding: 16px; background: var(--review); border: 1px solid #5e4d37; border-radius: 6px; margin-bottom: 20px; }
     /* Each palette has its own material, contrast, and accent treatment. */
     .section-head .eyebrow { color: var(--accent); border: 1px solid var(--line); padding: 4px 7px; border-radius: 4px; }
     .mark svg { width: 100%; height: 100%; }
@@ -110,7 +101,6 @@
     :root[data-theme=forest] .mark { color: #255347; }
     :root[data-theme=rose] .mark { color: #913d59; }
     :root[data-theme=terminal] .mark { color: #79ef97; }
-    .notice { border-left: 3px solid var(--accent); }
     pre { border-left-color: var(--accent); }
     :root[data-theme=midnight] { font-family: Georgia, serif; --theme-font: Georgia, serif; }
     :root[data-theme=midnight] .page-heading h2 { font-size: 34px; font-weight: 400; font-style: italic; letter-spacing: -.8px; }
@@ -124,39 +114,35 @@
     :root[data-theme=paper] aside { --bg: #283638; --surface: #243032; --field: #304043; --button: #3b4d50; --hover: #475b5e; --selected: #405653; --text: #f3eee1; --muted: #b9c6c2; --line: #536765; --accent: #efb18a; color: var(--text); }
     :root[data-theme=paper] .content { background-image: radial-gradient(#806d441c .6px, transparent .6px); background-size: 6px 6px; }
     :root[data-theme=paper] #instructions { border-radius: 0; box-shadow: 5px 5px 0 #ded6c5; }
-    :root[data-theme=paper] .notice { background: #e9eddf; }
     :root[data-theme=paper] .section-head .eyebrow { border-radius: 0; border-color: var(--accent); }
-    :root[data-theme=cobalt] { color-scheme: light; --bg: #edf1f6; --surface: #e0e7f0; --field: #ffffff; --button: #d9e3f2; --hover: #c8d8ed; --selected: #c9d9f0; --text: #202e47; --line: #bac8dc; --muted: #586a83; --accent: #245dde; --primary: #245dde; --primary-text: #ffffff; --error-bg: #f7dedb; --error-text: #8b2929; --review: #f0e3cd; }
+    :root[data-theme=cobalt] { color-scheme: light; --bg: #edf1f6; --surface: #e0e7f0; --field: #ffffff; --button: #d9e3f2; --hover: #c8d8ed; --selected: #c9d9f0; --text: #202e47; --line: #bac8dc; --muted: #586a83; --accent: #245dde; --primary: #245dde; --primary-text: #ffffff; --error-bg: #f7dedb; --error-text: #8b2929; }
     :root[data-theme=cobalt] aside { color-scheme: dark; --bg: #121e38; --surface: #172744; --field: #1e3354; --button: #294369; --hover: #355480; --selected: #2f4b72; --text: #eef3ff; --muted: #adbfdb; --line: #3a537a; --accent: #ffba70; color: var(--text); }
     :root[data-theme=cobalt] header { border-bottom: 3px solid #245dde; }
     :root[data-theme=cobalt] .content { background-image: linear-gradient(#245dde06 1px, transparent 1px), linear-gradient(90deg, #245dde06 1px, transparent 1px); background-size: 24px 24px; }
     :root[data-theme=cobalt] .page-heading h2 { color: #245dde; }
     :root[data-theme=cobalt] .section-head .eyebrow { background: #f9d2a6; border-color: #d3a474; color: #704216; }
-    :root[data-theme=cobalt] .notice { background: #e0e9fb; }
-    :root[data-theme=forest] { --theme-font: Georgia, serif; color-scheme: light; --bg: #f3f0e4; --surface: #e6e6d4; --field: #fffdf4; --button: #e0e1c9; --hover: #d1d6b9; --selected: #d6dec3; --text: #2d382a; --line: #c4cbb3; --muted: #66705b; --accent: #956032; --primary: #426343; --primary-text: #fffdf4; --error-bg: #f7dedb; --error-text: #8b2929; --review: #efe1c5; }
+    :root[data-theme=forest] { --theme-font: Georgia, serif; color-scheme: light; --bg: #f3f0e4; --surface: #e6e6d4; --field: #fffdf4; --button: #e0e1c9; --hover: #d1d6b9; --selected: #d6dec3; --text: #2d382a; --line: #c4cbb3; --muted: #66705b; --accent: #956032; --primary: #426343; --primary-text: #fffdf4; --error-bg: #f7dedb; --error-text: #8b2929; }
     :root[data-theme=forest] aside { color-scheme: dark; --bg: #1b3026; --surface: #233c2d; --field: #2c4938; --button: #395940; --hover: #486b4c; --selected: #415d3e; --text: #f1f0d9; --muted: #b5c5a9; --line: #526b4e; --accent: #e7b97c; color: var(--text); }
     :root[data-theme=forest] .page-heading h2 { color: #426343; font-family: Georgia, serif; font-style: italic; }
     :root[data-theme=forest] .content { background: radial-gradient(ellipse at top right, #d7dfc3, transparent 60%); }
     :root[data-theme=forest] #instructions { border-color: #8b9e73; border-radius: 14px 14px 14px 2px; }
-    :root[data-theme=forest] .notice { background: #e1e7d3; border-left-color: #426343; }
     :root[data-theme=forest] .control-bar { border-top: 3px solid #426343; }
     :root[data-theme=rose] { --theme-font: Georgia, serif; --bg: #fff6ef; --surface: #ede5f2; --field: #fffcf8; --button: #e4d4ef; --hover: #d8c2e7; --accent: #a13f62; }
     :root[data-theme=rose] header { background: #f3dece; border-bottom-color: #d5b199; }
     :root[data-theme=rose] .page-heading h2 { color: #913d59; font-family: Georgia, serif; font-size: 34px; }
     :root[data-theme=rose] #instructions { border-color: #cbaaae; border-radius: 18px 18px 4px 18px; box-shadow: 4px 4px 0 #edd9d1; }
     :root[data-theme=rose] .section-head .eyebrow { background: #e5d6ef; border: 0; color: #674c80; border-radius: 20px; }
-    :root[data-theme=rose] .notice { background: #f6e3d5; }
     :root[data-theme=rose] .control-bar { --text: #fff0f4; --muted: #e0b8ca; --button: #784359; --line: #975d74; --primary: #ffd0a8; --primary-text: #482737; background: #4b2b40; }
     :root[data-theme=terminal] { --theme-font: ui-monospace, monospace; --bg: #111516; --surface: #191f20; --field: #20282a; --button: #263133; --hover: #344347; --line: #3c4b4e; --muted: #a0b1ae; font-family: ui-monospace, monospace; }
     :root[data-theme=terminal] header { background-image: repeating-linear-gradient(0deg, #79ef9705 0 1px, transparent 1px 4px); border-bottom-color: #79ef9760; }
     :root[data-theme=terminal] .page-heading h2 { color: #79ef97; letter-spacing: -1px; font-size: clamp(24px, 3vw, 30px); }
     :root[data-theme=terminal] .page-heading h2::before { content: '> '; color: #ffc17c; }
     :root[data-theme=terminal] .section-head .eyebrow { color: #ffc17c; border-radius: 0; }
-    :root[data-theme=terminal] button, :root[data-theme=terminal] textarea, :root[data-theme=terminal] select, :root[data-theme=terminal] input[type=text], :root[data-theme=terminal] .notice { border-radius: 0; }
+    :root[data-theme=terminal] button, :root[data-theme=terminal] textarea, :root[data-theme=terminal] select, :root[data-theme=terminal] input[type=text] { border-radius: 0; }
     :root[data-theme=terminal] .control-bar { border-top: 1px solid #79ef9760; }
     @media (min-width: 1440px) { main { border-left: 1px solid var(--line); border-right: 1px solid var(--line); } }
     @media (max-width: 900px) { .workspace { grid-template-columns: 240px minmax(0, 1fr); } .content { padding: 28px 24px; } header { padding: 0 24px; } .field-row { align-items: flex-start; flex-direction: column; gap: 8px; } }
-    @media (max-width: 620px) { header { height: 68px; padding: 0 16px; } .brand { gap: 10px; } .brand small { display: none; } .brand .mark { width: 29px; height: 36px; flex-shrink: 0; } h1 { font-size: 12px; max-width: 130px; } .badge { font-size: 10px; } .workspace { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid var(--line); padding: 22px 20px; } #threads { max-height: 220px; } .content { padding: 26px 20px; } .rule { grid-template-columns: 1fr; } .control-inner { padding: 14px 16px; gap: 8px; flex-wrap: wrap; } .control-label { flex-basis: 100%; } .control-inner .toolbar { width: 100%; } #saved { flex-basis: 100%; } main { padding-bottom: 150px; } }
+    @media (max-width: 620px) { header { height: 68px; padding: 0 16px; } .brand { gap: 10px; } .brand small { display: none; } .brand .mark { width: 29px; height: 36px; flex-shrink: 0; } h1 { font-size: 12px; max-width: 130px; } .badge { font-size: 10px; } .workspace { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid var(--line); padding: 22px 20px; } #threads { max-height: 220px; } .content { padding: 26px 20px; } .control-inner { padding: 14px 16px; gap: 8px; flex-wrap: wrap; } .control-label { flex-basis: 100%; } .control-inner .toolbar { width: 100%; } #saved { flex-basis: 100%; } main { padding-bottom: 150px; } }
       .header-tools { display: flex; align-items: center; gap: 18px; }
     #theme { padding: 6px 10px; font-size: 11px; }
     #progress { position: relative; padding: 12px 32px; background: var(--surface); color: var(--accent); border-top: 1px solid var(--line); font-size: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -233,20 +219,20 @@
         <button class="workflow-step" data-panel="chrome-password-panel" hidden><span class="step-number">02</span><span>Chrome actions<small>Choose allowed actions</small></span></button>
         <button class="workflow-step" data-panel="chats-panel"><span class="step-number">03</span><span>Chats<small>Chat monitoring</small></span></button>
         <button class="workflow-step" data-panel="authorization-panel"><span class="step-number">04</span><span>Authorization<small>Chat monitoring</small></span></button>
-        <button class="workflow-step" data-panel="monitor-panel"><span class="step-number">05</span><span>Monitor<small>Response mode and previews</small></span></button>
-        <button class="workflow-step" data-panel="activity-panel"><span class="step-number">06</span><span>Activity<small>Results and requests to review</small></span></button>
+        <button class="workflow-step" data-panel="activity-panel"><span class="step-number">05</span><span>Activity<small>Completed actions and history</small></span></button>
       </nav>
-      <p class="muted">Chrome tools: connect, choose actions, then set the response mode and save. Chat monitoring also needs selected chats and authorization.</p>
+      <p class="muted">Connect, choose Chrome actions or chats, then start monitoring. Activity records actions as they happen.</p>
     </aside>
     <div class="content">
       <div class="page-heading"><span class="eyebrow">Workspace</span><h2>Set up your helper.</h2><p>Connect once, choose what Zenshin may do, then keep moving.</p></div>
+      <p id="error" role="alert" hidden></p>
       <section id="codex-setup" aria-labelledby="setup-heading">
         <div class="section-head"><h2 id="setup-heading">Connect to Codex</h2><span class="eyebrow">One-time setup</span></div>
         <p class="muted">Give your Codex the tools to request one Chrome password selection or terms checkbox action and receive the result in the same turn.</p>
         <ol>
           <li>Install the Codex CLI, sign in with <code>codex login</code>, and keep Zenshin running. Chrome actions require Windows; chat monitoring also works on Linux.</li>
-          <li>Connect once using the button below. This adds the local <code>zenshin</code> MCP entry to your Codex configuration. It leaves other entries and approval settings unchanged.</li>
-          <li>Reload MCP connections or restart Codex. In your working chat, ask it to confirm that <code>select_chrome_password</code> and <code>check_chrome_terms</code> are available, without calling them.</li>
+          <li>Connect once using the button below. This registers Zenshin tools and adds guidance to your Codex instructions so new chats know when to use them. Other tools and approval settings stay unchanged.</li>
+          <li>Reload MCP connections or restart Codex once. New chats receive the guidance automatically; reopen existing chats to refresh it. Then enable your actions and Start monitoring.</li>
         </ol>
         <div class="toolbar"><button id="register-codex" class="primary">Connect Zenshin tools</button><button id="check-codex">Check connection</button></div>
         <p id="setup-chat-result" class="muted" role="status">Check connection to verify chat access and tool registration separately.</p>
@@ -255,25 +241,19 @@
         <p id="setup-result" class="muted" role="status">Checking registration…</p>
         <details id="manual-setup"><summary>Manual setup or troubleshooting</summary>
           <p>Run this command in <span id="setup-shell">your terminal</span> on this computer. It uses this installation's paths and port. Then check registration again.</p>
-          <pre id="setup-command" tabindex="0" aria-label="Registration command"></pre><button id="copy-command">Copy command</button>
+          <pre id="setup-command" tabindex="0" aria-label="Registration command"></pre><button id="copy-command">Copy command</button><span id="copy-result" class="muted" role="status"></span>
           <p>If Codex is missing, install its CLI and sign in, then restart Zenshin so it can find the CLI. If an old or disabled <code>zenshin</code> entry conflicts, inspect it with <code>codex mcp get zenshin</code>. Choose Connect Zenshin tools to replace the old entry automatically.</p>
           <p>Registration confirms configuration only. Your working Codex chat must also load the tools. If tools are missing, reload its MCP connections or restart Codex. Keep Zenshin running at this address; reconnect after moving the app or changing its port.</p>
         </details>
-        <div id="codex-guidance">
-          <h3>Tell Codex when to use Zenshin</h3>
-          <p class="muted">The connected tools include usage instructions. For consistent use, paste this prompt once per Codex chat, alongside your task authorization; you do not need to repeat it for each action. Alternatively, save it in the project's AGENTS.md for chats in that project.</p>
-          <pre id="setup-instructions" tabindex="0">Use normal browser tools for navigation and other work. Delegate authorized Chrome password generation/selection and terms checkbox actions to Zenshin's select_chrome_password or check_chrome_terms tool. Zenshin handles the complete native interaction, including opening the password suggestion. Do not use Computer Use to prepare or perform these actions. Keep the normal permission flow. Chrome must already show the intended page. Supply the full current page URL, an exact terms checkbox label, and a unique request_id per action. Continue after confirmed success. Reuse the same ID on transport retries; stop for review after an uncertain result. Never delegate safety refusals, URL-policy stops, CAPTCHA, marketing consent, or account submission.</pre>
-          <button id="copy-instructions">Copy Codex instructions</button><span id="copy-result" class="muted" role="status"></span>
-          <p class="muted">Next, open Chrome actions in the sidebar and enable only the actions you want. In Monitor, choose Send authorized replies, then save. Chrome tools work while chat monitoring is paused; no chat selection is required. Registration alone does not authorize actions.</p>
-        </div>
+        <p class="muted help">Connect Zenshin tools installs usage guidance for new Codex chats automatically. Reload MCP connections or restart Codex once to update existing connections. Choose Chrome actions or chats, then select Start monitoring to enable them.</p>
       </section>
       <section id="chrome-password-panel" aria-labelledby="chrome-password-heading" hidden>
         <div class="section-head"><h2 id="chrome-password-heading">Individual Chrome actions</h2><span class="eyebrow">Windows</span></div>
         <label><input id="auto-password" type="checkbox"> Allow Zenshin to select Chrome's suggested password</label>
         <label><input id="auto-terms" type="checkbox"> Allow Zenshin to check a named terms agreement box</label>
         <p class="muted help">Codex requests the action through the connected Zenshin tools; Zenshin performs it in Chrome and returns confirmation. Zenshin focuses the new-password field and opens and selects Chrome's native suggestion. Chrome generates and fills the password. Zenshin also checks the exact terms agreement box named in the request.</p>
-        <p class="muted help">In Setup, copy the Codex instructions and paste them once per chat, alongside your task authorization. You do not need to repeat the prompt for each action. Codex supplies the current page URL with each request; there is no URL to enter here. Chrome must already show the intended page.</p>
-        <p class="muted help">Enable an action and save Send authorized replies mode once. Keep Zenshin running. Chat monitoring can stay paused; Pause stops monitoring only. Disable an action and save to revoke it. Preview mode blocks both tools. Marketing opt-ins are excluded. No account is submitted.</p>
+        <p class="muted help">The connected tools tell Codex to use Zenshin automatically for these actions. Codex supplies the current page URL with each request. Chrome must already show the intended page.</p>
+        <p class="muted help">Choose the actions you authorize, then select Start monitoring. Actions run immediately and are logged in Activity. Pause disables Chrome actions and chat monitoring. Saving settings also pauses them. Marketing opt-ins are excluded. No account is submitted.</p>
       </section>
       <section id="chats-panel" aria-labelledby="chats-heading" hidden>
         <div class="section-head"><h2 id="chats-heading">Chats</h2><span class="eyebrow">Chat monitoring</span></div>
@@ -294,28 +274,16 @@
       </section>
       <section id="authorization-panel" aria-labelledby="authorization-heading" hidden>
         <div class="section-head"><h2 id="authorization-heading">Authorization</h2><span class="eyebrow">Chat monitoring</span></div>
-        <div class="field-row"><label for="decision-method">Choose how requests are matched</label><select id="decision-method"><option value="ai">AI · follow my instructions</option><option value="exact">Match exact questions</option></select></div>
-        <div id="ai-fields" hidden>
-          <label for="instructions">What may the helper approve?</label>
-          <textarea id="instructions" placeholder="For example: Continue formatting the report. Ask me for missing facts or decisions outside that task."></textarea>
-          <p class="muted help">Describe the allowed work in plain language. AI reads recent chat messages and replies only when your instructions cover the request. Anything else stays for you. Each analysis uses your Codex account.</p>
-        </div>
-        <div id="exact-fields">
-          <p class="muted">Answer only when the complete question matches a saved rule.</p>
-          <p class="muted" id="rules-empty">No rules yet. Add the question you expect and the reply to send.</p><div id="rules"></div><button id="add">+ Add rule</button>
-        </div>
-      </section>
-      <section id="monitor-panel" aria-labelledby="monitor-heading" hidden>
-        <div class="section-head"><h2 id="monitor-heading">Monitor</h2><span class="eyebrow">Response settings</span></div>
-        <div class="field-row"><label for="mode">Response mode</label><select id="mode"><option value="preview">Preview only</option><option value="desktop">Send authorized replies</option></select></div>
-        <div class="notice"><span class="notice-symbol" aria-hidden="true">↳</span><div><strong id="mode-title">Preview only</strong><span id="mode-description">Inspect suggested responses before enabling delivery.</span></div></div>
-        <p id="error" role="alert" hidden></p>
-        <div id="review-panel" hidden><p class="muted">Resolve unconfirmed requests in Codex first. Reviewing them enables future monitoring without retrying the old requests.</p><button id="review">Mark requests reviewed</button></div>
-        <p class="muted help">Starts paused. Saving settings pauses monitoring. Pause takes effect after the current check.</p>
-        <div id="previews"><p class="empty">Latest requests will appear here.</p></div>
+        <label for="instruction-preset">AI · follow my instructions</label>
+        <div class="field-row"><select id="instruction-preset" aria-label="Instruction preset"><option value="" selected disabled>Choose a starting prompt…</option><option value="approve">Approve task requests</option><option value="recommended">Use recommended choices</option><option value="continue">Continue existing plan</option></select></div>
+        <label for="instructions">What may the helper approve?</label>
+        <textarea id="instructions" placeholder="Describe what Zenshin should approve and how it should answer."></textarea>
+        <p class="muted help">Choose a starting prompt and edit it as needed. While monitoring runs, AI sends replies covered by these instructions automatically. Requests without enough information are logged as skipped. Each analysis uses your Codex account.</p>
+        <p class="muted help">Start monitoring enables authorized replies and your selected Chrome actions. Saving settings pauses them; Pause takes effect after the current check.</p>
       </section>
       <section id="activity-panel" aria-labelledby="activity-heading" hidden>
         <div class="section-head"><h2 id="activity-heading">Activity</h2><span class="eyebrow">Local history</span></div>
+        <p class="muted">Password selections, terms agreements, and chat replies appear here after they run. Failed or skipped actions are recorded here too; there is no review queue.</p>
         <div id="activity"></div>
       </section>
     </div>
@@ -354,7 +322,7 @@
     if (className) node.className = className;
     return node;
   }
-  function showError(message) { $('error').textContent = message; $('error').hidden = !message; if (message) showPanel('monitor-panel'); }
+  function showError(message) { $('error').textContent = message; $('error').hidden = !message; }
   let activePanel = 'codex-setup';
   function showPanel(id, scroll = true) {
     activePanel = id;
@@ -378,7 +346,7 @@
       $('setup-shell').textContent = state?.chrome_password_supported ? 'PowerShell' : 'your terminal';
       $('setup-result').textContent = setup.message;
       $('setup-result').dataset.ready = setup.registered;
-      $('register-codex').textContent = setup.registered ? 'Registered · check again' : 'Connect Zenshin tools';
+      $('register-codex').textContent = setup.registered ? 'Reconnect / repair guidance' : 'Connect Zenshin tools';
       $('manual-setup').open = setup.conflict || (!setup.registered && setup.message.startsWith('Could not'));
     } catch (error) { $('setup-result').textContent = error.message; }
     finally { setupBusy = false; $('register-codex').disabled = $('check-codex').disabled = false; }
@@ -434,7 +402,6 @@
   $('check-codex').onclick = () => checkConnection(true);
   $('check-chat-connection').onclick = () => checkConnection();
   $('copy-command').onclick = () => copySetup('setup-command');
-  $('copy-instructions').onclick = () => copySetup('setup-instructions');
 
   let tourSteps = [], tourIndex = 0, tourFocus;
   function rememberTour() { localStorage.setItem('zenshin-tour-v1', 'seen'); }
@@ -457,22 +424,20 @@
     $('tour-back').disabled = tourIndex === 0;
     $('tour-next').textContent = tourIndex === tourSteps.length - 1 ? 'Finish' : 'Next';
     const panel = document.querySelector(selector).closest('.content > section');
-    showPanel(panel ? panel.id : 'monitor-panel', false);
+    if (panel) showPanel(panel.id, false);
     document.querySelector(selector).scrollIntoView({block: 'center', behavior: 'instant'});
     positionTour();
   }
   function startTour() {
     tourFocus = document.activeElement; rememberTour(); $('welcome').close();
     tourSteps = [
-      ['#register-codex', 'Connect your Codex once', 'Use Connect Zenshin tools to register this installation. Then reload MCP connections or restart Codex. A registered entry still needs to be loaded by your working chat. Manual setup is available here if needed.'],
-      ['#copy-instructions', 'Give Codex the instructions once per chat', 'Paste this guidance once per Codex chat, or save it in the project instructions. You do not need to repeat it for each action. Tell Codex which task and agreements you authorize. Codex requests each action; Zenshin performs it in Chrome and returns confirmation.'],
+      ['#register-codex', 'Connect your Codex once', 'Use Connect Zenshin tools to register this installation and install guidance automatically for new Codex chats. Reload MCP connections or restart Codex once. Reconnect / repair guidance restores the setup if needed.'],
       ...(state?.chrome_password_supported ? [['#auto-password', 'Choose your Chrome actions', 'In Chrome actions, enable password selection, terms agreement, or both. Zenshin opens and selects the native password suggestion itself; a terms request names one exact checkbox. Codex delegates these actions without using Computer Use. These actions never submit an account or select marketing consent.']] : []),
       ['#connect', 'Monitor chat requests', 'Load Codex chats to monitor questions and continuation requests. This is separate from registering the Chrome tools. Select chats with unique titles; desktop monitoring visits each selected chat in turn.'],
-      ['#authorization-panel', 'Define what may be answered', 'For chat monitoring, choose AI and write narrow standing instructions, or save exact question-and-answer rules. Missing facts and new decisions stay for you. AI analysis uses your Codex account.'],
-      ['#mode', 'Preview or allow delivery', 'Preview blocks Chrome actions and only shows suggested chat replies. In Monitor, choose Send authorized replies when ready. Save changes to apply the mode and action toggles. Chrome tools need no selected chat or running monitor.'],
-      ['#save', 'Save, then try Preview', 'Save changes applies your settings and pauses monitoring. For chat monitoring, start in Preview, select a chat and add instructions or a rule, then Start monitoring. Keep this page open for its five-second checks.'],
-      ['#pause', 'You stay in control', 'Pause stops future monitoring checks after the current check. Direct Chrome tools remain available while paused: disable their toggles and save, or save Preview mode, to block them.'],
-      ['#activity-panel', 'Check results and uncertainty', 'Activity records confirmed actions and requests needing review. If delivery is uncertain, inspect Chrome or Codex before marking requests reviewed. Zenshin does not automatically retry an uncertain action. You can replay this guide anytime from Take the tour.']
+      ['#authorization-panel', 'Set your standing instructions', 'Choose a prefilled prompt and edit it to say what Zenshin may approve. While monitoring runs, AI answers covered requests automatically using your Codex account. Requests missing required facts are logged as skipped.'],
+      ['#start', 'Start when ready', 'Start monitoring saves your choices and enables selected Chrome actions and chat replies. Chrome actions need no selected chats. Keep this page open for five-second chat checks. Saving settings pauses all actions.'],
+      ['#pause', 'Pause all actions', 'Pause stops future chat checks after the current check and disables Chrome actions. Start monitoring enables them again.'],
+      ['#activity-panel', 'See what happened', 'Activity logs completed password selections, terms agreements, and replies, along with any failures or skipped requests. Actions run without a review queue. You can replay this guide anytime from Take the tour.']
     ];
     tourIndex = 0; $('tutorial').showModal(); showTourStep(); $('tour-next').focus();
   }
@@ -492,7 +457,7 @@
     $('read-progress').hidden = !p?.read;
     if (p && (p.running || p.stage === 'updating' || (p.stage === 'error' && state?.error))) {
       const titles = {reading: 'Reading chats', opening: 'Opening chat in Codex', inspecting: 'Checking for a request',
-        deciding: p.detail === 'Using a saved decision.' ? 'Using saved decision' : state?.decision_method === 'ai' ? 'AI deciding' : 'Matching your rule',
+        deciding: p.detail === 'Using a saved decision.' ? 'Using saved decision' : 'AI deciding',
         sending: 'Sending answer', confirming: 'Confirming delivery',
         updating: 'Updating Zenshin', waiting: 'Waiting for next check', done: 'Check complete', error: 'Check failed'};
       $('progress').hidden = false; $('progress').dataset.stage = p.stage;
@@ -569,29 +534,23 @@
   }
   function updateSelection() {
     $('selection').textContent = selected.size ? `${selected.size} chat${selected.size === 1 ? '' : 's'} selected` : 'Select one or more chats to monitor.';
-    const ai = $('decision-method').value === 'ai';
-    const rows = [...$('rules').children];
-    const authorized = ai ? !!$('instructions').value.trim() : rows.length > 0 && rows.every(row =>
-      [...row.querySelectorAll('textarea')].every(input => input.value.trim()));
-    $('start').disabled = busy || !state?.connected || state.running || !selected.size || !authorized;
-    $('next-step').textContent = !state?.connected ? 'Choose a sidebar section to begin'
-      : !selected.size ? 'Select at least one chat'
-      : !authorized ? (ai ? 'Write what the helper may approve' : 'Add a complete question and reply')
-      : state.running ? 'Monitoring every 5s · Keep this window open'
-      : 'Ready to start · Checks every 5s';
+    const chatReady = state?.connected && selected.size > 0 && !!$('instructions').value.trim();
+    const chromeReady = !selected.size && state?.chrome_password_supported && ($('auto-password').checked || $('auto-terms').checked);
+    $('start').disabled = busy || state?.running || !(chatReady || chromeReady);
+    $('pause').disabled = !state?.running;
+    $('next-step').textContent = state?.running ? 'Monitoring active · Keep this window open'
+      : chatReady || chromeReady ? 'Ready to start · Actions run automatically'
+      : selected.size && !state?.connected ? 'Load Codex chats to reconnect, or deselect chats for Chrome actions only'
+      : selected.size && !$('instructions').value.trim() ? 'Write what the helper may approve'
+      : 'Choose Chrome actions or connect and select chats';
   }
   function markChanged() { $('saved').textContent = 'Unsaved changes'; updateSelection(); }
-  function addRule(rule = {request: '', response: ''}) {
-    const row = element('div', undefined, 'rule');
-    $('rules-empty').hidden = true;
-    for (const [key, title] of [['request', 'When Codex asks…'], ['response', 'Reply with…']]) {
-      const label = element('label', title);
-      const input = document.createElement('textarea'); input.value = rule[key]; input.dataset.field = key;
-      label.append(input); row.append(label);
-    }
-    const remove = element('button', 'Remove rule'); remove.onclick = () => { row.remove(); $('rules-empty').hidden = !!$('rules').children.length; markChanged(); };
-    row.append(remove); $('rules').append(row);
-  }
+  const instructionPresets = {
+    approve: 'Approve permission and continuation requests needed to complete my current task. Tell Codex to proceed with its recommended option when a choice is needed. Use Zenshin for enabled Chrome password and terms actions. Do not invent missing facts or credentials.',
+    recommended: 'Approve all requests needed to complete my current task. When Codex offers options, choose its recommended option and tell it to continue without asking again. Use Zenshin for enabled Chrome password and terms actions. Do not invent missing facts or credentials.',
+    continue: 'Keep Codex working through the existing plan automatically. Approve permission requests and tell it to continue whenever it asks to proceed. Use Zenshin for enabled Chrome password and terms actions. Do not invent missing facts or credentials.'
+  };
+  $('instruction-preset').onchange = () => { $('instructions').value = instructionPresets[$('instruction-preset').value]; markChanged(); };
   function renderEntries(id, entries, empty) {
     $(id).replaceChildren();
     if (!entries.length) $(id).append(element('p', empty, 'empty'));
@@ -601,10 +560,10 @@
       head.append(element('strong', entry.name || 'Selected chat'));
       if (entry.time) head.append(element('small', new Date(entry.time * 1000).toLocaleString()));
       row.append(head, element('small', entry.kind === 'browser_action' && entry.status === 'sent' ? 'Action confirmed'
-        : ({sent: 'Sent', uncertain: 'Needs your review', sending: 'Sending', reviewed: 'Reviewed'})[entry.status] || entry.status));
+        : ({sent: 'Sent', uncertain: 'Could not confirm', sending: 'Sending', failed: 'Failed', skipped: 'Skipped', reviewed: 'Recorded'})[entry.status] || entry.status));
       row.append(element('pre', entry.text));
-      if (entry.response) row.append(element('p', (entry.status === 'sent' ? 'Sent: ' : 'Suggested reply: ') + entry.response, 'response'));
-      if (entry.answers) for (const answer of entry.answers) row.append(element('p', answer.question + ' → ' + (answer.response || 'Needs your answer'), 'muted'));
+      if (entry.response) row.append(element('p', (entry.status === 'sent' ? 'Sent: ' : 'Reply: ') + entry.response, 'response'));
+      if (entry.answers) for (const answer of entry.answers) row.append(element('p', answer.question + ' → ' + (answer.response || 'No answer sent'), 'muted'));
       if (entry.reason) row.append(element('p', 'Reason: ' + entry.reason, 'muted'));
       if (entry.options?.length) row.append(element('p', 'Available choices: ' + entry.options.join(' / '), 'muted'));
       if (entry.error) row.append(element('p', entry.error, 'muted'));
@@ -628,16 +587,9 @@
     monitorProgress = result.progress; progressReceived = Date.now(); renderProgress();
     $('status').textContent = `${state.running ? 'Monitoring' : 'Paused'} · chats ${state.connected ? 'connected' : 'disconnected'}`;
     $('status').classList.toggle('running', state.running);
-    $('mode-title').textContent = state.mode === 'desktop' ? 'Authorized replies will be sent' : 'Suggestions only — nothing is sent';
-    $('mode-description').textContent = state.mode === 'desktop'
-      ? 'Selected chats open automatically in Codex, one at a time. Requests covered by your rules or instructions are answered. Unclear requests stay for you; an unconfirmed send pauses the helper.'
-      : 'Reads saved messages and shows suggested replies here. Check your instructions before enabling automatic replies. Live approval cards are read in Send authorized replies mode.';
     $('refresh').disabled = busy || !state.connected;
     updateSelection();
-    $('pause').disabled = !state.running;
-    $('review-panel').hidden = !state.unconfirmed;
-    renderEntries('previews', state.previews, state.running ? 'Waiting for the next check…' : 'Start monitoring to see requests and suggested replies here.');
-    renderEntries('activity', [...state.activity].reverse(), 'No activity yet. Checks and responses will be recorded here.');
+    renderEntries('activity', [...state.activity].reverse(), 'No activity yet. Start monitoring to run authorized actions and record results here.');
     showError(state.error);
   }
   async function loadChats(append = false) {
@@ -650,10 +602,7 @@
     } finally { $('threads').setAttribute('aria-busy', 'false'); drawChats(); }
   }
   async function save() {
-    const rules = [...$('rules').children].map(row => ({request: row.querySelector('[data-field="request"]').value,
-      response: row.querySelector('[data-field="response"]').value}));
-    renderState(await request('settings', {targets: [...selected.values()], rules, mode: $('mode').value,
-      decision_method: $('decision-method').value, instructions: $('instructions').value,
+    renderState(await request('settings', {targets: [...selected.values()], instructions: $('instructions').value,
       auto_password: $('auto-password').checked, auto_terms: $('auto-terms').checked}));
     $('saved').textContent = 'Settings saved.';
   }
@@ -686,31 +635,21 @@
     selected.set(target.id, target); drawChats(); markChanged(); $('target-id').value = '';
   }, 'find-target', 'Finding this chat…');
   $('chat-search').oninput = drawChats;
-  $('add').onclick = () => { addRule(); markChanged(); };
-  for (const id of ['instructions', 'rules']) $(id).addEventListener('input', markChanged);
-  $('mode').onchange = markChanged;
+  $('instructions').addEventListener('input', () => { $('instruction-preset').value = ''; markChanged(); });
   $('auto-password').onchange = markChanged;
   $('auto-terms').onchange = markChanged;
-  function showAuthorization() {
-    $('ai-fields').hidden = $('decision-method').value !== 'ai';
-    $('exact-fields').hidden = $('decision-method').value === 'ai';
-  }
-  $('decision-method').onchange = () => { showAuthorization(); $('mode').value = 'preview'; markChanged(); };
   $('save').onclick = () => action(save, 'save', 'Saving your settings…');
   $('start').onclick = () => action(async () => { await save(); renderState(await request('start')); $('progress-text').textContent = 'Checking selected chats · AI analysis may take a moment…'; renderState(await request('poll')); }, 'start', 'Starting monitoring…');
   $('pause').onclick = () => {
     if (busy) { pauseRequested = true; $('status').textContent = 'Pausing after current check…'; }
     else action(async () => renderState(await request('pause')), 'pause', 'Pausing monitoring…');
   };
-  $('review').onclick = () => action(async () => renderState(await request('review')), 'review', 'Marking requests reviewed…');
   action(async () => {
     const response = await fetch('/api/state');
     if (!response.ok) throw new Error('Could not read local settings');
     const result = await response.json();
     selected = new Map(result.targets.map(target => [target.id, target]));
-    drawChats(); result.rules.forEach(addRule); $('mode').value = result.mode;
-    $('decision-method').value = result.decision_method;
-    $('instructions').value = result.instructions; showAuthorization(); renderState(result);
+    drawChats(); $('instructions').value = result.instructions; renderState(result);
     $('auto-password').checked = result.auto_password; $('auto-terms').checked = result.auto_terms; updateSelection();
     if (result.connected) await loadChats();
   }, null, 'Loading your saved settings…').then(() => {
@@ -721,11 +660,6 @@
     nextCheckAt = Date.now() + 5000;
     if (busy) return;
     if (state?.running) action(async () => renderState(await request('poll')));
-    else if (state?.chrome_password_supported && (state.auto_password || state.auto_terms)) action(async () => {
-      const response = await fetch('/api/state');
-      if (!response.ok) throw new Error('Could not read Chrome action history');
-      renderState(await response.json());
-    }, null, 'Reading Chrome action history…');
   }, 5000);
   setInterval(() => { renderProgress(); refreshProgress(); }, 1000);
 </script>

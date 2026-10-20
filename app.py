@@ -1,4 +1,4 @@
-"""Local Codex approval previews and scoped desktop question responses."""
+"""Local AI-authorized Codex replies and Chrome actions."""
 
 import argparse
 import hashlib
@@ -17,10 +17,15 @@ from threading import Lock, Thread
 
 import ai_decision
 import updates
+import zenshin_mcp
 
 
 ROOT = Path(__file__).resolve().parent
 INSTALL_ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else ROOT
+DEFAULT_INSTRUCTIONS = ("Approve permission and continuation requests needed to complete my current task. "
+                        "Tell Codex to proceed with its recommended option when a choice is needed. "
+                        "Use Zenshin for enabled Chrome password and terms actions. "
+                        "Do not invent missing facts or credentials.")
 
 
 def codex_setup(port, register=False):
@@ -63,7 +68,10 @@ def codex_setup(port, register=False):
             inspect()
             if not result["registered"]:
                 raise RuntimeError("Registration could not be verified. Check the manual setup below.")
-        result["message"] = ("Registered for this installation. Reload MCP connections or restart Codex, then confirm both Zenshin tools are available in your working chat."
+        if register and result["registered"]:
+            zenshin_mcp.install_codex_guidance()
+        result["message"] = ("Registered for this installation. Automatic Zenshin guidance is installed for new Codex chats. Reload MCP connections or restart Codex to refresh existing chats."
+            if register and result["registered"] else "Registered for this installation. Connect again to install or refresh automatic guidance, then reload Codex's MCP connections."
             if result["registered"] else "An old or disabled Zenshin registration exists. Connect Zenshin tools to replace it."
             if result["conflict"] else "Not registered yet. Connect once to make the two tools available to Codex.")
     except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
@@ -75,11 +83,12 @@ def load_state(path):
     if path.exists():
         state = json.loads(path.read_text(encoding="utf-8"))
     else:
-        state = {"targets": [], "rules": [], "activity": [], "seen": []}
-    state.setdefault("mode", "desktop")
+        state = {"targets": [], "activity": []}
+    for obsolete in ("rules", "mode", "decision_method", "seen"):
+        state.pop(obsolete, None)
     state.setdefault("attempts", {})
-    state.setdefault("decision_method", "ai")
-    state.setdefault("instructions", "")
+    if not state.get("instructions", "").strip():
+        state["instructions"] = DEFAULT_INSTRUCTIONS
     state.setdefault("ai_decisions", {})
     state.setdefault("auto_password", False)
     state.setdefault("auto_terms", False)
@@ -228,26 +237,20 @@ def progress_snapshot(app):
 
 
 def validate_settings(data):
-    targets, rules = data["targets"], data["rules"]
-    if not isinstance(targets, list) or not isinstance(rules, list):
-        raise ValueError("Targets and rules must be lists")
+    targets, instructions = data["targets"], data.get("instructions", "")
+    if not isinstance(targets, list):
+        raise ValueError("Selected chats must be a list")
     for target in targets:
         if not isinstance(target["id"], str) or not target["id"].strip():
             raise ValueError("Select a chat with a valid ID")
         if not isinstance(target["name"], str):
             raise ValueError("Chat names must be text")
-    requests = []
-    for rule in rules:
-        if not all(isinstance(rule[key], str) and rule[key].strip()
-                   for key in ("request", "response")):
-            raise ValueError("Each rule needs a complete request and response")
-        requests.append(normalize(rule["request"]))
-    if len(set(requests)) != len(requests):
-        raise ValueError("Use only one response per exact request")
-    return targets, rules
+    if not isinstance(instructions, str):
+        raise ValueError("Write your AI instructions as text")
+    return targets, instructions
 
 
-def preview_latest(thread, rules):
+def latest_message(thread):
     turns = thread.get("turns", [])
     if not turns:
         return None
@@ -257,12 +260,8 @@ def preview_latest(thread, rules):
     if not messages:
         return None
     message = messages[-1]
-    response = next((rule["response"] for rule in rules
-                     if normalize(rule["request"]) == normalize(message["text"])), None)
-    # A persisted message is not proof of a live pending approval.
     return {"thread_id": thread["id"], "turn_id": turn["id"], "item_id": message["id"],
-            "text": message["text"], "response": response,
-            "status": "Rule matched — preview only" if response else "No exact rule match"}
+            "text": message["text"], "options": []}
 
 
 def analysis_input(thread, request, instructions):
@@ -302,10 +301,10 @@ def finish_analysis(app):
     if decision is not None:
         app.pop("analysis", None)
         app["state"]["ai_decisions"][job["key"]] = decision
-        app["state"]["activity"].append({**job["request"], **decision,
-                                        "status": "AI analysis — " + decision["decision"],
-                                        "time": int(time.time())})
-        app["state"]["activity"] = app["state"]["activity"][-100:]
+        if decision["decision"] in {"needs_input", "no_response"}:
+            app["state"]["activity"].append({**job["request"], **decision,
+                                            "status": "skipped", "time": int(time.time())})
+            app["state"]["activity"] = app["state"]["activity"][-100:]
         save_state(app["path"], app["state"])
 
 
@@ -345,36 +344,8 @@ def poll(app):
 
 def check_chats(app):
     finish_analysis(app)
-    if app["state"].get("mode") == "desktop":
-        return poll_desktop(app)
-    previews = []
-    for target in app["state"]["targets"]:
-        set_progress(app, "reading", target["name"])
-        thread = rpc(app["connection"], "thread/read",
-                     {"threadId": target["id"], "includeTurns": True})["thread"]
-        set_progress(app, "inspecting", target["name"])
-        if app["state"]["decision_method"] == "exact":
-            set_progress(app, "deciding", target["name"], "Matching your saved rule.")
-        preview = preview_latest(thread, app["state"]["rules"])
-        if not preview:
-            continue
-        preview["name"] = target["name"]
-        if app["state"]["decision_method"] == "ai":
-            structured = next((item for item in questions(thread)
-                               if item["item_id"] == preview["item_id"]), None)
-            preview = analyze_request(app, thread, {**preview, **(structured or {})})
-            previews.append(preview)
-            continue
-        previews.append(preview)
-        fingerprint = hashlib.sha256(json.dumps(preview, sort_keys=True).encode()).hexdigest()
-        if fingerprint not in app["state"]["seen"]:
-            app["state"]["seen"].append(fingerprint)
-            app["state"]["activity"].append({"time": int(time.time()), **preview})
-            app["state"]["activity"] = app["state"]["activity"][-100:]
-            save_state(app["path"], app["state"])
-    app["previews"] = previews
-    if not app.get("analysis"):
-        set_progress(app, "done", app.get("progress", {}).get("chat", ""), "Preview updated; nothing sent.")
+    if app["state"]["targets"]:
+        poll_desktop(app)
 
 
 def questions(thread):
@@ -410,10 +381,7 @@ def verify_desktop_targets(app):
         thread = rpc(app["connection"], "thread/read", {
             "threadId": target["id"], "includeTurns": False})["thread"]
         if thread.get("name") != target["name"] or any(identity != target["id"] for identity in matches):
-            raise ValueError("Desktop mode needs a unique chat title; rename duplicate chats first")
-        if any(attempt["thread_id"] == target["id"] and attempt["status"] not in {"sent", "reviewed"}
-               for attempt in app["state"]["attempts"].values()):
-            raise ValueError("This chat has an unconfirmed attempt; resolve its question manually")
+            raise ValueError("Selected chats need unique titles; rename duplicate chats first")
 
 
 def poll_desktop(app):
@@ -426,8 +394,6 @@ def poll_desktop(app):
 
 def check_desktop(app, ui):
 
-    previews = []
-    app["previews"] = previews
     for target in app["state"]["targets"]:
         set_progress(app, "reading", target["name"])
         thread = rpc(app["connection"], "thread/read", {
@@ -451,7 +417,7 @@ def check_desktop(app, ui):
             requests.insert(0, {**card, "thread_id": thread["id"], "turn_id": turns[-1]["id"],
                                 "item_id": turns[-1]["id"] + ":approval:" + fingerprint,
                                 "approval": True})
-        latest = preview_latest(thread, app["state"]["rules"])
+        latest = latest_message(thread)
         if latest:
             requests.append({**latest, "options": [], "conversation": True})
         for request in requests:
@@ -468,40 +434,26 @@ def check_desktop(app, ui):
                 raise RuntimeError("Desktop access failed: " + str(error)) from error
             if not is_pending:
                 continue
+            if request["thread_id"] + ":" + request["item_id"] in app["state"]["attempts"]:
+                continue
             responses = []
             decision = None
             prompts = request.get("questions") or [{"title": request["text"], "options": request["options"]}]
             for prompt in prompts:
                 current = {**request, "text": prompt["title"], "options": prompt.get("options") or []}
-                if app["state"]["decision_method"] == "ai":
-                    decision = analyze_request(app, thread, {**current, "name": target["name"]})
-                    response = decision["response"] if decision.get("decision") in {"approve", "continue"} else None
-                else:
-                    set_progress(app, "deciding", target["name"], "Matching your saved rule.")
-                    response = next((rule["response"] for rule in app["state"]["rules"]
-                                     if normalize(rule["request"]) == normalize(current["text"])), None)
+                decision = analyze_request(app, thread, {**current, "name": target["name"]})
+                response = decision["response"] if decision.get("decision") in {"approve", "continue"} else None
                 responses.append(response)
-            preview = {**request, "name": target["name"], "response": responses[0],
-                       "status": "Pending — every question needs authorization"}
-            if decision:
-                preview.update(decision)
             if request.get("approval") and responses[0] != "Allow once":
                 responses[0] = None
-                preview["response"] = None
-            previews.append(preview)
-            if len(prompts) > 1:
-                preview["answers"] = [{"question": prompt["title"], "response": response}
-                                      for prompt, response in zip(prompts, responses)]
             if any(response is None for response in responses):
-                preview["status"] = "Pending — every question needs authorization"
-                if not app.get("analysis"):
-                    set_progress(app, "done", target["name"], "Request left for you; no answer sent.")
                 continue
             key = request["thread_id"] + ":" + request["item_id"]
-            if key in app["state"]["attempts"]:
-                preview["status"] = "Already attempted — no second response"
-                continue
-            attempt = {**preview, "time": int(time.time()), "status": "sending"}
+            response_record = {**request, "name": target["name"], "response": responses[0]}
+            if len(prompts) > 1:
+                response_record["answers"] = [{"question": prompt["title"], "response": response}
+                                      for prompt, response in zip(prompts, responses)]
+            attempt = {**response_record, "time": int(time.time()), "status": "sending"}
             # Commit before any UI action, including opening the answer form.
             app["state"]["attempts"][key] = attempt
             save_state(app["path"], app["state"])
@@ -518,32 +470,25 @@ def check_desktop(app, ui):
                     else:
                         ui.answer(target["name"], prompt["title"], response, on_progress=notify)
             except Exception as error:
-                if request.get("conversation") and persisted_reply(
-                        app["connection"], target["id"], request["turn_id"], responses[0]):
+                confirmed = False
+                if request.get("conversation"):
+                    try:
+                        confirmed = persisted_reply(app["connection"], target["id"], request["turn_id"], responses[0])
+                    except (OSError, RuntimeError):
+                        pass
+                if confirmed:
                     attempt.update(status="sent", reply_confirmed_by="app_server")
-                    preview["status"] = "Response delivered"
                 else:
-                    attempt["status"] = "uncertain"
-                    attempt["error"] = str(error)
-                    app["running"] = False
-                    preview["status"] = "Unconfirmed — paused; inspect the chat manually"
+                    attempt.update(status="uncertain", error=str(error))
+                    set_progress(app, "done", target["name"], "Delivery was not confirmed; duplicate send skipped.")
             else:
                 attempt["status"] = "sent"
-                preview["status"] = "Response delivered"
                 set_progress(app, "done", target["name"], "Response delivered.")
             app["state"]["activity"].append(dict(attempt))
             app["state"]["activity"] = app["state"]["activity"][-100:]
             save_state(app["path"], app["state"])
-            if attempt["status"] == "uncertain":
-                raise RuntimeError("Desktop delivery was not confirmed: " + attempt["error"])
             # One response per check lets a queued Pause take effect before the next.
             return
-        latest = preview_latest(thread, app["state"]["rules"])
-        if latest and not any(entry["thread_id"] == target["id"] for entry in previews):
-            if app["state"]["decision_method"] == "ai":
-                latest = analyze_request(app, thread, {**latest, "name": target["name"]})
-            previews.append({**latest, "name": target["name"],
-                             "status": latest["status"] + " — no live response control; no response sent"})
 
 
 def browser_action(app, data):
@@ -552,8 +497,8 @@ def browser_action(app, data):
     action = data.get("action")
     if action not in {"password", "terms"}:
         raise ValueError("Choose one password or terms action")
-    if app["state"]["mode"] != "desktop" or not app["state"].get("auto_" + action):
-        raise ValueError("Enable this Chrome action and save Send authorized replies mode in Zenshin first")
+    if not app["running"] or not app["state"].get("auto_" + action):
+        raise ValueError("Enable this Chrome action, save, and Start monitoring in Zenshin first")
     site, request_id, label = data.get("site"), data.get("request_id"), data.get("label", "")
     if not all(isinstance(value, str) and value.strip() for value in (site, request_id)):
         raise ValueError("A site URL and stable request_id are required")
@@ -569,10 +514,7 @@ def browser_action(app, data):
             raise ValueError("This request_id belongs to a different browser action")
         if prior["status"] == "sent":
             return {**prior["result"], "replayed": True}
-        raise RuntimeError("This action was attempted already; inspect Chrome and review the unconfirmed request, without retrying it")
-    if any(attempt.get("kind") == "browser_action" and attempt["status"] not in {"sent", "reviewed"}
-           for attempt in app["state"]["attempts"].values()):
-        raise RuntimeError("An earlier Chrome action is unconfirmed; inspect Chrome and mark requests reviewed first")
+        raise RuntimeError("This action was already attempted without confirmation; duplicate action skipped")
     description = "Select Chrome's suggested password" if action == "password" else "Check terms: " + label
     attempt = {"kind": "browser_action", "thread_id": "", "name": "Chrome",
                "request": identity, "text": description + " on " + origin,
@@ -595,7 +537,6 @@ def browser_action(app, data):
         attempt.update(status="sent", result=result)
     except Exception as error:
         attempt.update(status="uncertain", error=str(error))
-        app["running"] = False
         raise RuntimeError("Chrome action was not confirmed; do not retry. " + str(error)) from error
     finally:
         app["state"]["activity"].append(dict(attempt))
@@ -622,16 +563,12 @@ def snapshot(app):
     return {"connected": app["connection"] is not None, "running": app["running"],
             "version": updates.VERSION,
             "updates_supported": os.name == "nt" and getattr(sys, "frozen", False),
-            "mode": app["state"].get("mode", "preview"),
-            "targets": app["state"]["targets"], "rules": app["state"]["rules"],
-            "decision_method": app["state"]["decision_method"],
+            "targets": app["state"]["targets"],
             "instructions": app["state"]["instructions"],
             "chrome_password_supported": os.name == "nt",
             "auto_password": app["state"].get("auto_password", False),
             "auto_terms": app["state"].get("auto_terms", False),
-            "activity": app["state"]["activity"], "previews": app["previews"],
-            "unconfirmed": sum(attempt["status"] not in {"sent", "reviewed"}
-                               for attempt in app["state"]["attempts"].values()),
+            "activity": app["state"]["activity"],
             "progress": progress_snapshot(app),
             "error": app["error"]}
 
@@ -650,6 +587,19 @@ def check_codex_connection(app):
         return {"connected": False, "message": "Chat connection: disconnected. " + str(error) + ". Load Codex chats to reconnect."}
 
 
+def start_monitoring(app):
+    state = app["state"]
+    if state["targets"]:
+        if not app["connection"]:
+            raise ValueError("Load Codex chats to reconnect before starting")
+        if not state["instructions"].strip():
+            raise ValueError("Write your standing instructions before starting")
+        verify_desktop_targets(app)
+    elif not (state.get("auto_password") or state.get("auto_terms")):
+        raise ValueError("Select a chat or enable a Chrome action first")
+    app["running"] = True
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
@@ -662,7 +612,7 @@ def main():
         import zenshin_mcp
         return zenshin_mcp.serve(args.port)
     app = {"path": args.state, "state": load_state(args.state), "running": False,
-           "connection": None, "previews": [], "error": ""}
+           "connection": None, "error": ""}
     operations = Lock()
     window = None
     repair_registration = args.repair_registration
@@ -762,23 +712,6 @@ def main():
                         return self.reply(browser_action(app, data))
                     except RuntimeError as error:
                         return self.reply({"error": str(error)}, 503)
-                if self.path in {"/api/chrome-password", "/api/chrome-prepare"}:
-                    if os.name != "nt":
-                        raise ValueError("Chrome password selection is available on Windows only")
-                    if data.get("thread_id"):
-                        raise ValueError("The automatic Chrome-preparation hook was retired; chat-bound calls are no longer supported")
-                    import windows_ui
-                    try:
-                        def prepare():
-                            result = windows_ui.prepare_chrome_site(data["site"])
-                            if self.path == "/api/chrome-password":
-                                windows_ui.open_chrome_password_suggestion(data["site"])
-                                result = windows_ui.accept_chrome_password(data["site"])
-                            return result
-                        result = windows_ui.run(prepare)
-                    except (OSError, RuntimeError) as error:
-                        return self.reply({"error": str(error)}, 503)
-                    return self.reply(result)
                 if self.path == "/api/connect":
                     app["running"] = False
                     cancel_analysis(app)
@@ -800,43 +733,22 @@ def main():
                         raise ValueError("Give this chat a unique title in Codex first")
                     return self.reply({"id": thread["id"], "name": thread["name"]})
                 elif self.path == "/api/settings":
-                    targets, rules = validate_settings(data)
-                    mode = data.get("mode", "preview")
-                    if mode not in {"preview", "desktop"}:
-                        raise ValueError("Choose preview or desktop mode")
-                    method = data.get("decision_method", "exact")
-                    instructions = data.get("instructions", "")
-                    if method not in {"exact", "ai"} or not isinstance(instructions, str):
-                        raise ValueError("Choose exact rules or AI with text instructions")
+                    targets, instructions = validate_settings(data)
                     browser = {key: data.get(key, False) for key in ("auto_password", "auto_terms")}
                     if any(type(value) is not bool for value in browser.values()):
                         raise ValueError("Browser automation toggles must be on or off")
                     if os.name != "nt" and any(browser.values()):
                         raise ValueError("Automatic Chrome actions are available on Windows only")
-                    state = {**app["state"], "targets": targets, "rules": rules, "mode": mode,
-                             "decision_method": method, "instructions": instructions, **browser}
+                    state = {**app["state"], "targets": targets, "instructions": instructions, **browser}
                     save_state(app["path"], state)
                     cancel_analysis(app)
                     app["state"] = state
                     app["running"] = False
-                    app["previews"] = []
                 elif self.path == "/api/start":
-                    if not app["connection"] or not app["state"]["targets"]:
-                        raise ValueError("Connect and save at least one selected chat first")
-                    if app["state"]["decision_method"] == "ai" and not app["state"]["instructions"].strip():
-                        raise ValueError("Write your standing instructions before starting AI analysis")
-                    if app["state"].get("mode") == "desktop":
-                        verify_desktop_targets(app)
-                    app["running"] = True
+                    start_monitoring(app)
                 elif self.path == "/api/pause":
                     app["running"] = False
                     cancel_analysis(app)
-                elif self.path == "/api/review":
-                    app["running"] = False
-                    for attempt in app["state"]["attempts"].values():
-                        if attempt["status"] not in {"sent", "reviewed"}:
-                            attempt["status"] = "reviewed"
-                    save_state(app["path"], app["state"])
                 elif self.path == "/api/poll":
                     poll(app)
                 else:

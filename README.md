@@ -4,24 +4,24 @@
 
 Zenshin runs on your computer with a dedicated Windows desktop window (or a browser control page when running from source). You choose what it may do. For Chrome actions, Zenshin itself focuses the password field, opens and selects Chrome's generated-password suggestion, or checks the named terms box through Windows accessibility. Codex requests the action and receives a result; ChatGPT Computer Use is not needed for those interactions.
 
-## Windows release v0.2.8
+## Windows release v0.2.9
 
-[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.8/Zenshin-Setup-0.2.8-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.8) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.8/SHA256SUMS.txt)
+[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.9/Zenshin-Setup-0.2.9-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.9) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.9/SHA256SUMS.txt)
 
 1. Run the installer. It installs for your Windows account without administrator access and adds a Start Menu shortcut. A desktop shortcut is optional.
 2. Launch **Zenshin** from the Start Menu. The controls open in a dedicated desktop window, without a browser tab or console. Close the window to stop Zenshin.
-3. For Chrome actions, choose **Connect Zenshin tools**, then reload MCP connections or restart Codex. Use **Copy Codex instructions** to paste the guidance into each working chat once, enable the Chrome actions you want, and save.
-4. For chat monitoring, load and select chats, write narrow AI standing instructions, save, and choose **Start monitoring**. New settings use **AI** and **Send authorized replies**; monitoring starts paused and Chrome actions start disabled.
+3. Choose **Connect Zenshin tools** to register the tools and install reusable Codex guidance. Reload MCP connections or restart Codex once, enable the Chrome actions you want, save, and choose **Start monitoring**.
+4. For chat replies, load and select chats, choose or edit an AI instruction preset, save, and choose **Start monitoring**. Monitoring starts paused and Chrome action switches start disabled.
 
 Python and accessibility dependencies are bundled. The installer checks for Microsoft WebView2 Runtime and installs it if missing; internet access is needed for that step. Use Windows 10 or later on x64. Codex desktop is required for chat monitoring; the signed-in Codex CLI is required for the Codex connection and AI decisions. Chrome is required for Chrome actions. The installation includes a setup guide with prerequisite, migration, and uninstall instructions.
 
-The default installation is `%LOCALAPPDATA%\Programs\Zenshin`. Settings and the permanent attempt journal live in `.local/state.json` inside that folder. New settings default to **AI** and **Send authorized replies**. Upgrades preserve your saved choices. Use **Check for updates → Install update** in Connect to Codex. Zenshin downloads and checksum-verifies the installer, pauses monitoring, upgrades in place, reopens, and replaces an old MCP registration automatically. No uninstall is needed. Codex may need an MCP reload or restart afterward. Updates and uninstall preserve `.local`; uninstall through **Windows Settings → Apps**. To remove the Codex tool registration, run `codex mcp remove zenshin`.
+The default installation is `%LOCALAPPDATA%\Programs\Zenshin`. Settings and the permanent attempt journal live in `.local/state.json` inside that folder. AI decisions and authorized replies are always enabled while monitoring runs. Upgrades preserve your instructions, action switches, and journal. Use **Check for updates → Install update** in Connect to Codex. Zenshin downloads and checksum-verifies the installer, pauses monitoring, upgrades in place, reopens, and replaces an old MCP registration automatically. No uninstall is needed. Codex may need an MCP reload or restart afterward. Updates and uninstall preserve `.local`; uninstall through **Windows Settings → Apps**. To remove the Codex tool registration, run `codex mcp remove zenshin`.
 
-To get this updater from v0.2.5 or earlier, close Zenshin and run the v0.2.8 installer once over the existing installation. Launch it from the installer to repair the old tool registration automatically. If updating manually later, re-run the installer; do not uninstall first.
+To get this updater from v0.2.5 or earlier, close Zenshin and run the v0.2.9 installer once over the existing installation. Launch it from the installer to repair the old tool registration automatically. If updating manually later, re-run the installer; do not uninstall first.
 
 When moving from a portable/source installation, stop it, copy its `.local` folder into the installed folder before launching, choose Connect Zenshin tools to replace the old registration. Do not run both installations together.
 
-The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.8/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
+The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.9/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
 
 This is an unsigned application; Windows may display a publisher warning. It bundles Python bytecode, which can still be extracted or reverse engineered. The repository and release downloads are public. Linux uses the source setup below.
 
@@ -38,17 +38,17 @@ python -m pip install -r requirements-windows.txt -r requirements-build.txt
 
 Outputs are in `dist/`. Native Codex/Chrome interactions still require a live Windows check. `Zenshin.exe --no-browser` runs the local server without a window; `--port` and `--state` work as in source mode.
 
-## Source downloads v0.2.8
+## Source downloads v0.2.9
 
-[Source ZIP](https://github.com/ahmedmurtazamalik/zenshin/archive/refs/tags/v0.2.8.zip) · [Source tar.gz](https://github.com/ahmedmurtazamalik/zenshin/archive/refs/tags/v0.2.8.tar.gz)
+[Source ZIP](https://github.com/ahmedmurtazamalik/zenshin/archive/refs/tags/v0.2.9.zip) · [Source tar.gz](https://github.com/ahmedmurtazamalik/zenshin/archive/refs/tags/v0.2.9.tar.gz)
 
 Both archives contain the same source for Windows and Linux, extracted into `zenshin-0.2.5`. They require Python and the Codex CLI; they do not contain the Windows executables or installer. Python 3.11 is the verified Windows build runtime. The release's `SHA256SUMS.txt` covers the Windows installer and portable ZIP, not these GitHub-generated source archives. macOS is not supported.
 
 ## What it does
 
 - Answers offered choices, custom text, multi-question forms, ordinary continuation requests, and recognized one-time approval cards in selected Codex desktop chats.
-- Uses exact question/reply rules or AI standing instructions through your signed-in Codex CLI.
-- Offers Preview mode, Start/Pause, saved settings, progress, activity, and a durable attempt journal that prevents duplicate delivery.
+- Follows editable AI standing instructions through your signed-in Codex CLI, with ready-to-use approval and continuation presets.
+- Offers Start/Pause, saved settings, progress, action history, and a durable attempt journal that prevents duplicate delivery.
 - Provides one-time Codex tool registration, connection checks, and a first-visit tutorial that can be replayed from **Take the tour**.
 - On Windows, exposes `select_chrome_password` and `check_chrome_terms` so Codex can delegate individual Chrome actions and continue in the same turn.
 
@@ -112,73 +112,46 @@ The numbered sidebar takes you through the workflow. The welcome tutorial highli
 
 ### 1. Connect to Codex
 
-Choose **Connect Zenshin tools** to register this installation's MCP bridge with your Codex CLI. Zenshin generates the correct executable, folder, and port arguments. It reuses a matching registration and leaves a different or disabled registration unchanged, with recovery instructions. Other MCP entries and approval settings are preserved.
+Choose **Connect Zenshin tools** to register this installation's MCP bridge and install a marked Zenshin guidance block in Codex's global instructions. Other instructions and MCP entries are preserved. Reconnecting refreshes the guidance and repairs old registrations.
 
-Reload Codex's MCP connections or restart Codex. In the working chat, ask:
+Reload MCP connections or restart Codex once. New Codex chats receive the guidance automatically; no per-chat prompt is needed. Existing chats may need to be reopened to refresh their instructions. The connected MCP server also supplies usage instructions and tool descriptions.
 
-> Confirm that Zenshin's select_chrome_password and check_chrome_terms tools are available. Do not call them yet.
-
-The connected MCP server supplies usage instructions and tool descriptions. For consistent use, use **Copy Codex instructions** to paste the guidance once per working chat, alongside your task authorization; it does not need repeating for each action. Alternatively, save the guidance in the project's `AGENTS.md` for chats in that project. Registration alone does not authorize an action.
-
-**Check connection** reports two separate things: whether the tools are registered, and whether Zenshin's chat-history connection responds. Registration does not prove that an existing Codex chat has loaded its tools. A disconnected chat-history connection does not prevent registered Chrome tools from working.
-
-If registration fails, expand **Manual setup or troubleshooting** and use the command generated for your installation. Reconnect after moving Zenshin or changing its port.
+**Check connection** checks tool registration and chat-history access separately. Chrome tools do not need the chat-history connection. Manual registration troubleshooting remains available if the CLI cannot be found or registration fails.
 
 ### 2. Chrome actions — Windows
 
-Enable **Allow Zenshin to select Chrome's suggested password**, **Allow Zenshin to check a named terms agreement box**, or both. In **Monitor**, ensure **Send authorized replies** is selected, then **Save changes**. Both action toggles are off for new settings.
+Enable password selection, terms agreement, or both, save, then choose **Start monitoring**. No selected chat is required for Chrome-only use. Start and the switches provide standing authorization for Codex to request those actions while Zenshin runs. **Pause** blocks further Chrome actions and chat checks; saving settings also pauses them.
 
-- **Password:** Codex supplies the current page URL. Zenshin locates one visible new-password field, focuses it, invokes Chrome's native Suggest password command if needed, and selects the suggestion once. Chrome generates and fills the password. Confirmation/current/old-password fields are excluded from target selection. No password values are returned or logged.
-- **Terms:** Codex supplies the current page URL and the exact checkbox label. Zenshin checks one matching, unchecked agreement box. Marketing opt-ins are excluded.
+- **Password:** Codex supplies the current page URL. Zenshin opens and selects Chrome's native password suggestion. No password values are returned or logged.
+- **Terms:** Codex supplies the current page URL and checkbox label. Zenshin checks the matching unchecked agreement box. Marketing opt-ins are excluded.
 
-Zenshin performs these interactions using Windows UI Automation, without ChatGPT screenshots, coordinate clicks, or keyboard injection. The page must already be open and loaded. The individual actions do not open new Chrome windows, navigate, submit an account, solve CAPTCHA, or bypass a safety refusal or URL-policy stop.
-
-Keep Zenshin running. These tools do not need selected chats or a running chat monitor. **Pause stops chat monitoring only.** To revoke Chrome actions, disable their toggles and save, or save **Preview only** mode.
-
-For consistent use, paste the instructions from **Setup** once per Codex chat, alongside your task authorization, or save them in the project's AGENTS.md. You do not need to repeat the prompt for each action. Codex requests the action and supplies the current page URL; Zenshin performs it in Chrome. There is no manual URL field or site-opening/password button in the Chrome section.
+The intended page must already be open in Chrome. These actions do not navigate, submit accounts, solve CAPTCHA, or bypass a safety refusal or URL-policy stop. Confirmed actions are logged immediately without a review step.
 
 ### 3. Chats
 
-Choose **Load Codex chats**, then select the conversations to monitor. Give each selected chat a unique title and keep only one visible copy. If a new chat is missing from the list, use **Add a chat by ID**.
-
-**Check connection** here sends one read-only request through the existing Codex connection. If disconnected, choose **Load Codex chats** to reconnect. This connection reads identity/history; it does not control another client's approvals through internal IPC.
+Choose **Load Codex chats**, then select the conversations to monitor. Selected chats need unique titles. If a new chat is missing from the list, use **Add a chat by ID**. Chat history reads allow up to 60 seconds and show elapsed time and received data. A failure stays visible without changing the section you selected; load chats again to reconnect.
 
 ### 4. Authorization
 
-New settings use **AI · follow my instructions**. Choose either:
+Choose **Approve task requests**, **Use recommended choices**, or **Continue existing plan**, then edit the prefilled instructions as needed. AI uses recent chat context to send authorized replies automatically. Exact-question matching and Preview mode have been removed.
 
-- **AI · follow my instructions:** write narrow standing instructions, such as “Continue formatting this report. Ask me for missing facts or decisions outside that task.” AI examines recent context and the current request; missing facts and uncovered decisions stay for you.
-- **Match exact questions:** save the complete expected question and its reply. Matching normalizes whitespace and otherwise requires the full question.
+Keep the control window open for its five-second checks. Chat replies require a live response control in the selected chat. Missing facts are not invented: requests that cannot be answered are logged as skipped rather than entering a review queue. AI analysis uses your signed-in Codex account, times out after 60 seconds, and is canceled by Pause or changed settings.
 
-Changing the decision method switches the response mode to **Preview only**; select **Send authorized replies** again and save if you want delivery.
+### 5. Activity
 
-AI analysis uses your signed-in Codex CLI, times out after 60 seconds, and is canceled by Pause or changed settings. Invalid decisions and CLI failures stop monitoring without sending.
-
-### 5. Monitor
-
-New settings default to **Send authorized replies**. Write your AI standing instructions (or exact rules), select chats, and save before choosing **Start monitoring**. AI monitoring requires nonempty standing instructions. To inspect suggested chat replies before enabling delivery, choose **Preview only**, save, and start monitoring. Preview also blocks the Chrome tools. Upgrades retain your saved response and decision modes.
-
-Keep the desktop window (packaged Windows app) or browser control page (source mode) open for five-second polling. Desktop mode visits selected chats one at a time. An ordinary reply requires a stopped chat and an empty composer. Every answer in a multi-question form must be authorized before any answer is entered. Recognized approval cards permit only **Allow once**.
-
-The app starts paused after restart. Saving settings pauses monitoring. Pause stops future checks after the current check; it does not cancel Codex's work or undo an action.
-
-### 6. Activity
-
-Inspect confirmed responses and actions here. Attempts are recorded before desktop interaction. Chrome actions are confirmed against the UI; chat delivery is confirmed through the desktop controls or a newly echoed reply in chat history. An uncertain result pauses monitoring and blocks further relevant actions instead of automatically retrying.
-
-Inspect and resolve the request in Codex or Chrome, then choose **Mark requests reviewed** in Monitor. Reviewing permits future requests; it does not resend the old request.
+Activity is a history of password selections, terms agreements, chat replies, and failed or skipped attempts. It has no approval or review controls. The journal records attempts before desktop interaction and prevents the same request from being sent twice. An unconfirmed result is recorded and is not repeated; independent later requests can continue without clearing a review gate.
 
 ## Settings, updates, and troubleshooting
 
 Settings, the latest 100 activity entries, and the permanent attempt journal are stored in `.local/state.json` beside the executable (packaged app) or `app.py` (source mode), unless you supply `--state`. Keep this file private; it can contain chat titles, request text, replies, and standing instructions.
 
-Before updating, stop monitoring, disable and save Chrome actions, stop Zenshin, and back up `.local`.
+Use **Check for updates → Install update** for an in-place update. Start monitoring again after Zenshin reopens.
 
 - **Installer:** close the desktop window and run the new installer. It preserves `.local` and saved choices in the installation folder.
 - **Portable ZIP:** close the desktop window, extract the new ZIP into a writable folder, and copy `.local` from the old folder before launching.
 - **Source:** stop the server with Ctrl+C, extract the new source archive, and copy `.local` into the new folder before launching. Recreate the Windows virtual environment and install the new requirements.
 
-Reconnect the MCP registration if the installation path or port changed. After updating, re-enable and save any Chrome actions you want. Do not delete the old attempt journal to retry uncertain actions.
+Reconnect the MCP registration if the installation path or port changed. After updating, check your saved switches and choose Start monitoring. Do not delete the old attempt journal to retry uncertain actions.
 
 | Problem | What to do |
 | --- | --- |
@@ -201,7 +174,7 @@ On Windows, replace `python3` with `.\.venv\Scripts\python.exe` and use a Window
 
 ## Verified scope and limitations
 
-- On 19 October 2026, the v0.2.8 Windows x64 release workflow passed all 63 tests in about 3 seconds, plus portable/installed-app startup, bundled assets, settings persistence, MCP discovery/transport, desktop-window rendering and normal close, reinstall, and uninstall checks. These packaging checks do not exercise live Codex or Chrome actions.
+- On 19 October 2026, the v0.2.9 Windows x64 release workflow passed all 63 tests in about 3 seconds, plus portable/installed-app startup, bundled assets, settings persistence, MCP discovery/transport, desktop-window rendering and normal close, reinstall, and uninstall checks. These packaging checks do not exercise live Codex or Chrome actions.
 - On 16 October 2026, real Windows checks verified Codex connection, one delivered and acknowledged approval reply, and Zenshin-owned Chrome password generation/selection plus terms selection on a disposable form. Both password fields were filled and matched; terms was checked and marketing was left unchecked. No account was submitted and the final native Chrome check used no ChatGPT Computer Use.
 - Earlier controlled tests verified Windows/Linux question forms, custom text, multi-question handling, draft preservation, and navigation on Windows. A real Linux file-access Allow once card was verified; real Windows approval cards and other command/tool-card variants still need live checks.
 - Windows reply delivery previously encountered intermittent UI Automation event/confirmation errors. The latest single live reply passed; that does not establish that the intermittent issue is eliminated.
@@ -217,8 +190,8 @@ git clone https://github.com/ahmedmurtazamalik/zenshin.git
 cd zenshin
 ```
 
-The clone follows the current default branch. To inspect the released source instead, run `git checkout v0.2.8`.
+The clone follows the current default branch. To inspect the released source instead, run `git checkout v0.2.9`.
 
-Install the source prerequisites above, then run the existing behavior tests with `python3 -m unittest -q`, or `.\.venv\Scripts\python.exe -m unittest -q` on Windows. The v0.2.8 suite contains 63 tests: all passed on Windows; the local Linux run passed with one Windows-only test skipped. Tests using simulated desktop controls do not replace live UI verification. Read [AGENTS.md](AGENTS.md) before changing code.
+Install the source prerequisites above, then run the existing behavior tests with `python3 -m unittest -q`, or `.\.venv\Scripts\python.exe -m unittest -q` on Windows. Tests using simulated desktop controls do not replace live UI verification. Read [AGENTS.md](AGENTS.md) before changing code.
 
 [Older captioned walkthrough](demo/approval-helper-demo.mp4) · [Transcript](demo/README.md). This video predates Windows support, Chrome delegation, and the current onboarding UI.

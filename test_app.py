@@ -6,6 +6,7 @@ from unittest.mock import ANY, Mock, patch
 import app
 import linux_ui
 import ai_decision
+import zenshin_mcp
 
 
 def thread(thread_id="selected", text="May I submit this application?"):
@@ -14,6 +15,11 @@ def thread(thread_id="selected", text="May I submit this application?"):
 
 
 class CodexSetupTests(unittest.TestCase):
+    def setUp(self):
+        guidance = patch.object(zenshin_mcp, "install_codex_guidance", return_value=Path("test/AGENTS.md"))
+        self.guidance = guidance.start()
+        self.addCleanup(guidance.stop)
+
     def test_standalone_registration_uses_executable_bridge_and_custom_port(self):
         import json
         import sys
@@ -29,6 +35,7 @@ class CodexSetupTests(unittest.TestCase):
             self.assertTrue(app.codex_setup(8879, register=True)["registered"])
             self.assertEqual(run.call_args_list[1].args[0],
                              ["codex", "mcp", "add", "zenshin", "--", executable, *arguments])
+            self.guidance.assert_called_once_with()
 
     def test_chat_connection_check_reports_disconnected_live_and_failed_connection(self):
         monitor = {"connection": None, "running": False}
@@ -93,64 +100,30 @@ class CodexSetupTests(unittest.TestCase):
 
 
 class StateTests(unittest.TestCase):
-    def test_defaults_to_ai_delivery_and_preserves_saved_choices(self):
+    def test_migrates_removed_modes_and_preserves_instructions_and_action_history(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
             state = app.load_state(path)
-            self.assertEqual(state["decision_method"], "ai")
-            self.assertEqual(state["mode"], "desktop")
-            state.update(decision_method="exact", mode="preview")
+            self.assertTrue(state["instructions"].strip())
+            state.update(decision_method="exact", mode="preview", rules=[{"request": "Continue?", "response": "Yes"}],
+                         instructions="Approve task-related requests.", activity=[{"status": "sent"}],
+                         attempts={"browser:old": {"status": "sent"}})
             app.save_state(path, state)
             saved = app.load_state(path)
-            self.assertEqual(saved["decision_method"], "exact")
-            self.assertEqual(saved["mode"], "preview")
+            self.assertTrue({"mode", "rules", "decision_method"}.isdisjoint(saved))
+            self.assertEqual(saved["instructions"], "Approve task-related requests.")
+            self.assertEqual(saved["activity"], [{"status": "sent"}])
+            self.assertEqual(saved["attempts"], {"browser:old": {"status": "sent"}})
 
 
-class PreviewTests(unittest.TestCase):
-    def setUp(self):
-        self.rule = {"request": "May I submit this application?", "response": "Approved."}
-
-    def test_matches_complete_request_but_not_factual_or_combined_questions(self):
-        self.assertEqual(app.preview_latest(thread(text="May I submit\nthis application?"),
-                                            [self.rule])["response"], "Approved.")
-        for text in ["What is your salary expectation?",
-                     "May I submit this application? Also accept these terms?"]:
-            self.assertIsNone(app.preview_latest(thread(text=text), [self.rule])["response"])
-
-    def test_uses_latest_turn_instead_of_old_matching_request(self):
+class LatestMessageTests(unittest.TestCase):
+    def test_uses_latest_turn_instead_of_an_old_request(self):
         data = thread()
         data["turns"].append({"id": "turn-2", "items": [
             {"type": "agentMessage", "id": "message-2", "text": "Application submitted."}]})
-        self.assertIsNone(app.preview_latest(data, [self.rule])["response"])
+        self.assertEqual(app.latest_message(data)["text"], "Application submitted.")
         data["turns"].append({"id": "turn-3", "items": []})
-        self.assertIsNone(app.preview_latest(data, [self.rule]))
-
-    def test_monitor_reads_only_selected_chat_and_preserves_history_after_restart(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "state.json"
-            state = app.load_state(path)
-            state.update(mode="preview", decision_method="exact",
-                         targets=[{"id": "selected", "name": "Job search"}], rules=[self.rule])
-            monitor = {"path": path, "state": state, "running": True,
-                       "connection": None, "previews": []}
-            with patch.object(app, "rpc", return_value={"thread": thread()}) as read:
-                app.poll(monitor)
-                read.assert_called_once_with(None, "thread/read",
-                                             {"threadId": "selected", "includeTurns": True})
-                monitor["state"] = app.load_state(path)
-                app.poll(monitor)
-                self.assertEqual(len(monitor["state"]["activity"]), 1)
-                self.assertEqual(monitor["state"]["rules"], [self.rule])
-                self.assertEqual(monitor["state"]["targets"][0]["id"], "selected")
-                monitor["running"] = False
-                read.reset_mock()
-                app.poll(monitor)
-                read.assert_not_called()
-
-    def test_conflicting_rules_are_rejected(self):
-        with self.assertRaises(ValueError):
-            app.validate_settings({"targets": [], "rules": [self.rule, {
-                "request": "May I submit\nthis application?", "response": "No."}]})
+        self.assertIsNone(app.latest_message(data))
 
     def test_connection_rejects_mutating_operations(self):
         with self.assertRaises(ValueError):
@@ -186,6 +159,10 @@ class ReadProgressTests(unittest.TestCase):
 
 class DesktopTests(unittest.TestCase):
     def setUp(self):
+        analysis = patch.object(app, "analyze_request", return_value={
+            "decision": "approve", "response": "Yes", "reason": "Authorized by saved instructions."})
+        self.analysis = analysis.start()
+        self.addCleanup(analysis.stop)
         desktop = patch.object(app, "poll_desktop", side_effect=lambda monitor: app.check_desktop(monitor, linux_ui))
         desktop.start()
         self.addCleanup(desktop.stop)
@@ -204,9 +181,9 @@ class DesktopTests(unittest.TestCase):
 
     def test_selected_chats_are_opened_in_order_before_inspection(self):
         state = app.load_state(self.empty_state)
-        state.update(mode="desktop", decision_method="exact", targets=[{"id": "first", "name": "First chat"},
+        state.update(targets=[{"id": "first", "name": "First chat"},
                                              {"id": "second", "name": "Second chat"}])
-        monitor = {"state": state, "running": True, "connection": None, "previews": []}
+        monitor = {"state": state, "running": True, "connection": None}
         events = []
         self.open_chat.side_effect = lambda identity, name, **kwargs: events.append(("open", identity))
         def read(_connection, _method, params):
@@ -225,11 +202,10 @@ class DesktopTests(unittest.TestCase):
 
     def test_navigation_failure_pauses_before_inspection_or_response(self):
         state = app.load_state(self.empty_state)
-        state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
-                     rules=[{"request": "Continue?", "response": "Yes"}])
+        state.update(targets=[{"id": "selected", "name": "Test chat"}])
         data = thread(text="Continue?")
         data["name"] = "Test chat"
-        monitor = {"state": state, "running": True, "connection": None, "previews": []}
+        monitor = {"state": state, "running": True, "connection": None}
         self.open_chat.side_effect = RuntimeError("Chat did not appear")
         with patch.object(app, "rpc", return_value={"thread": data}), \
              patch.object(linux_ui, "approval_cards") as inspect, \
@@ -326,11 +302,11 @@ class DesktopTests(unittest.TestCase):
             path = Path(directory) / "state.json"
             state = app.load_state(path)
             response = "Open https://jobs.example.com/register\nContinue."
-            state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
-                         rules=[{"request": "Continue test?", "response": response}])
+            state.update(targets=[{"id": "selected", "name": "Test chat"}])
+            self.analysis.return_value["response"] = response
             data = thread(text="Continue test?")
             data["name"] = "Test chat"
-            monitor = {"state": state, "path": path, "running": True, "connection": None, "previews": []}
+            monitor = {"state": state, "path": path, "running": True, "connection": None}
             ui = Mock()
             ui.approval_cards.return_value = []
             ui.conversation_pending.return_value = True
@@ -351,14 +327,13 @@ class DesktopTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
             state = app.load_state(path)
-            state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
-                         rules=[{"request": "Complete test?", "response": "Yes"}])
+            state.update(targets=[{"id": "selected", "name": "Test chat"}])
             data = thread(text="Complete test?")
             data["name"] = "Test chat"
             data["turns"][0]["items"][0]["questions"] = [
                 {"title": "Complete test?", "options": ["Yes", "No"]}]
             monitor = {"state": state, "path": path, "running": True,
-                       "connection": None, "previews": []}
+                       "connection": None}
 
             def answer(*_args, **_kwargs):
                 saved = app.load_state(path)
@@ -373,38 +348,44 @@ class DesktopTests(unittest.TestCase):
                 send.assert_called_once_with("Test chat", "Complete test?", "Yes", on_progress=ANY)
                 self.assertEqual(monitor["state"]["attempts"]["selected:message-1"]["status"], "sent")
 
-    def test_uncertain_delivery_pauses_and_blocks_restart(self):
+    def test_uncertain_delivery_is_logged_without_blocking_restart_or_resending(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
             state = app.load_state(path)
-            state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
-                         rules=[{"request": "Complete test?", "response": "Yes"}])
+            state.update(targets=[{"id": "selected", "name": "Test chat"}])
             data = thread()
             data["name"] = "Test chat"
             data["turns"][0]["items"][0]["questions"] = [
                 {"title": "Complete test?", "options": ["Yes", "No"]}]
             monitor = {"state": state, "path": path, "running": True,
-                       "connection": None, "previews": []}
+                       "connection": Mock()}
             with patch.object(app, "rpc", return_value={"thread": data}), \
                  patch.object(linux_ui, "pending", return_value=True), \
-                 patch.object(linux_ui, "answer", side_effect=RuntimeError("Lost confirmation")):
-                with self.assertRaises(RuntimeError):
-                    app.poll(monitor)
-            self.assertFalse(monitor["running"])
+                 patch.object(linux_ui, "answer", side_effect=RuntimeError("Lost confirmation")) as send:
+                app.poll(monitor)
+                app.poll(monitor)
+                send.assert_called_once()
+            self.assertTrue(monitor["running"])
             monitor["state"] = app.load_state(path)
+            self.assertEqual(monitor["state"]["activity"][0]["status"], "uncertain")
+            monitor["running"] = False
             with patch.object(app, "rpc", side_effect=[{"data": [data]}, {"thread": data}]):
-                with self.assertRaisesRegex(ValueError, "unconfirmed attempt"):
-                    app.verify_desktop_targets(monitor)
+                app.start_monitoring(monitor)
+            with patch.object(app, "rpc", return_value={"thread": data}), \
+                 patch.object(linux_ui, "pending", return_value=True), \
+                 patch.object(linux_ui, "answer") as send:
+                app.poll(monitor)
+                send.assert_not_called()
 
-    def test_unmatched_request_and_pause_do_not_send(self):
+    def test_ai_without_an_answer_and_pause_do_not_send(self):
         state = app.load_state(self.empty_state)
-        state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
-                     rules=[{"request": "A different request?", "response": "Yes"}])
+        state.update(targets=[{"id": "selected", "name": "Test chat"}])
+        self.analysis.return_value = {"decision": "needs_input", "response": None, "reason": "Missing information."}
         data = thread()
         data["name"] = "Test chat"
         data["turns"][0]["items"][0]["questions"] = [
             {"title": "Complete test?", "options": ["Yes", "No"]}]
-        monitor = {"state": state, "running": True, "connection": None, "previews": []}
+        monitor = {"state": state, "running": True, "connection": None}
         with patch.object(app, "rpc", return_value={"thread": data}) as read, \
              patch.object(linux_ui, "pending", return_value=True), \
              patch.object(linux_ui, "answer") as send:
@@ -419,20 +400,21 @@ class DesktopTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
             state = app.load_state(path)
-            state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
-                         rules=[{"request": "First?", "response": "Yes"}])
+            state.update(targets=[{"id": "selected", "name": "Test chat"}])
+            self.analysis.side_effect = [
+                {"decision": "approve", "response": "Yes"}, {"decision": "needs_input", "response": None},
+                {"decision": "approve", "response": "Yes"}, {"decision": "continue", "response": "Continue"}]
             data = thread(text="First? Second?")
             data["name"] = "Test chat"
             data["turns"][0]["items"][0]["questions"] = [
                 {"title": "First?", "options": ["Yes"]}, {"title": "Second?", "options": ["Continue"]}]
-            monitor = {"state": state, "path": path, "running": True, "connection": None, "previews": []}
+            monitor = {"state": state, "path": path, "running": True, "connection": None}
             with patch.object(app, "rpc", return_value={"thread": data}), \
                  patch.object(linux_ui, "pending", return_value=True), \
                  patch.object(linux_ui, "answer") as send:
                 app.poll(monitor)
                 send.assert_not_called()
                 self.assertEqual(state["attempts"], {})
-                state["rules"].append({"request": "Second?", "response": "Continue"})
                 app.poll(monitor)
                 self.assertEqual(send.call_args_list[0].args, ("Test chat", "First?", "Yes", "Second?"))
                 self.assertEqual(send.call_args_list[1].args, ("Test chat", "Second?", "Continue"))
@@ -444,11 +426,10 @@ class DesktopTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
             state = app.load_state(path)
-            state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
-                         rules=[{"request": "Continue?", "response": "Yes"}])
+            state.update(targets=[{"id": "selected", "name": "Test chat"}])
             data = thread(text="Continue?")
             data["name"] = "Test chat"
-            monitor = {"state": state, "path": path, "running": True, "connection": None, "previews": []}
+            monitor = {"state": state, "path": path, "running": True, "connection": None}
             def reply(*args, **kwargs):
                 self.assertEqual(app.load_state(path)["attempts"]["selected:message-1"]["status"], "sending")
             with patch.object(app, "rpc", return_value={"thread": data}), \
@@ -464,21 +445,20 @@ class DesktopTests(unittest.TestCase):
             path = Path(directory) / "state.json"
             state = app.load_state(path)
             text = "Run local receipt command?\npython3 receipt.py"
-            state.update(mode="desktop", decision_method="exact", targets=[{"id": "selected", "name": "Test chat"}],
-                         rules=[{"request": text, "response": "Allow once"}])
+            state.update(targets=[{"id": "selected", "name": "Test chat"}])
             data = thread()
             data["name"] = "Test chat"
-            monitor = {"state": state, "path": path, "running": True, "connection": None, "previews": []}
+            monitor = {"state": state, "path": path, "running": True, "connection": None}
             def approve(*args, **kwargs):
                 saved = app.load_state(path)
                 self.assertEqual(next(iter(saved["attempts"].values()))["status"], "sending")
             with patch.object(app, "rpc", return_value={"thread": data}), \
                  patch.object(linux_ui, "approval_cards", return_value=[{"text": text, "options": ["Allow once"]}]), \
                  patch.object(linux_ui, "approve", side_effect=approve) as send:
-                state["rules"][0]["response"] = "Always allow"
+                self.analysis.return_value["response"] = "Always allow"
                 app.poll(monitor)
                 send.assert_not_called()
-                state["rules"][0]["response"] = "Allow once"
+                self.analysis.return_value["response"] = "Allow once"
                 app.poll(monitor)
                 monitor["state"] = app.load_state(path)
                 app.poll(monitor)
@@ -573,7 +553,7 @@ class AIDecisionTests(unittest.TestCase):
 
     def monitor(self, path):
         state = app.load_state(path)
-        state.update(decision_method="ai", mode="desktop", instructions="Continue formatting the report.",
+        state.update(instructions="Continue formatting the report.",
                      targets=[{"id": "selected", "name": "Test chat"}])
         data = thread(text="Shall I carry on?")
         data["name"] = "Test chat"
@@ -581,8 +561,7 @@ class AIDecisionTests(unittest.TestCase):
             "content": [{"type": "text", "text": "Format the report."}]})
         data["turns"][0]["items"][-1]["questions"] = [{"title": "Shall I carry on?",
                                                                    "options": ["Yes, continue.", "No."]}]
-        return {"state": state, "path": path, "running": True, "connection": None,
-                "previews": []}, data
+        return {"state": state, "path": path, "running": True, "connection": None}, data
 
     def test_ai_uses_context_and_sends_offered_choice_once_without_exact_rule(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -618,7 +597,8 @@ class AIDecisionTests(unittest.TestCase):
                     app.poll(monitor)
                     send.assert_not_called()
                     start.assert_called_once()
-                    self.assertEqual(monitor["previews"][0]["reason"], decision["reason"])
+                    self.assertEqual(monitor["state"]["activity"][0]["reason"], decision["reason"])
+                    self.assertEqual(monitor["state"]["activity"][0]["status"], "skipped")
 
     def test_pause_cancels_analysis_and_does_not_poll_or_send(self):
         with tempfile.TemporaryDirectory() as directory:

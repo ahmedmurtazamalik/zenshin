@@ -27,7 +27,8 @@ unclear scope, or insufficient context require needs_input. Never invent facts.
 A statement, completed action, old answered request, or request with no need for
 a reply is no_response. Combined questions must all be covered to approve.
 For approve/continue, choose an exact offered option when one expresses the
-authorized response. Otherwise propose a brief reply. For needs_input and
+authorized response. For a permission card offering Allow once, use Allow once.
+Otherwise propose a brief reply. For needs_input and
 no_response, response must be null. Explain the decision in one short sentence.
 """
 

@@ -1,3 +1,12 @@
+# Zenshin v0.2.9 — Automatic AI workflow and action history
+
+- Remove exact-question rules, Preview mode, and the Monitor section. AI sends authorized replies while monitoring runs.
+- Add editable instruction presets for approvals, recommended choices, and continuing the existing plan. Existing nonempty instructions and the action journal are preserved.
+- Connect installs reusable Codex guidance automatically, preserving other global instructions. New chats no longer need a copied setup prompt; refresh existing Codex sessions once.
+- Start enables saved Chrome actions, including Chrome-only use without selected chats. Pause and Save stop further actions.
+- Activity logs completed password selections, terms agreements, replies, and failed/skipped attempts. No manual review queue or global unconfirmed-action gate remains; duplicate requests are still not repeated.
+- Errors stay visible without pulling the app back to another section. Chat-read timeout/progress and the update restart fix remain.
+
 # Zenshin v0.2.8 — Fix restart after in-app updates
 
 - Reset PyInstaller's inherited runtime when starting the installer and when the installer reopens Zenshin. The updated app extracts its own runtime instead of reusing the old app's deleted temporary folder.

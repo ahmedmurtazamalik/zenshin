@@ -96,71 +96,7 @@ class AutomationLifetimeTests(unittest.TestCase):
 
 class ChromeServerTests(unittest.TestCase):
     @unittest.skipUnless(sys.platform == "win32", "Windows-only action")
-    def test_password_action_works_without_codex_and_returns_errors_without_disconnect(self):
-        import json
-        from pathlib import Path
-        import threading
-        from urllib.error import HTTPError
-        from urllib.request import Request, urlopen
 
-        servers, ready = [], threading.Event()
-        server_class = app.ThreadingHTTPServer
-        def create_server(*args):
-            server = server_class(("127.0.0.1", 0), args[1])
-            servers.append(server)
-            ready.set()
-            return server
-        def post(path="chrome-password", data=None):
-            with urlopen(Request(base + "/api/" + path,
-                                 data=json.dumps(data or {"site": "https://jobs.example.com"}).encode(),
-                                 headers={"Content-Type": "application/json", "Host": "127.0.0.1:8765"}),
-                         timeout=2) as response:
-                return json.load(response)
-
-        with tempfile.TemporaryDirectory() as directory, \
-             patch.object(app, "ThreadingHTTPServer", side_effect=create_server), \
-             patch("sys.argv", ["app.py", "--state", str(Path(directory) / "state.json")]), \
-             patch("builtins.print"), patch.object(ui, "run", side_effect=lambda operation, *args, **kwargs: operation(*args, **kwargs)), \
-             patch.object(ui, "prepare_chrome_site", return_value={"message": "Ready"}) as prepare, \
-             patch.object(ui, "open_chrome_password_suggestion"), \
-             patch.object(ui, "accept_chrome_password", return_value={"message": "Selected"}) as accept:
-            worker = threading.Thread(target=app.main, daemon=True)
-            worker.start()
-            try:
-                self.assertTrue(ready.wait(2))
-                base = f"http://127.0.0.1:{servers[0].server_port}"
-                with self.assertRaises(HTTPError) as error:
-                    post("chrome-prepare", {"site": "https://jobs.example.com", "thread_id": "retired-chat"})
-                self.assertEqual(error.exception.code, 400)
-                error.exception.close()
-                prepare.assert_not_called()
-                self.assertEqual(post("chrome-prepare"), {"message": "Ready"})
-                prepare.assert_called_once_with("https://jobs.example.com")
-                accept.assert_not_called()
-                self.assertEqual(post(), {"message": "Selected"})
-                accept.assert_called_once_with("https://jobs.example.com")
-                accept.side_effect = RuntimeError("No suggestion appeared")
-                with patch.object(app, "close_connection") as disconnect:
-                    with self.assertRaises(HTTPError) as error:
-                        post()
-                    self.assertEqual(error.exception.code, 503)
-                    self.assertEqual(json.load(error.exception), {"error": "No suggestion appeared"})
-                    error.exception.close()
-                    disconnect.assert_not_called()
-                accept.reset_mock()
-                prepare.side_effect = RuntimeError("Chrome site is not ready")
-                with self.assertRaises(HTTPError) as error:
-                    post()
-                self.assertEqual(error.exception.code, 503)
-                error.exception.close()
-                accept.assert_not_called()
-            finally:
-                if servers:
-                    servers[0].shutdown()
-                worker.join(2)
-
-
-class WindowsControlsTests(unittest.TestCase):
     def chrome_form(self, address="https://jobs.example.com/register"):
         api = Mock()
         api.ControlsAreSame.side_effect = lambda first, second: first is second

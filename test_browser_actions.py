@@ -7,9 +7,11 @@ import tempfile
 import threading
 import unittest
 from unittest.mock import Mock, patch
+from urllib.request import Request, urlopen
 
 import app
 import windows_ui as ui
+import zenshin_mcp
 
 
 class BrowserActionTests(unittest.TestCase):
@@ -18,8 +20,8 @@ class BrowserActionTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.path = Path(directory.name) / "state.json"
         self.state = app.load_state(self.path)
-        self.state.update(mode="desktop", auto_password=True, auto_terms=True)
-        self.monitor = {"path": self.path, "state": self.state, "running": False, "connection": None}
+        self.state.update(auto_password=True, auto_terms=True)
+        self.monitor = {"path": self.path, "state": self.state, "running": True, "connection": None}
         platform = Mock(wraps=app.os)
         platform.name = "nt"
         for item in (patch.object(app, "os", platform),
@@ -43,8 +45,13 @@ class BrowserActionTests(unittest.TestCase):
             receipt = app.browser_action(self.monitor, data)
             self.assertTrue(receipt["confirmed"])
             self.assertEqual(receipt["action"], data["action"])
+            saved = app.load_state(self.path)
+            logged = saved["activity"][-1]
+            self.assertEqual(logged["status"], "sent")
+            self.assertEqual(logged["request"], {
+                "action": data["action"], "site": data["site"], "label": data.get("label", "")})
             ui.prepare_chrome_site.assert_called_with(data["site"], open_site=False)
-            self.monitor["state"] = app.load_state(self.path)
+            self.monitor["state"] = saved
             self.assertTrue(app.browser_action(self.monitor, data)["replayed"])
         self.assertEqual(ui.perform_chrome_signup_request.call_count, 2)
         ui.chrome_signup_request.assert_called_with("https://jobs.example.com", password=False,
@@ -54,11 +61,12 @@ class BrowserActionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "different browser action"):
             app.browser_action(self.monitor, {**self.request, "site": "https://other.example.com"})
 
-    def test_preview_disabled_action_and_linux_never_inspect_chrome(self):
-        self.state["mode"] = "preview"
-        with self.assertRaisesRegex(ValueError, "Enable"):
+    def test_paused_disabled_action_and_linux_never_inspect_chrome(self):
+        self.monitor["running"] = False
+        with self.assertRaisesRegex(ValueError, "Start monitoring"):
             app.browser_action(self.monitor, self.request)
-        self.state.update(mode="desktop", auto_password=False)
+        self.monitor["running"] = True
+        self.state["auto_password"] = False
         with self.assertRaisesRegex(ValueError, "Enable"):
             app.browser_action(self.monitor, self.request)
         self.state["auto_password"] = True
@@ -68,16 +76,22 @@ class BrowserActionTests(unittest.TestCase):
         ui.run.assert_not_called()
         self.assertEqual(self.state["attempts"], {})
 
-    def test_uncertain_action_blocks_retries_after_restart_even_with_another_id(self):
+    def test_uncertain_action_blocks_same_request_after_restart_but_allows_a_new_action(self):
         ui.perform_chrome_signup_request.side_effect = RuntimeError("Selection was not confirmed")
         with self.assertRaisesRegex(RuntimeError, "do not retry"):
             app.browser_action(self.monitor, self.request)
+        self.assertTrue(self.monitor["running"])
         self.monitor["state"] = app.load_state(self.path)
-        for data in (self.request, {**self.request, "request_id": "new-id"}):
-            with self.assertRaises(RuntimeError):
-                app.browser_action(self.monitor, data)
+        with self.assertRaisesRegex(RuntimeError, "already"):
+            app.browser_action(self.monitor, self.request)
         ui.perform_chrome_signup_request.assert_called_once()
         self.assertEqual(self.monitor["state"]["attempts"]["browser:password-1"]["status"], "uncertain")
+        ui.perform_chrome_signup_request.side_effect = None
+        receipt = app.browser_action(self.monitor, {
+            "action": "terms", "site": "https://other.example.com/register",
+            "request_id": "terms-2", "label": "I agree to the Terms"})
+        self.assertTrue(receipt["confirmed"])
+        self.assertEqual(ui.perform_chrome_signup_request.call_count, 2)
 
     def test_missing_or_unmatched_terms_label_never_activates_a_control(self):
         with self.assertRaisesRegex(ValueError, "exact checkbox label"):
@@ -89,16 +103,16 @@ class BrowserActionTests(unittest.TestCase):
         ui.perform_chrome_signup_request.assert_not_called()
 
     def test_monitor_does_not_interpret_password_refusals_as_browser_requests(self):
-        self.state["decision_method"] = "exact"
         self.state["targets"] = [{"id": "chat", "name": "Job search"}]
         thread = {"name": "Job search", "id": "chat", "turns": [{"id": "turn", "status": "completed", "items": [
             {"type": "agentMessage", "id": "reply", "text": "I cannot enter the password at https://jobs.example.com"}]}]}
         desktop = Mock()
         desktop.approval_cards.return_value = []
         desktop.conversation_pending.return_value = False
-        self.monitor["previews"] = []
-        with patch.object(app, "rpc", return_value={"thread": thread}):
+        with patch.object(app, "rpc", return_value={"thread": thread}), \
+             patch.object(app, "analyze_request") as analyze:
             app.check_desktop(self.monitor, desktop)
+        analyze.assert_not_called()
         desktop.chrome_signup_request.assert_not_called()
         desktop.perform_chrome_signup_request.assert_not_called()
 
@@ -136,11 +150,16 @@ class BrowserActionTests(unittest.TestCase):
             worker.start()
             try:
                 self.assertTrue(ready.wait(2))
+                with urlopen(Request(f"http://127.0.0.1:{port}/api/start", data=b"{}",
+                                     headers={"Content-Type": "application/json"}), timeout=2) as response:
+                    self.assertTrue(json.load(response)["running"])
                 process = subprocess.run([sys.executable, "-B", str(app.ROOT / "zenshin_mcp.py"), "--port", str(port)],
                     input="".join(json.dumps({"jsonrpc": "2.0", **message}) + "\n" for message in messages),
                     capture_output=True, text=True, timeout=10)
                 self.assertEqual(process.returncode, 0, process.stderr)
                 replies = {reply["id"]: reply["result"] for reply in map(json.loads, process.stdout.splitlines())}
+                self.assertIn("Use Zenshin automatically", replies[1]["instructions"])
+                self.assertIn("standing authorization", replies[1]["instructions"])
                 self.assertEqual(len(replies[2]["tools"]), 2)
                 for identity in (3, 4):
                     self.assertFalse(replies[identity]["isError"])
@@ -155,6 +174,28 @@ class BrowserActionTests(unittest.TestCase):
                 if servers:
                     servers[0].shutdown()
                 worker.join(2)
+
+
+class CodexGuidanceTests(unittest.TestCase):
+    def test_updates_active_instructions_block_without_changing_personal_instructions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            agents = root / "AGENTS.md"
+            agents.write_bytes(b"Keep my default instructions.\r\n")
+            override = root / "AGENTS.override.md"
+            before, after = b"# Personal instructions\r\n\r\n", b"\r\n\r\nKeep this ending.\r\n"
+            override.write_bytes(before + b"<!-- Zenshin instructions: begin -->\r\nOld guidance\r\n"
+                                 b"<!-- Zenshin instructions: end -->" + after)
+            with patch.dict(zenshin_mcp.os.environ, {"CODEX_HOME": directory}):
+                self.assertEqual(zenshin_mcp.install_codex_guidance(), override)
+                installed = override.read_bytes()
+                zenshin_mcp.install_codex_guidance()
+                self.assertEqual(override.read_bytes(), installed)
+            self.assertTrue(installed.startswith(before))
+            self.assertTrue(installed.endswith(after))
+            self.assertEqual(installed.count(b"<!-- Zenshin instructions: begin -->"), 1)
+            self.assertIn(b"Use Zenshin automatically", installed)
+            self.assertEqual(agents.read_bytes(), b"Keep my default instructions.\r\n")
 
 
 if __name__ == "__main__":

@@ -49,7 +49,7 @@ def check(executable, copy=True):
                         for path in ("/", "/assets/zenshin.svg", "/assets/space-grotesk.ttf"):
                             with urlopen(url + path, timeout=5) as response:
                                 assert response.read(), "Missing bundled asset: " + path
-                        settings = {"targets": [], "rules": [], "instructions": "Bundle persistence check"}
+                        settings = {"targets": [], "instructions": "Bundle persistence check"}
                         request = Request(url + "/api/settings", data=json.dumps(settings).encode(),
                                           headers={"Content-Type": "application/json"})
                         with urlopen(request, timeout=5) as response:
