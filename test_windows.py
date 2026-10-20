@@ -20,6 +20,32 @@ def node(role, name="", children=()):
 
 
 class PipeTests(unittest.TestCase):
+    def test_chat_history_can_arrive_after_ten_seconds(self):
+        process = Mock()
+        connection = {"process": process, "next_id": 0, "buffer": b""}
+        now = 0
+
+        def ready(_pipe):
+            nonlocal now
+            now = 11
+            return True
+
+        with patch.object(app.time, "monotonic", side_effect=lambda: now), \
+             patch.object(app, "pipe_ready", side_effect=ready), \
+             patch.object(app.os, "read", return_value=b'{"id":1,"result":{"thread":{"id":"selected"}}}\n'):
+            result = app.rpc(connection, "thread/read", {"threadId": "selected", "includeTurns": True})
+        self.assertEqual(result["thread"]["id"], "selected")
+
+    def test_unresponsive_server_reports_operation_and_still_times_out(self):
+        from itertools import count
+        for method, timeout in [("thread/read", 60), ("thread/list", 10)]:
+            with self.subTest(method=method):
+                connection = {"process": Mock(), "next_id": 0, "buffer": b""}
+                with patch.object(app.time, "monotonic", side_effect=count(0, 5)), \
+                     patch.object(app, "pipe_ready", return_value=False):
+                    with self.assertRaisesRegex(RuntimeError, rf"{timeout} seconds \({method}\)"):
+                        app.rpc(connection, method, {})
+
     def test_rpc_reads_split_utf8_messages_notifications_and_reports_eof(self):
         script = '''import json,sys,time
 sys.stdin.buffer.readline()

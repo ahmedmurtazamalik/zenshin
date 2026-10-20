@@ -142,7 +142,9 @@ def rpc(connection, method, params):
     process.stdin.write((json.dumps({"id": request_id, "method": method,
                                     "params": params}) + "\n").encode())
     process.stdin.flush()
-    deadline = time.monotonic() + 10
+    # Reading persisted chat history can take longer than a connection check.
+    timeout = 60 if method == "thread/read" else 10
+    deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if b"\n" not in connection["buffer"]:
             if not pipe_ready(process.stdout):
@@ -160,7 +162,7 @@ def rpc(connection, method, params):
             if "error" in message:
                 raise RuntimeError(message["error"]["message"])
             return message["result"]
-    raise RuntimeError("Codex App Server did not respond within 10 seconds")
+    raise RuntimeError(f"Codex App Server did not respond within {timeout} seconds ({method})")
 
 
 def connect():
