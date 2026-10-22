@@ -250,10 +250,10 @@
       <section id="chrome-password-panel" aria-labelledby="chrome-password-heading" hidden>
         <div class="section-head"><h2 id="chrome-password-heading">Individual Chrome actions</h2><span class="eyebrow">Windows</span></div>
         <label><input id="auto-password" type="checkbox"> Allow Zenshin to select Chrome's suggested password</label>
-        <label><input id="auto-terms" type="checkbox"> Allow Zenshin to check a named terms agreement box</label>
-        <p class="muted help">Codex requests the action through the connected Zenshin tools; Zenshin performs it in Chrome and returns confirmation. Zenshin focuses the new-password field and opens and selects Chrome's native suggestion. Chrome generates and fills the password. Zenshin also checks the exact terms agreement box named in the request.</p>
+        <label><input id="auto-terms" type="checkbox"> Allow Zenshin to check a terms agreement box</label>
+        <p class="muted help">Codex requests the action through the connected Zenshin tools; Zenshin performs it in Chrome and returns confirmation. Zenshin identifies password fields and agreement boxes from their meaning and nearby text. It opens and selects Chrome's native password suggestion; Chrome generates and fills the password. An exact checkbox label is not required.</p>
         <p class="muted help">The connected tools tell Codex to use Zenshin automatically for these actions. Codex supplies the current page URL with each request. Chrome must already show the intended page.</p>
-        <p class="muted help">Choose the actions you authorize, then select Start monitoring. Actions run immediately and are logged in Activity. Pause disables Chrome actions and chat monitoring. Saving settings also pauses them. Marketing opt-ins are excluded. No account is submitted.</p>
+        <p class="muted help">Choose the actions you authorize, then select Start monitoring. Actions run immediately and are logged in Activity. Pause disables Chrome actions and chat monitoring. Saving settings also pauses them. Terms bundled with marketing consent are allowed; separate marketing boxes are left alone. No account is submitted.</p>
       </section>
       <section id="chats-panel" aria-labelledby="chats-heading" hidden>
         <div class="section-head"><h2 id="chats-heading">Chats</h2><span class="eyebrow">Chat monitoring</span></div>
@@ -432,7 +432,7 @@
     tourFocus = document.activeElement; rememberTour(); $('welcome').close();
     tourSteps = [
       ['#register-codex', 'Connect your Codex once', 'Use Connect Zenshin tools to register this installation and install guidance automatically for new Codex chats. Reload MCP connections or restart Codex once. Reconnect / repair guidance restores the setup if needed.'],
-      ...(state?.chrome_password_supported ? [['#auto-password', 'Choose your Chrome actions', 'In Chrome actions, enable password selection, terms agreement, or both. Zenshin opens and selects the native password suggestion itself; a terms request names one exact checkbox. Codex delegates these actions without using Computer Use. These actions never submit an account or select marketing consent.']] : []),
+      ...(state?.chrome_password_supported ? [['#auto-password', 'Choose your Chrome actions', 'In Chrome actions, enable password selection, terms agreement, or both. Zenshin identifies controls by meaning and opens and selects the native password suggestion itself. Terms bundled with marketing are allowed; separate marketing boxes are left alone. Codex delegates these actions without using Computer Use. These actions never submit an account.']] : []),
       ['#connect', 'Monitor chat requests', 'Load Codex chats to monitor questions and continuation requests. This is separate from registering the Chrome tools. Select chats with unique titles; desktop monitoring visits each selected chat in turn.'],
       ['#authorization-panel', 'Set your standing instructions', 'Choose a prefilled prompt and edit it to say what Zenshin may approve. While monitoring runs, AI answers covered requests automatically using your Codex account. Requests missing required facts are logged as skipped.'],
       ['#start', 'Start when ready', 'Start monitoring saves your choices and enables selected Chrome actions and chat replies. Chrome actions need no selected chats. Keep this page open for five-second chat checks. Saving settings pauses all actions.'],

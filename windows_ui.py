@@ -8,6 +8,8 @@ import subprocess
 import time
 from urllib.parse import quote, urlsplit
 
+import ai_decision
+
 
 def automation():
     try:
@@ -296,33 +298,79 @@ def prepare_chrome_site(address, open_site=True):
     raise RuntimeError("Chrome site is not ready: check the address, loading indicator, and any redirects before trying again")
 
 
-def open_chrome_password_suggestion(address):
-    origin = site_origin(address)
-    browser, suggestion = chrome_password_suggestion(origin)
-    if suggestion is not None:
-        return
-    if browser is None:
-        raise RuntimeError("The requested Chrome page is not available")
+def chrome_page_controls(browser, origin):
     api = automation()
-    fields = []
     for doc in nodes(browser, stop_at_documents=True):
         if doc.ControlTypeName != "DocumentControl" or doc.IsOffscreen:
             continue
         value = doc.GetPattern(api.PatternId.ValuePattern)
-        if not value or not value.Value.startswith(origin + "/"):
-            continue
-        # Inspect field metadata only; never read a password field's value.
-        fields.extend(control for control in nodes(doc)
-                      if control.ControlTypeName == "EditControl" and control.IsPassword
-                      and control.IsEnabled and not control.IsOffscreen
-                      and not re.search(r"confirm|repeat|re-enter|current|old", control.Name, re.I))
-    if len(fields) != 1:
+        if value and value.Value.startswith(("http://", "https://")) and site_origin(value.Value) == origin:
+            yield from nodes(doc)
+
+
+def chrome_control_description(control):
+    # Labels and nearby static text only. Never read editable content or values.
+    def text_nodes(root):
+        if root.ControlTypeName == "EditControl":
+            return
+        if root.ControlTypeName in {"TextControl", "HyperlinkControl"} and not root.IsOffscreen:
+            yield root.Name
+        for child in root.GetChildren():
+            yield from text_nodes(child)
+
+    nearby = []
+    parent = control.GetParentControl()
+    for _ in range(2):
+        if parent is None or parent.ControlTypeName in {"DocumentControl", "WindowControl"}:
+            break
+        nearby = list(text_nodes(parent))
+        if nearby:
+            break
+        parent = parent.GetParentControl()
+    return {"name": control.Name, "help_text": control.HelpText,
+            "automation_id": control.AutomationId,
+            "nearby_text": " ".join(nearby)[:2000]}
+
+
+def chrome_new_password_field(browser, origin):
+    fields = [control for control in chrome_page_controls(browser, origin)
+              if control.ControlTypeName == "EditControl" and control.IsPassword
+              and control.IsEnabled and not control.IsOffscreen]
+    if not fields:
         raise RuntimeError("Cannot identify one new-password field; inspect Chrome manually")
-    field = fields[0]
+    descriptions = [chrome_control_description(field) for field in fields]
+    selected = ai_decision.select_browser_control("password", descriptions, hint=browser.Name)
+    if selected is None:
+        raise RuntimeError("Cannot identify one new-password field; inspect Chrome manually")
+    field = fields[selected]
+    if (field.ControlTypeName != "EditControl" or not field.IsPassword
+            or not field.IsEnabled or field.IsOffscreen
+            or chrome_control_description(field) != descriptions[selected]):
+        raise RuntimeError("Chrome's password field changed; nothing was selected")
+    return {"control": field, "description": descriptions[selected]}
+
+
+def open_chrome_password_suggestion(address):
+    origin = site_origin(address)
+    browser, suggestion = chrome_password_suggestion(origin)
+    if browser is None:
+        raise RuntimeError("The requested Chrome page is not available")
+    api = automation()
+    selection = chrome_new_password_field(browser, origin)
+    field = selection["control"]
+    # Classification can take time: check the site and control again before focus.
+    prepare_chrome_site(address, open_site=False)
+    current_browser, _ = chrome_password_suggestion(origin)
+    if (not api.ControlsAreSame(browser, current_browser)
+            or not any(api.ControlsAreSame(field, control) for control in chrome_page_controls(current_browser, origin))
+            or field.ControlTypeName != "EditControl" or not field.IsPassword
+            or not field.IsEnabled or field.IsOffscreen
+            or chrome_control_description(field) != selection["description"]):
+        raise RuntimeError("Chrome's password field changed; nothing was selected")
     if not field.SetFocus() or not field.HasKeyboardFocus:
         raise RuntimeError("Chrome did not focus the new-password field")
     if chrome_password_suggestion(origin)[1] is not None:
-        return
+        return selection
     # Invoke Chrome's native context menu, without keyboard or coordinate input.
     interface = api.uiautomation._AutomationClient.instance().UIAutomationCore.IUIAutomationElement3
     field.Element.QueryInterface(interface).ShowContextMenu()
@@ -338,24 +386,17 @@ def open_chrome_password_suggestion(address):
     deadline = time.monotonic() + 3
     while time.monotonic() < deadline:
         if chrome_password_suggestion(origin)[1] is not None:
-            return
+            return selection
         time.sleep(.2)
     raise RuntimeError("Chrome did not open its native password suggestion; check Chrome manually")
 
 
-def chrome_password_filled(browser, origin):
+def chrome_password_filled(browser, origin, field=None):
     api = automation()
-    fields = []
-    for doc in nodes(browser, stop_at_documents=True):
-        if doc.ControlTypeName != "DocumentControl" or doc.IsOffscreen:
-            continue
-        value = doc.GetPattern(api.PatternId.ValuePattern)
-        if not value or not value.Value.startswith(origin + "/"):
-            continue
-        fields.extend(control for control in nodes(doc)
-                      if control.ControlTypeName == "EditControl" and control.IsPassword
-                      and control.IsEnabled and not control.IsOffscreen
-                      and not re.search(r"current|old", control.Name, re.I))
+    fields = [control for control in chrome_page_controls(browser, origin)
+              if control.ControlTypeName == "EditControl" and control.IsPassword
+              and control.IsEnabled and not control.IsOffscreen
+              and (field is None or api.ControlsAreSame(field, control))]
     if not fields:
         return False
     for field in fields:
@@ -372,28 +413,39 @@ def chrome_password_filled(browser, origin):
     return True
 
 
-def accept_chrome_password(address):
+def accept_chrome_password(address, selection=None):
     origin = site_origin(address.strip())
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         browser, suggestion = chrome_password_suggestion(origin)
         if suggestion is not None:
+            if selection is None:
+                selection = chrome_new_password_field(browser, origin)
+                field = selection["control"]
+                if not field.SetFocus() or not field.HasKeyboardFocus:
+                    raise RuntimeError("Chrome did not focus the new-password field")
+            field = selection["control"]
             # Re-read the site and native popup immediately before activation.
             current_browser, current = chrome_password_suggestion(origin)
             api = automation()
             if (current is None or not api.ControlsAreSame(browser, current_browser)
                     or not api.ControlsAreSame(suggestion, current)):
                 raise RuntimeError("Chrome's password suggestion changed; nothing was selected")
+            if (not any(api.ControlsAreSame(field, control) for control in chrome_page_controls(browser, origin))
+                    or field.ControlTypeName != "EditControl" or not field.IsPassword
+                    or not field.IsEnabled or field.IsOffscreen
+                    or chrome_control_description(field) != selection["description"]):
+                raise RuntimeError("Chrome's password field changed; nothing was selected")
             press(current)  # Exactly one activation; never retry an uncertain result.
             deadline = time.monotonic() + 3
             while time.monotonic() < deadline:
                 current_browser, remaining = chrome_password_suggestion(origin)
                 if current_browser is None or not api.ControlsAreSame(browser, current_browser):
                     raise RuntimeError("Chrome's site changed after activation; inspect Chrome before trying again")
-                if remaining is None and chrome_password_filled(current_browser, origin):
+                if remaining is None and chrome_password_filled(current_browser, origin, field):
                     time.sleep(.3)
-                    if chrome_password_filled(current_browser, origin):
-                        return {"message": "Chrome's generated password fields remained filled after acceptance."}
+                    if chrome_password_filled(current_browser, origin, field):
+                        return {"message": "Chrome's generated password field remained filled after acceptance."}
                     break
                 time.sleep(.2)
             raise RuntimeError("Chrome's password fields did not remain filled after selection; do not retry this action")
@@ -407,46 +459,32 @@ def chrome_signup_request(origin, password=False, terms=False, label=None):
         return {"kind": "password", "label": "Chrome suggested password"}
     if not terms or browser is None:
         return None
-    matches = []
     api = automation()
-    for doc in nodes(browser, stop_at_documents=True):
-        if doc.ControlTypeName != "DocumentControl" or doc.IsOffscreen:
-            continue
-        value = doc.GetPattern(api.PatternId.ValuePattern)
-        if not value or not value.Value.startswith(origin + "/"):
-            continue
-        for control in nodes(doc):
-            if control.ControlTypeName != "CheckBoxControl" or control.IsOffscreen or not control.IsEnabled:
-                continue
-            if label is not None and control.Name != label:
-                continue
-            text = control.Name
-            if (not re.search(r"\b(?:agree|accept)\b.*\bterms\b|\bterms (?:and|&) conditions\b|\bterms of (?:service|use)\b", text, re.I)
-                    or re.search(r"marketing|newsletter|promotional|offers|updates|subscrib|partners", text, re.I)):
-                continue
-            toggle = control.GetPattern(api.PatternId.TogglePattern)
-            if toggle and toggle.ToggleState == 0:
-                matches.append({"kind": "terms", "label": text})
-    if len(matches) > 1:
-        raise RuntimeError("Several terms checkboxes are available; inspect the form manually")
-    return matches[0] if matches else None
+    controls = [control for control in chrome_page_controls(browser, origin)
+                if control.ControlTypeName == "CheckBoxControl" and not control.IsOffscreen and control.IsEnabled
+                and (toggle := control.GetPattern(api.PatternId.TogglePattern)) and toggle.ToggleState == 0]
+    if not controls:
+        return None
+    descriptions = [chrome_control_description(control) for control in controls]
+    selected = ai_decision.select_browser_control("terms", descriptions, hint=label or "")
+    if selected is None:
+        return None
+    return {"kind": "terms", "label": controls[selected].Name,
+            "control": controls[selected], "description": descriptions[selected]}
 
 
 def perform_chrome_signup_request(origin, request):
-    current = chrome_signup_request(origin, password=request["kind"] == "password",
-                                    terms=request["kind"] == "terms",
-                                    label=request["label"] if request["kind"] == "terms" else None)
-    if current != request:
-        raise RuntimeError("Chrome's signup control changed; nothing was selected")
     if request["kind"] == "password":
-        return accept_chrome_password(origin)
+        return accept_chrome_password(origin, request.get("field"))
     browser, _ = chrome_password_suggestion(origin)
-    controls = [control for control in nodes(browser) if control.ControlTypeName == "CheckBoxControl"
-                and control.Name == request["label"] and not control.IsOffscreen and control.IsEnabled]
+    controls = [control for control in chrome_page_controls(browser, origin) if control.ControlTypeName == "CheckBoxControl"
+                and automation().ControlsAreSame(control, request["control"])
+                and not control.IsOffscreen and control.IsEnabled]
     if len(controls) != 1:
         raise RuntimeError("The terms checkbox changed or is ambiguous; inspect Chrome manually")
     toggle = controls[0].GetPattern(automation().PatternId.TogglePattern)
-    if not toggle or toggle.ToggleState != 0:
+    if (not toggle or toggle.ToggleState != 0
+            or chrome_control_description(controls[0]) != request["description"]):
         raise RuntimeError("The terms checkbox changed; nothing was selected")
     toggle.Toggle()
     deadline = time.monotonic() + 3

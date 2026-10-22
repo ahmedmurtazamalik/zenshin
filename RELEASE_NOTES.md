@@ -1,3 +1,12 @@
+# Zenshin v0.2.14 — Understand real signup forms
+
+- Identify new-password fields and agreement checkboxes by meaning and nearby text through the existing Codex classifier, instead of requiring exact wording. The terms tool's label is now an optional hint.
+- Allow an agreement that bundles terms with marketing consent. Leave separate marketing boxes alone.
+- Verify the selected password field without requiring unrelated password fields to be filled. Recheck the field and native suggestion before selection, including suggestions already open for another field.
+- Update Chrome action guidance and activity receipts to reflect the selected agreement. Settings, action switches, and the attempt journal are preserved on upgrade.
+
+Verification: all 81 behavior tests passed in 3.8 seconds. Five live classifier checks passed in 34 seconds using labels inspected on GitLab, Overleaf, and PythonAnywhere, plus a constructed bundled-marketing example. Native Chrome filling and checkbox activation on public sites remain unverified. Both actions now require the signed-in Codex CLI for semantic selection; classification can take up to 60 seconds.
+
 # Zenshin v0.2.13 — Faster Chrome actions and reliable MCP updates
 
 - Find Chrome windows directly instead of scanning unrelated desktop apps. In five planned live cases, password actions took 7.0–8.4 seconds and terms actions took 3.4–4.5 seconds.

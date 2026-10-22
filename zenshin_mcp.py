@@ -16,7 +16,8 @@ action switches and Start monitoring provide standing authorization for those
 actions; do not request another review for an enabled action. Zenshin enforces
 Start/Pause and the switches, performs the action, and logs a receipt.
 Honor any narrower limits in the user's task. Never delegate a safety refusal,
-URL-policy stop, CAPTCHA, account submission, or marketing consent.
+URL-policy stop, CAPTCHA, account submission, or a separate marketing opt-in.
+Terms bundled with marketing consent are allowed; separate marketing boxes are not.
 Use normal browser tools for navigation and other work. Zenshin performs the
 entire native interaction, including opening the password suggestion; do not use
 Computer Use to prepare or perform these actions. Do not read or return passwords.
@@ -71,13 +72,14 @@ TOOLS = [
      "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}},
     {"name": "check_chrome_terms",
      "description": "Use automatically when the user's task needs a terms agreement checkbox. "
-                    "Check one exactly named, unchecked terms agreement box on the current Chrome page. "
+                    "Identify and check one unchecked agreement box by meaning and nearby text on the current Chrome page. "
                     "Start monitoring and the saved terms switch provide standing authorization; no extra review. "
                     "Honor task limits; never bypass a safety refusal or URL stop. "
-                    "Excludes marketing opt-ins and account submission. Returns a confirmed receipt or error.",
+                    "Allows terms bundled with marketing; excludes separate marketing opt-ins and account submission. "
+                    "Returns a confirmed receipt or error.",
      "inputSchema": {"type": "object", "properties": {**COMMON,
-         "label": {"type": "string", "description": "Exact visible accessible label of the authorized terms checkbox."}},
-                     "required": ["site", "request_id", "label"], "additionalProperties": False},
+         "label": {"type": "string", "description": "Optional wording or intent hint for the agreement; an exact label is not required."}},
+                     "required": ["site", "request_id"], "additionalProperties": False},
      "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}},
 ]
 

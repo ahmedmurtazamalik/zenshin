@@ -1,8 +1,8 @@
 # Codex Approval Helper continuation context
 
-## Current scope — 15 October 2026
+## Current scope — 22 October 2026
 
-The global Chrome-preparation hooks and toggle remain retired. Direct single-action MCP tools now delegate password selection or an exactly named terms box to the running Zenshin app and return receipts in the calling turn. The refusal-wording detector and browser continuation replies have been removed. Original Windows/Linux Codex approval/form features remain; Chrome actions require Windows. Use PLAN.md and README.md for current scope and limits. The dated handoff notes below are historical.
+The global Chrome-preparation hooks and toggle remain retired. Direct single-action MCP tools delegate password selection or a terms box to the running Zenshin app and return receipts in the calling turn. As of 22 October, the existing Codex classifier selects fields and agreement boxes by meaning and nearby static text; the terms label is an optional hint. Terms bundled with marketing are allowed; separate marketing boxes remain excluded. The refusal-wording detector and browser continuation replies have been removed. Original Windows/Linux Codex approval/form features remain; Chrome actions require Windows. Use PLAN.md and README.md for current scope and limits. The dated handoff notes below are historical.
 
 Handoff saved on 12 October 2026, using the user's Asia/Karachi date. Read AGENTS.md and PLAN.md before continuing.
 

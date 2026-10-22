@@ -13,6 +13,9 @@ def node(role, name="", children=()):
     control = Mock()
     control.ControlTypeName, control.Name = role, name
     control.IsEnabled, control.IsOffscreen = True, False
+    control.HelpText, control.AutomationId = "", ""
+    control.HasKeyboardFocus, control.IsPassword = False, False
+    control.GetParentControl.return_value = None
     control.GetChildren.return_value = list(children)
     for child in children:
         child.GetParentControl.return_value = control
@@ -95,6 +98,11 @@ class AutomationLifetimeTests(unittest.TestCase):
 
 
 class ChromeServerTests(unittest.TestCase):
+    def setUp(self):
+        selection = patch.object(ui.ai_decision, "select_browser_control", return_value=0)
+        self.select = selection.start()
+        self.addCleanup(selection.stop)
+
     @unittest.skipUnless(sys.platform == "win32", "Windows-only action")
 
     def chrome_form(self, address="https://jobs.example.com/register"):
@@ -106,7 +114,7 @@ class ChromeServerTests(unittest.TestCase):
         webpage = node("DocumentControl", children=[node("ButtonControl", "Use strong password")])
         webpage.GetPattern.return_value.Value = address
         password = node("EditControl", "New password")
-        password.IsPassword = True
+        password.IsPassword, password.HasKeyboardFocus = True, True
         password.GetPattern.return_value.DocumentRange.textRange.CompareEndpoints.return_value = -1
         password.GetPattern.return_value.DocumentRange.textRange.Clone.return_value.CompareEndpoints.return_value = -1
         webpage.GetChildren.return_value.append(password)
@@ -182,11 +190,13 @@ class ChromeServerTests(unittest.TestCase):
             window.GetChildren.return_value = [address_bar, webpage]
         suggestion.GetPattern.return_value.Invoke.side_effect = invoke
         with patch.object(ui, "automation", return_value=api), \
-             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"):
-            ui.open_chrome_password_suggestion("https://jobs.example.com/register")
-            result = ui.accept_chrome_password("https://jobs.example.com/register")
+             patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"), \
+             patch.object(ui, "prepare_chrome_site"):
+            selected = ui.open_chrome_password_suggestion("https://jobs.example.com/register")
+            result = ui.accept_chrome_password("https://jobs.example.com/register", selected)
         self.assertIn("remained filled", result["message"])
         self.assertNotIn("disposable-secret", str(result))
+        self.assertNotIn("disposable-secret", str(self.select.call_args_list))
         suggestion.GetPattern.return_value.Invoke.assert_called_once()
         field = webpage.GetChildren.return_value[-1]
         field.GetPattern.assert_called_with(api.PatternId.TextPattern)
@@ -238,20 +248,21 @@ class ChromeServerTests(unittest.TestCase):
         with patch.object(ui, "automation", return_value=api), \
              patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"), \
              patch.object(ui, "prepare_chrome_site"):
-            ui.open_chrome_password_suggestion("https://jobs.example.com/register")
-            ui.accept_chrome_password("https://jobs.example.com/register")
+            selected = ui.open_chrome_password_suggestion("https://jobs.example.com/register")
+            ui.accept_chrome_password("https://jobs.example.com/register", selected)
         field.SetFocus.assert_called_once()
         field.Element.QueryInterface.return_value.ShowContextMenu.assert_called_once()
         command.GetPattern.return_value.Invoke.assert_called_once()
         suggestion.GetPattern.return_value.Invoke.assert_called_once()
         field.GetPattern.assert_called_with(api.PatternId.TextPattern)
-        confirmation.GetPattern.assert_called_with(api.PatternId.TextPattern)
+        confirmation.GetPattern.assert_not_called()
         confirmation.SetFocus.assert_not_called()
 
     def test_password_preparation_leaves_ambiguous_fields_untouched(self):
         api, window, address_bar, webpage, _ = self.chrome_form()
         first, second = node("EditControl", "Password"), node("EditControl", "New password")
         first.IsPassword = second.IsPassword = True
+        self.select.return_value = None
         webpage.GetChildren.return_value = [first, second]
         window.GetChildren.return_value = [address_bar, webpage]
         with patch.object(ui, "automation", return_value=api), \
@@ -335,12 +346,105 @@ class ChromeServerTests(unittest.TestCase):
         with patch.object(ui, "automation", return_value=api), \
              patch.object(ui, "process_path", return_value=r"C:\Chrome\chrome.exe"):
             request = ui.chrome_signup_request("https://jobs.example.com", terms=True)
-            self.assertEqual(request, {"kind": "terms", "label": terms.Name})
+            self.assertEqual(request["label"], terms.Name)
+            self.assertIs(request["control"], terms)
             ui.perform_chrome_signup_request("https://jobs.example.com", request)
+            self.select.return_value = None
             self.assertIsNone(ui.chrome_signup_request("https://jobs.example.com", terms=True))
             self.assertIsNone(ui.chrome_signup_request("https://unrelated.example.com", terms=True))
         toggle.Toggle.assert_called_once()
         marketing.GetPattern.return_value.Toggle.assert_not_called()
+
+    def test_terms_accepts_paraphrased_hint_and_bundled_marketing_using_nearby_text(self):
+        api, window, address_bar, webpage, _ = self.chrome_form()
+        window.GetChildren.return_value = [address_bar, webpage]
+        agreement = node("CheckBoxControl")
+        separate = node("CheckBoxControl", "Send me offers")
+        row = node("GroupControl", children=[agreement, node("TextControl",
+            "By joining, I acknowledge the User Agreement and consent to product emails.")])
+        webpage.GetChildren.return_value = [row, separate]
+        for control in (agreement, separate):
+            control.GetPattern.return_value.ToggleState = 0
+        toggle = agreement.GetPattern.return_value
+        toggle.Toggle.side_effect = lambda: setattr(toggle, "ToggleState", 1)
+        with patch.object(ui, "automation", return_value=api):
+            request = ui.chrome_signup_request("https://jobs.example.com", terms=True, label="Accept signup agreement")
+            candidates = self.select.call_args.args[1]
+            self.assertIn("User Agreement", candidates[0]["nearby_text"])
+            self.assertEqual(self.select.call_args.kwargs["hint"], "Accept signup agreement")
+            ui.perform_chrome_signup_request("https://jobs.example.com", request)
+        self.select.assert_called_once()
+        toggle.Toggle.assert_called_once()
+        separate.GetPattern.return_value.Toggle.assert_not_called()
+
+    def test_terms_rechecks_control_identity_and_wording_after_analysis(self):
+        api, window, address_bar, webpage, _ = self.chrome_form()
+        window.GetChildren.return_value = [address_bar, webpage]
+        agreement = node("CheckBoxControl", "Our user agreement applies")
+        agreement.GetPattern.return_value.ToggleState = 0
+        webpage.GetChildren.return_value = [agreement]
+        with patch.object(ui, "automation", return_value=api):
+            request = ui.chrome_signup_request("https://jobs.example.com", terms=True)
+            agreement.Name = "Receive promotional messages"
+            with self.assertRaisesRegex(RuntimeError, "changed"):
+                ui.perform_chrome_signup_request("https://jobs.example.com", request)
+            replacement = node("CheckBoxControl", request["label"])
+            webpage.GetChildren.return_value = [replacement]
+            with self.assertRaisesRegex(RuntimeError, "changed"):
+                ui.perform_chrome_signup_request("https://jobs.example.com", request)
+        agreement.GetPattern.return_value.Toggle.assert_not_called()
+        replacement.GetPattern.return_value.Toggle.assert_not_called()
+
+    def test_password_uses_semantic_field_selection_and_ignores_unrelated_empty_fields(self):
+        api, window, address_bar, webpage, suggestion = self.chrome_form()
+        current = node("EditControl", "Mot de passe actuel")
+        new = node("EditControl", "Choisissez votre secret")
+        confirmation = node("EditControl", "Saisissez-le de nouveau")
+        for control in (current, new, confirmation):
+            control.IsPassword = True
+        new.HasKeyboardFocus = True
+        new.GetPattern.return_value.DocumentRange.textRange.Clone.return_value.CompareEndpoints.return_value = -1
+        webpage.GetChildren.return_value = [current, new, confirmation]
+        self.select.return_value = 1
+        suggestion.GetPattern.return_value.Invoke.side_effect = lambda: setattr(
+            window.GetChildren, "return_value", [address_bar, webpage])
+        with patch.object(ui, "automation", return_value=api), patch.object(ui.time, "sleep"), \
+             patch.object(ui, "prepare_chrome_site"):
+            field = ui.open_chrome_password_suggestion("https://jobs.example.com/register")
+            self.assertIs(field["control"], new)
+            result = ui.accept_chrome_password("https://jobs.example.com/register", field)
+        self.assertIn("remained filled", result["message"])
+        self.select.assert_called_once()
+        new.SetFocus.assert_called_once()
+        current.GetPattern.assert_not_called()
+        confirmation.GetPattern.assert_not_called()
+        new.GetPattern.assert_called_with(api.PatternId.TextPattern)
+        new.GetPattern.return_value.DocumentRange.GetText.assert_not_called()
+
+    def test_password_rechecks_selected_field_wording_before_accepting(self):
+        api, window, _, webpage, suggestion = self.chrome_form()
+        field = webpage.GetChildren.return_value[-1]
+        with patch.object(ui, "automation", return_value=api), patch.object(ui, "prepare_chrome_site"):
+            selected = ui.open_chrome_password_suggestion("https://jobs.example.com/register")
+            field.Name = "Current password"
+            with self.assertRaisesRegex(RuntimeError, "password field changed"):
+                ui.accept_chrome_password("https://jobs.example.com/register", selected)
+        suggestion.GetPattern.return_value.Invoke.assert_not_called()
+
+    def test_password_focus_replaces_popup_for_another_field_before_accepting(self):
+        api, window, address_bar, webpage, previous = self.chrome_form()
+        field = webpage.GetChildren.return_value[-1]
+        current = node("MenuItemControl", "Use strong password replacement-secret")
+        field.SetFocus.side_effect = lambda: setattr(window.GetChildren, "return_value", [address_bar, webpage, current]) or True
+        current.GetPattern.return_value.Invoke.side_effect = lambda: setattr(
+            window.GetChildren, "return_value", [address_bar, webpage])
+        with patch.object(ui, "automation", return_value=api), patch.object(ui.time, "sleep"), \
+             patch.object(ui, "prepare_chrome_site"):
+            selected = ui.open_chrome_password_suggestion("https://jobs.example.com/register")
+            ui.accept_chrome_password("https://jobs.example.com/register", selected)
+        field.SetFocus.assert_called_once()
+        previous.GetPattern.return_value.Invoke.assert_not_called()
+        current.GetPattern.return_value.Invoke.assert_called_once()
 
     def test_ordinary_reply_confirms_echo_after_invoke_event_error_without_retry(self):
         class EventError(Exception):

@@ -502,8 +502,8 @@ def browser_action(app, data):
     site, request_id, label = data.get("site"), data.get("request_id"), data.get("label", "")
     if not all(isinstance(value, str) and value.strip() for value in (site, request_id)):
         raise ValueError("A site URL and stable request_id are required")
-    if not isinstance(label, str) or (action == "terms" and not label.strip()):
-        raise ValueError("Terms actions require the exact checkbox label")
+    if not isinstance(label, str):
+        raise ValueError("The checkbox label hint must be text")
     import windows_ui
     origin = windows_ui.site_origin(site)
     key = "browser:" + request_id
@@ -515,7 +515,7 @@ def browser_action(app, data):
         if prior["status"] == "sent":
             return {**prior["result"], "replayed": True}
         raise RuntimeError("This action was already attempted without confirmation; duplicate action skipped")
-    description = "Select Chrome's suggested password" if action == "password" else "Check terms: " + label
+    description = "Select Chrome's suggested password" if action == "password" else "Check terms: " + (label or "agreement checkbox")
     attempt = {"kind": "browser_action", "thread_id": "", "name": "Chrome",
                "request": identity, "text": description + " on " + origin,
                "time": int(time.time()), "status": "sending"}
@@ -525,16 +525,25 @@ def browser_action(app, data):
         def perform():
             set_progress(app, "opening", "Chrome", "Checking the requested Chrome page.")
             windows_ui.prepare_chrome_site(site, open_site=False)
+            field = None
             if action == "password":
-                set_progress(app, "inspecting", "Chrome", "Opening Chrome's native password suggestion.")
-                windows_ui.open_chrome_password_suggestion(site)
+                set_progress(app, "inspecting", "Chrome", "Identifying the new-password field and opening Chrome's native suggestion.")
+                field = windows_ui.open_chrome_password_suggestion(site)
+            else:
+                set_progress(app, "inspecting", "Chrome", "Identifying the agreement checkbox from its meaning and nearby text.")
             request = windows_ui.chrome_signup_request(origin, password=action == "password",
                                                        terms=action == "terms", label=label or None)
             if not request:
                 raise RuntimeError("The requested native password suggestion or unchecked terms box is not available")
+            if field is not None:
+                request["field"] = field
             set_progress(app, "confirming", "Chrome", "Selecting and verifying the authorized Chrome action.")
             windows_ui.perform_chrome_signup_request(origin, request)
-        windows_ui.run(perform)
+            return request["label"] or request.get("description", {}).get("nearby_text") or "agreement checkbox"
+        selected_label = windows_ui.run(perform)
+        if action == "terms":
+            description = "Check terms: " + selected_label
+            attempt["text"] = description + " on " + origin
         result = {"request_id": request_id, "action": action, "site": origin, "confirmed": True,
                   "message": description + " confirmed. Continue the current task using your normal tools."}
         attempt.update(status="sent", result=result)

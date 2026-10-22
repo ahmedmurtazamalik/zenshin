@@ -94,9 +94,11 @@ class BrowserActionTests(unittest.TestCase):
         self.assertTrue(receipt["confirmed"])
         self.assertEqual(ui.perform_chrome_signup_request.call_count, 2)
 
-    def test_missing_or_unmatched_terms_label_never_activates_a_control(self):
-        with self.assertRaisesRegex(ValueError, "exact checkbox label"):
-            app.browser_action(self.monitor, {**self.request, "action": "terms"})
+    def test_terms_label_is_optional_but_missing_agreement_never_activates_a_control(self):
+        receipt = app.browser_action(self.monitor, {**self.request, "action": "terms", "request_id": "no-label"})
+        self.assertTrue(receipt["confirmed"])
+        ui.chrome_signup_request.assert_called_with("https://jobs.example.com", password=False, terms=True, label=None)
+        ui.perform_chrome_signup_request.reset_mock()
         ui.chrome_signup_request.return_value = None
         ui.chrome_signup_request.side_effect = None
         with self.assertRaisesRegex(RuntimeError, "not available"):
@@ -165,11 +167,11 @@ class BrowserActionTests(unittest.TestCase):
                 for identity in (3, 4):
                     self.assertFalse(replies[identity]["isError"])
                     self.assertTrue(replies[identity]["structuredContent"]["confirmed"])
-                self.assertTrue(replies[5]["isError"])
+                self.assertFalse(replies[5]["isError"])
                 self.assertTrue(replies[6]["isError"])
                 self.assertIn("do not retry", replies[6]["content"][0]["text"])
-                self.assertEqual(ui.perform_chrome_signup_request.call_count, 2)
-                self.assertEqual(len(app.load_state(self.path)["attempts"]), 3)
+                self.assertEqual(ui.perform_chrome_signup_request.call_count, 3)
+                self.assertEqual(len(app.load_state(self.path)["attempts"]), 4)
                 # A client can time out after the native action has completed.
                 end_headers = app.BaseHTTPRequestHandler.end_headers
                 def disconnected_headers(handler):
