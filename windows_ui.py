@@ -313,7 +313,7 @@ def chrome_control_description(control):
     def text_nodes(root):
         if root.ControlTypeName == "EditControl":
             return
-        if root.ControlTypeName in {"TextControl", "HyperlinkControl"} and not root.IsOffscreen:
+        if root.ControlTypeName in {"TextControl", "HyperlinkControl"}:
             yield root.Name
         for child in root.GetChildren():
             yield from text_nodes(child)
@@ -350,6 +350,20 @@ def chrome_new_password_field(browser, origin):
     return {"control": field, "description": descriptions[selected]}
 
 
+def focus_chrome_password_field(browser, field):
+    # DOM focus can move while Chrome is in the background. Confirm Windows
+    # keyboard focus after activating Chrome, allowing its UIA event to arrive.
+    browser.SetActive(waitTime=.1)
+    field.SetFocus()
+    if field.HasKeyboardFocus:
+        return
+    deadline = time.monotonic() + 2
+    while not field.HasKeyboardFocus:
+        if time.monotonic() >= deadline:
+            raise RuntimeError("Chrome did not focus the new-password field")
+        time.sleep(.1)
+
+
 def open_chrome_password_suggestion(address):
     origin = site_origin(address)
     browser, suggestion = chrome_password_suggestion(origin)
@@ -367,8 +381,7 @@ def open_chrome_password_suggestion(address):
             or not field.IsEnabled or field.IsOffscreen
             or chrome_control_description(field) != selection["description"]):
         raise RuntimeError("Chrome's password field changed; nothing was selected")
-    if not field.SetFocus() or not field.HasKeyboardFocus:
-        raise RuntimeError("Chrome did not focus the new-password field")
+    focus_chrome_password_field(browser, field)
     if chrome_password_suggestion(origin)[1] is not None:
         return selection
     # Invoke Chrome's native context menu, without keyboard or coordinate input.
@@ -422,8 +435,7 @@ def accept_chrome_password(address, selection=None):
             if selection is None:
                 selection = chrome_new_password_field(browser, origin)
                 field = selection["control"]
-                if not field.SetFocus() or not field.HasKeyboardFocus:
-                    raise RuntimeError("Chrome did not focus the new-password field")
+                focus_chrome_password_field(browser, field)
             field = selection["control"]
             # Re-read the site and native popup immediately before activation.
             current_browser, current = chrome_password_suggestion(origin)
@@ -461,7 +473,7 @@ def chrome_signup_request(origin, password=False, terms=False, label=None):
         return None
     api = automation()
     controls = [control for control in chrome_page_controls(browser, origin)
-                if control.ControlTypeName == "CheckBoxControl" and not control.IsOffscreen and control.IsEnabled
+                if control.ControlTypeName == "CheckBoxControl" and control.IsEnabled
                 and (toggle := control.GetPattern(api.PatternId.TogglePattern)) and toggle.ToggleState == 0]
     if not controls:
         return None
@@ -479,13 +491,27 @@ def perform_chrome_signup_request(origin, request):
     browser, _ = chrome_password_suggestion(origin)
     controls = [control for control in chrome_page_controls(browser, origin) if control.ControlTypeName == "CheckBoxControl"
                 and automation().ControlsAreSame(control, request["control"])
-                and not control.IsOffscreen and control.IsEnabled]
+                and control.IsEnabled]
     if len(controls) != 1:
         raise RuntimeError("The terms checkbox changed or is ambiguous; inspect Chrome manually")
     toggle = controls[0].GetPattern(automation().PatternId.TogglePattern)
     if (not toggle or toggle.ToggleState != 0
             or chrome_control_description(controls[0]) != request["description"]):
         raise RuntimeError("The terms checkbox changed; nothing was selected")
+    if controls[0].IsOffscreen:
+        scroll = controls[0].GetPattern(automation().PatternId.ScrollItemPattern)
+        if not scroll:
+            raise RuntimeError("The terms checkbox is offscreen and cannot be scrolled into view")
+        scroll.ScrollIntoView()
+        current_browser, _ = chrome_password_suggestion(origin)
+        if (current_browser is None or not automation().ControlsAreSame(browser, current_browser)
+                or not any(automation().ControlsAreSame(control, controls[0])
+                           for control in chrome_page_controls(current_browser, origin))
+                or not controls[0].IsEnabled or toggle.ToggleState != 0
+                or chrome_control_description(controls[0]) != request["description"]):
+            raise RuntimeError("The terms checkbox changed after scrolling; nothing was selected")
+        if controls[0].IsOffscreen:
+            raise RuntimeError("The terms checkbox remained offscreen; nothing was selected")
     toggle.Toggle()
     deadline = time.monotonic() + 3
     while time.monotonic() < deadline:

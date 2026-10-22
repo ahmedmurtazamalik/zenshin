@@ -3,7 +3,7 @@ import sys
 import tempfile
 import threading
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, PropertyMock, patch
 
 import app
 import windows_ui as ui
@@ -271,6 +271,56 @@ class ChromeServerTests(unittest.TestCase):
                 ui.open_chrome_password_suggestion("https://jobs.example.com/register")
         first.SetFocus.assert_not_called()
         second.SetFocus.assert_not_called()
+
+    def test_password_waits_for_native_focus_before_opening_suggestion(self):
+        from itertools import count
+        for focused in (True, False):
+            with self.subTest(focused=focused):
+                api, window, _, webpage, _ = self.chrome_form()
+                field = webpage.GetChildren.return_value[-1]
+                field.SetFocus.return_value = False
+                focus = PropertyMock(side_effect=[False, focused, focused]) if focused else PropertyMock(return_value=False)
+                with patch.object(type(field), "HasKeyboardFocus", focus, create=True), \
+                     patch.object(ui, "automation", return_value=api), \
+                     patch.object(ui, "prepare_chrome_site"), \
+                     patch.object(ui.time, "monotonic", side_effect=count()), patch.object(ui.time, "sleep"):
+                    if focused:
+                        self.assertIs(ui.open_chrome_password_suggestion("https://jobs.example.com/register")["control"], field)
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, "did not focus"):
+                            ui.open_chrome_password_suggestion("https://jobs.example.com/register")
+                        field.Element.QueryInterface.assert_not_called()
+                window.SetActive.assert_called_once()
+                field.SetFocus.assert_called_once()
+
+    def test_terms_scrolls_selected_agreement_and_preserves_offscreen_label_context(self):
+        for revealed in (True, False):
+            with self.subTest(revealed=revealed):
+                api, window, address_bar, webpage, _ = self.chrome_form()
+                window.GetChildren.return_value = [address_bar, webpage]
+                agreement = node("CheckBoxControl")
+                label = node("TextControl", "I accept the service agreement")
+                agreement.IsOffscreen = label.IsOffscreen = True
+                marketing = node("CheckBoxControl", "Send offers")
+                toggle, scroll = Mock(ToggleState=0), Mock()
+                agreement.GetPattern.side_effect = lambda pattern: scroll if pattern == api.PatternId.ScrollItemPattern else toggle
+                scroll.ScrollIntoView.side_effect = lambda: setattr(agreement, "IsOffscreen", not revealed)
+                toggle.Toggle.side_effect = lambda: setattr(toggle, "ToggleState", 1)
+                marketing.GetPattern.return_value.ToggleState = 0
+                webpage.GetChildren.return_value = [node("GroupControl", children=[agreement, label]), marketing]
+                with patch.object(ui, "automation", return_value=api), patch.object(ui.time, "sleep"):
+                    request = ui.chrome_signup_request("https://jobs.example.com", terms=True)
+                    self.assertIsNotNone(request)
+                    self.assertIn(label.Name, self.select.call_args.args[1][0]["nearby_text"])
+                    if revealed:
+                        ui.perform_chrome_signup_request("https://jobs.example.com", request)
+                        toggle.Toggle.assert_called_once()
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, "offscreen"):
+                            ui.perform_chrome_signup_request("https://jobs.example.com", request)
+                        toggle.Toggle.assert_not_called()
+                scroll.ScrollIntoView.assert_called_once()
+                marketing.GetPattern.return_value.Toggle.assert_not_called()
 
     def test_chrome_wrong_site_or_webpage_lookalike_is_never_activated(self):
         api, window, address_bar, webpage, suggestion = self.chrome_form()

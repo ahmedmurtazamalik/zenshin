@@ -1,3 +1,11 @@
+# Zenshin v0.2.15 — Reliable Chrome focus and offscreen agreements
+
+- Activate the matched Chrome window and wait briefly for Windows keyboard focus before opening the generated-password suggestion. Public forms no longer fail merely because focus has not updated immediately.
+- Identify agreement checkboxes below the viewport using their labels and nearby text, scroll the selected checkbox into view, and recheck it before ticking. Separate marketing opt-ins remain untouched; bundled terms and marketing consent are supported.
+- Preserve settings, Chrome action switches, and the permanent attempt journal during upgrade.
+
+Verification: 83 behavior tests passed. Five native Chrome actions passed on four public sites: password filling on Overleaf and LOA Portal (including confirmation), offscreen terms on OpusGo and LOA Portal, and bundled email/WhatsApp/SMS consent with terms on PrivateCircle. Separate marketing boxes stayed unchecked. No accounts were submitted and no password values were read. Monitoring was paused after testing.
+
 # Zenshin v0.2.14 — Understand real signup forms
 
 - Identify new-password fields and agreement checkboxes by meaning and nearby text through the existing Codex classifier, instead of requiring exact wording. The terms tool's label is now an optional hint.
