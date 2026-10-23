@@ -51,7 +51,7 @@ def check_window_icons(window, icon_path):
 
 def finish_interactive_update(process):
     deadline = time.monotonic() + 60
-    setup = ui.WindowControl(Name="Setup - Zenshin", searchDepth=1)
+    setup = ui.WindowControl(ClassName="TWizardForm", searchDepth=1)
     last_controls = []
     while time.monotonic() < deadline:
         assert process.poll() is None, "Installer exited before its Finish page was checked"
@@ -78,7 +78,8 @@ def finish_interactive_update(process):
                 buttons[name].GetInvokePattern().Invoke()
                 break
         time.sleep(.2)
-    raise RuntimeError(f"Interactive installer did not reach Finish within 60 seconds: {last_controls}")
+    windows = [(control.Name, control.ClassName) for control in ui.GetRootControl().GetChildren()]
+    raise RuntimeError(f"Interactive installer did not reach Finish within 60 seconds: {last_controls}; windows: {windows}")
 
 
 def check(executable, installer=None, interactive=False):
