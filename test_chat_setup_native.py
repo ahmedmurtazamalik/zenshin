@@ -75,7 +75,8 @@ class ChatSetupNativeTests(unittest.TestCase):
                     progress = Mock()
                     with self.native(ui, api, doc):
                         self.assertTrue(ui.chat_setup_ready("Selected chat", latest))
-                        ui.send_chat_setup("Selected chat", latest, "Use Zenshin for enabled Chrome actions.", progress)
+                        self.assertTrue(ui.send_chat_setup("Selected chat", latest,
+                                                           "Use Zenshin for enabled Chrome actions.", progress))
                     self.assertEqual(state["writes"], ["Use Zenshin for enabled Chrome actions."])
                     self.assertEqual(state["sends"], 1)
                     self.assertEqual(value.Value, "")
@@ -92,11 +93,24 @@ class ChatSetupNativeTests(unittest.TestCase):
                     latest = "Different message" if blocked == "missing latest" else "Latest user message"
                     with self.native(ui, api, doc):
                         self.assertFalse(ui.chat_setup_ready("Selected chat", latest))
-                        with self.assertRaises(RuntimeError):
-                            ui.send_chat_setup("Selected chat", latest, "Setup prompt")
+                        self.assertFalse(ui.send_chat_setup("Selected chat", latest, "Setup prompt"))
                     self.assertEqual(state["writes"], [])
                     self.assertEqual(state["sends"], 0)
                     self.assertEqual(value.Value, draft)
+
+    def test_setup_defers_if_a_draft_appears_after_readiness_check(self):
+        for ui in (windows_ui, linux_ui):
+            with self.subTest(platform=ui.__name__):
+                api, value, doc, state = chat("Latest user message")
+                with self.native(ui, api, doc):
+                    self.assertTrue(ui.chat_setup_ready("Selected chat", "Latest user message"))
+                    value.Value = "My unfinished message"
+                    self.assertFalse(ui.send_chat_setup("Selected chat", "Latest user message", "Setup prompt"))
+                    with self.assertRaisesRegex(RuntimeError, "contains a draft"):
+                        ui.reply("Selected chat", "Latest user message", "Ordinary reply")
+                self.assertEqual(state["writes"], [])
+                self.assertEqual(state["sends"], 0)
+                self.assertEqual(value.Value, "My unfinished message")
 
     def test_setup_rechecks_idle_state_before_send(self):
         for ui in (windows_ui, linux_ui):

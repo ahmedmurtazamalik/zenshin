@@ -500,7 +500,13 @@ def send_chrome_setup(app, ui, target, thread):
     actions = {key: bool(state.get(key)) for key in ("auto_password", "auto_terms", "auto_captcha")}
     setups = state.setdefault("chrome_setups", {})
     previous = setups.get(target["id"])
-    if previous and previous["actions"] == actions:
+    prior_attempt = state["attempts"].get(f"chrome-setup:{target['id']}:{previous['revision']}", {}) if previous else {}
+    # v0.2.18 also marked this pre-write check as uncertain, despite doing no action.
+    pending = (prior_attempt.get("status") == "waiting" or
+               (prior_attempt.get("status") == "uncertain" and
+                prior_attempt.get("error") == "The composer contains a draft; reply manually"))
+    same_actions = previous and previous["actions"] == actions
+    if same_actions and not pending:
         return False
     turns = thread.get("turns", [])
     turn_id = turns[-1]["id"] if turns else None
@@ -519,6 +525,8 @@ def send_chrome_setup(app, ui, target, thread):
                      "Chrome setup is waiting for this chat to be idle with an empty composer.")
         return False
     revision = previous["revision"] + 1 if previous else 1
+    if same_actions and pending:
+        revision = previous["revision"]
     key = f"chrome-setup:{target['id']}:{revision}"
     response = zenshin_mcp.chrome_setup_prompt(state)
     attempt = {"kind": "chrome_setup", "thread_id": target["id"], "name": target["name"],
@@ -531,8 +539,8 @@ def send_chrome_setup(app, ui, target, thread):
     detail = "Sending Chrome-action setup."
     set_progress(app, "sending", target["name"], detail)
     try:
-        ui.send_chat_setup(target["name"], latest_text, response,
-                           on_progress=lambda stage: set_progress(app, stage, target["name"], detail))
+        delivered = ui.send_chat_setup(target["name"], latest_text, response,
+                                       on_progress=lambda stage: set_progress(app, stage, target["name"], detail))
     except Exception as error:
         try:
             confirmed = persisted_reply(app["connection"], target["id"],
@@ -544,6 +552,12 @@ def send_chrome_setup(app, ui, target, thread):
         else:
             attempt.update(status="uncertain", error=str(error))
     else:
+        if delivered is False:
+            attempt["status"] = "waiting"
+            set_progress(app, "setup_waiting", target["name"],
+                         "Chrome setup is waiting for this chat to be idle with an empty composer.")
+            save_state(app["path"], state)
+            return True
         attempt["status"] = "sent"
     set_progress(app, "done", target["name"], "Chrome-action setup delivered." if attempt["status"] == "sent"
                  else "Chrome setup delivery was not confirmed; duplicate send skipped. See Activity.")

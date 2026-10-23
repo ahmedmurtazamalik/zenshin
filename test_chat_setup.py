@@ -115,6 +115,38 @@ class ChatSetupTests(unittest.TestCase):
         self.poll()
         self.assertEqual(self.ui.send_chat_setup.call_count, 2)
 
+    def test_prewrite_deferral_retries_same_setup_after_restart_then_stops_after_success(self):
+        self.state["targets"] = self.state["targets"][:1]
+        self.ui.send_chat_setup.return_value = False
+        self.poll()
+        self.assertEqual(self.state["attempts"]["chrome-setup:first:1"]["status"], "waiting")
+        self.restart()
+        self.ui.send_chat_setup.return_value = True
+        self.poll()
+        self.assertEqual(self.ui.send_chat_setup.call_count, 2)
+        self.assertEqual(self.state["chrome_setups"]["first"]["revision"], 1)
+        self.assertEqual(len(self.state["attempts"]), 1)
+        self.assertEqual(self.state["attempts"]["chrome-setup:first:1"]["status"], "sent")
+        self.poll()
+        self.assertEqual(self.ui.send_chat_setup.call_count, 2)
+
+    def test_legacy_prewrite_draft_error_recovers_same_setup_revision(self):
+        self.state["targets"] = self.state["targets"][:1]
+        actions = {key: bool(self.state[key]) for key in ("auto_password", "auto_terms", "auto_captcha")}
+        self.state["chrome_setups"] = {"first": {"actions": actions, "revision": 1}}
+        self.state["attempts"]["chrome-setup:first:1"] = {
+            "kind": "chrome_setup", "thread_id": "first", "name": "First chat", "time": 1,
+            "text": "Set up Chrome actions", "response": zenshin_mcp.chrome_setup_prompt(self.state),
+            "status": "uncertain", "error": "The composer contains a draft; reply manually"}
+        app.save_state(self.path, self.state)
+        self.restart()
+        self.ui.send_chat_setup.return_value = True
+        self.poll()
+        self.assertEqual(self.ui.send_chat_setup.call_count, 1)
+        self.assertEqual(self.state["chrome_setups"]["first"]["revision"], 1)
+        self.assertEqual(len(self.state["attempts"]), 1)
+        self.assertEqual(self.state["attempts"]["chrome-setup:first:1"]["status"], "sent")
+
     def test_event_error_confirms_only_a_new_user_echo_even_in_initially_empty_chat(self):
         self.state["targets"] = self.state["targets"][:1]
 

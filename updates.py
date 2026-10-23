@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 from urllib.request import Request, urlopen
 
-VERSION = "0.2.18"
+VERSION = "0.2.19"
 REPOSITORY = "ahmedmurtazamalik/zenshin"
 RELEASES = f"https://github.com/{REPOSITORY}/releases/download/"
 

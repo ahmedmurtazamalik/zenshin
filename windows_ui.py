@@ -870,16 +870,20 @@ def reply(name, text, response, on_progress=None):
 
 
 def send_chat_setup(name, text, response, on_progress=None):
-    _send_reply(name, text, response, _chat_setup_pending, on_progress)
+    return _send_reply(name, text, response, _chat_setup_pending, on_progress, defer=True)
 
 
-def _send_reply(name, text, response, is_pending, on_progress):
+def _send_reply(name, text, response, is_pending, on_progress, defer=False):
     if not is_pending(name, text):
+        if defer:
+            return False
         raise RuntimeError("The chat is running or its latest message is not visible")
     doc = document(name)
     entries = matching(doc, "EditControl", "Work with Codex")
     if (len(entries) != 1 or not entries[0].IsEnabled or entries[0].IsOffscreen
             or entry_text(entries[0]).strip()):
+        if defer:
+            return False
         raise RuntimeError("The composer contains a draft; reply manually")
     prior = len(message_matches(doc, response))
     write_text(name, entries[0], response)
@@ -897,7 +901,7 @@ def _send_reply(name, text, response, is_pending, on_progress):
         if doc is None:
             break
         if len(message_matches(doc, response)) > prior:
-            return
+            return True
         time.sleep(.2)
     raise RuntimeError("Reply delivery was not confirmed; inspect the chat manually")
 
