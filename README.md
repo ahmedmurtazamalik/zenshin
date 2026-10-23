@@ -4,9 +4,9 @@
 
 Zenshin runs on your computer with a dedicated Windows desktop window (or a browser control page when running from source). You choose what it may do. For Chrome actions, Zenshin identifies controls by meaning, focuses the password field, opens and selects Chrome's generated-password suggestion, or checks the agreement box through Windows accessibility. Codex requests the action and receives a result. The Codex CLI may analyze supplied text or screenshots and return structured decisions; Zenshin captures screenshots and performs every click and text entry through its own native code. Zenshin never delegates computer interaction to ChatGPT/Codex Computer Use or browser-use tools.
 
-## Windows release v0.2.17
+## Windows release v0.2.18
 
-[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.17/Zenshin-Setup-0.2.17-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.17) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.17/SHA256SUMS.txt)
+[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.18/Zenshin-Setup-0.2.18-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.18) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.18/SHA256SUMS.txt)
 
 1. Run the installer. It installs for your Windows account without administrator access and adds a Start Menu shortcut. A desktop shortcut is optional.
 2. Launch **Zenshin** from the Start Menu. The controls open in a dedicated desktop window, without a browser tab or console. Close the window to stop Zenshin.
@@ -21,7 +21,7 @@ To get this updater from v0.2.5 or earlier, close Zenshin and run the v0.2.15 in
 
 When moving from a portable/source installation, stop it, copy its `.local` folder into the installed folder before launching, choose Connect Zenshin tools to replace the old registration. Do not run both installations together.
 
-The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.17/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
+The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.18/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
 
 This is an unsigned application; Windows may display a publisher warning. It bundles Python bytecode, which can still be extracted or reverse engineered. The repository and release downloads are public. Linux uses the source setup below.
 
@@ -179,6 +179,7 @@ On Windows, replace `python3` with `.\.venv\Scripts\python.exe` and use a Window
 
 ## Verified scope and limitations
 
+- For v0.2.18 on 23 October 2026, all 115 behavior tests passed in 4.1 seconds. A reproduced shutdown race could abort the update reconnect before reopening Codex when Windows briefly had no foreground window. The restart now tolerates that transition and reopens through the registered Windows launcher. Native-control tests verify the race, activation failures, and new-process confirmation; live quit/reopen still needs user verification.
 - For v0.2.16 on 23 October 2026, all 100 behavior tests passed in 4.4 seconds. Automatic selected-chat setup, settings updates, restart/reselection persistence, draft protection, and delivery confirmation were tested with simulated native controls. CAPTCHA behavior also has simulated-control tests; real public CAPTCHA solving and live delivery of the automatic setup message still need user verification.
 - For v0.2.15 on 22 October 2026, all 83 behavior tests passed in 3.9 seconds. Five native Chrome actions passed on four public sites: password filling on Overleaf and LOA Portal, offscreen terms on OpusGo and LOA Portal, and bundled terms plus email/WhatsApp/SMS consent on PrivateCircle. Separate marketing boxes stayed unchecked. No accounts were submitted or password values read. The live checks used the updated source through Zenshin MCP; release packaging has separate Windows smoke checks.
 - On 20 October 2026, all 72 Windows behavior tests passed in about 4 seconds. The v0.2.13 release workflow checks portable/installed-app startup, bundled assets, settings persistence, MCP discovery/transport, desktop-window rendering and normal close, update restart, old bridge process and pipe closure, fresh bridge startup, icons, reinstall, and uninstall. These packaging checks do not exercise live Codex or Chrome actions.
@@ -198,7 +199,7 @@ git clone https://github.com/ahmedmurtazamalik/zenshin.git
 cd zenshin
 ```
 
-The clone follows the current default branch. To inspect the released source instead, run `git checkout v0.2.17`.
+The clone follows the current default branch. To inspect the released source instead, run `git checkout v0.2.18`.
 
 Install the source prerequisites above, then run the existing behavior tests with `python3 -m unittest -q`, or `.\.venv\Scripts\python.exe -m unittest -q` on Windows. Tests using simulated desktop controls do not replace live UI verification. Read [AGENTS.md](AGENTS.md) before changing code.
 

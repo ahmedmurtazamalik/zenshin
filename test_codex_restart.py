@@ -1,7 +1,7 @@
 from contextlib import ExitStack
 from itertools import chain, count, repeat
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import windows_ui as ui
 
@@ -40,11 +40,12 @@ class CodexRestartTests(unittest.TestCase):
         events = []
         self.kernel.WaitForSingleObject.side_effect = lambda *_args: events.append("old exited") or 0
         with self.native(snapshots):
-            self.launch.side_effect = lambda *_args: events.append("launch")
+            self.open_app.side_effect = lambda *_args: events.append("launch")
             self.assertTrue(ui.restart_codex())
         self.assertEqual(events, ["old exited", "launch"])
         self.api.SendKeys.assert_called_once_with("{Ctrl}q", waitTime=.1)
-        self.launch.assert_called_once_with([self.path])
+        self.open_app.assert_called_once_with("codex://")
+        self.launch.assert_not_called()
         self.kernel.CloseHandle.assert_called_once()
 
     def test_only_owned_native_quit_confirmation_is_accepted_once(self):
@@ -72,6 +73,7 @@ class CodexRestartTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "no quit shortcut"):
                 ui.restart_codex()
         self.api.SendKeys.assert_not_called()
+        self.open_app.assert_not_called()
         self.launch.assert_not_called()
         self.kernel.CloseHandle.assert_called_once()
 
@@ -81,16 +83,25 @@ class CodexRestartTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "not forced closed or relaunched"):
                 ui.restart_codex()
         self.api.SendKeys.assert_called_once()
+        self.open_app.assert_not_called()
         self.launch.assert_not_called()
         self.kernel.TerminateProcess.assert_not_called()
         self.kernel.CloseHandle.assert_called_once()
 
+    def test_app_reopens_when_foreground_disappears_during_quit(self):
+        self.kernel.WaitForSingleObject.side_effect = [258, 0]
+        self.api.GetForegroundControl.side_effect = [self.old, None]
+        with self.native([[(self.old, self.path, 21)], [(self.new, self.path, 22)]]):
+            self.assertTrue(ui.restart_codex())
+        self.open_app.assert_called_once_with("codex://")
+        self.launch.assert_not_called()
+
     def test_background_app_is_restored_before_native_restart(self):
         with self.native([[], [(self.old, self.path, 21)], [(self.new, self.path, 22)]]):
             self.assertTrue(ui.restart_codex())
-        self.open_app.assert_called_once_with("codex://")
+        self.assertEqual(self.open_app.call_args_list, [call("codex://"), call("codex://")])
         self.api.SendKeys.assert_called_once_with("{Ctrl}q", waitTime=.1)
-        self.launch.assert_called_once_with([self.path])
+        self.launch.assert_not_called()
 
     def test_missing_protocol_handler_or_window_stops_without_quitting(self):
         for error in (OSError("No protocol handler"), None):
@@ -113,7 +124,16 @@ class CodexRestartTests(unittest.TestCase):
         with self.native(chain([old_window], repeat(old_window))):
             with self.assertRaisesRegex(RuntimeError, "new window was not confirmed"):
                 ui.restart_codex()
-        self.launch.assert_called_once_with([self.path])
+        self.open_app.assert_called_once_with("codex://")
+        self.launch.assert_not_called()
+
+    def test_failed_windows_activation_reports_that_codex_was_not_reopened(self):
+        with self.native([[(self.old, self.path, 21)]]):
+            self.open_app.side_effect = OSError("Activation failed")
+            with self.assertRaisesRegex(RuntimeError, "closed but Windows could not reopen"):
+                ui.restart_codex()
+        self.open_app.assert_called_once_with("codex://")
+        self.launch.assert_not_called()
 
 
 if __name__ == "__main__":

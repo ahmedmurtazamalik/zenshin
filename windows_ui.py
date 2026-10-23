@@ -164,7 +164,7 @@ def restart_codex():
             if status != 258:  # WAIT_TIMEOUT means the original process is alive.
                 raise RuntimeError("Could not confirm whether Codex exited")
             foreground = api.GetForegroundControl()
-            if not confirmed_quit and foreground.ClassName == "#32770":
+            if not confirmed_quit and foreground is not None and foreground.ClassName == "#32770":
                 dialogs = [candidate for candidate, candidate_path, candidate_id in codex_windows()
                            if candidate_id == identity and os.path.normcase(candidate_path) == os.path.normcase(path)
                            and api.ControlsAreSame(candidate, foreground)]
@@ -179,7 +179,10 @@ def restart_codex():
             raise RuntimeError("Codex did not quit within 30 seconds; it was not forced closed or relaunched")
     finally:
         kernel.CloseHandle(ctypes.c_void_p(handle))
-    subprocess.Popen([path])
+    try:
+        os.startfile("codex://")
+    except OSError as error:
+        raise RuntimeError("Codex closed but Windows could not reopen it: " + str(error)) from error
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         if any(candidate_id != identity and os.path.normcase(candidate_path) == os.path.normcase(path)
