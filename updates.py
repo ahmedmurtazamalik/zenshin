@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 from urllib.request import Request, urlopen
 
-VERSION = "0.2.16"
+VERSION = "0.2.17"
 REPOSITORY = "ahmedmurtazamalik/zenshin"
 RELEASES = f"https://github.com/{REPOSITORY}/releases/download/"
 
@@ -63,7 +63,14 @@ def download_installer(release, on_progress):
 
 def launch_installer(installer, install_root, port, state_path):
     # Inno Setup owns replacement and reopening; never uninstall or delete user data.
-    subprocess.Popen([str(installer), "/SILENT", "/SP-", "/NORESTART", "/CLOSEAPPLICATIONS",
+    subprocess.Popen([str(installer), "/SP-", "/NORESTART", "/CLOSEAPPLICATIONS",
                       "/FORCECLOSEAPPLICATIONS", "/UPDATE=1", f"/DIR={install_root}",
                       f"/PORT={port}", f"/STATE={state_path}"], close_fds=True,
                      env={**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"})
+
+
+def refresh_codex_mcp():
+    # This desktop has no external reload endpoint. A normal native quit and
+    # relaunch discards its old MCP connections and loads the repaired config.
+    import windows_ui
+    windows_ui.run(windows_ui.restart_codex)

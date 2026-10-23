@@ -75,6 +75,7 @@ def codex_setup(port, register=False):
             if result["registered"] else "An old or disabled Zenshin registration exists. Connect Zenshin tools to replace it."
             if result["conflict"] else "Not registered yet. Connect once to make the Chrome tools available to Codex.")
     except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
+        result["registered"] = False
         result["message"] = "Could not check or register Zenshin: " + str(error) + ". Use manual setup below."
     return result
 
@@ -683,11 +684,54 @@ def start_monitoring(app):
     app["running"] = True
 
 
+def install_update(app, release, port):
+    resume = {"connected": app["connection"] is not None, "running": app["running"]}
+    app["running"] = False
+    cancel_analysis(app)
+    set_progress(app, "updating", detail="Downloading the latest Windows installer.")
+    installer = updates.download_installer(release, lambda detail: set_progress(
+        app, "updating", detail=detail))
+    app["state"]["update_resume"] = resume
+    save_state(app["path"], app["state"])
+    try:
+        updates.launch_installer(installer, INSTALL_ROOT, port, app["path"].resolve())
+    except Exception:
+        app["state"].pop("update_resume")
+        save_state(app["path"], app["state"])
+        raise
+
+
+def restore_update(app, port):
+    resume = app["state"].pop("update_resume")
+    save_state(app["path"], app["state"])
+    app["running"] = False
+    result = codex_setup(port, register=True)
+    try:
+        if not result["registered"]:
+            raise RuntimeError(result["message"])
+        updates.refresh_codex_mcp()
+        if resume["connected"] or (resume["running"] and app["state"]["targets"]):
+            app["connection"] = connect()
+        if resume["running"]:
+            start_monitoring(app)
+        app["error"] = ""
+        result["message"] = ("Update complete. Codex connections refreshed automatically. "
+                             + ("Monitoring resumed." if app["running"] else "Monitoring remains paused."))
+    except Exception as error:
+        app["running"] = False
+        close_connection(app["connection"])
+        app["connection"] = None
+        app["error"] = "Update refresh failed: " + str(error)
+        result["message"] = app["error"]
+    return {**result, "state": snapshot(app)}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--state", type=Path, default=INSTALL_ROOT / ".local" / "state.json")
     parser.add_argument("--repair-registration", action="store_true", help="Replace old Zenshin tool registration after installation")
+    parser.add_argument("--finish-update", action="store_true", help="Reconnect Codex after the installer's Finish step")
     parser.add_argument("--mcp", action="store_true", help="Run the Codex tool bridge over stdio")
     parser.add_argument("--no-browser", action="store_true", help="Run the local server without the desktop window")
     args = parser.parse_args()
@@ -696,6 +740,11 @@ def main():
         return zenshin_mcp.serve(args.port)
     app = {"path": args.state, "state": load_state(args.state), "running": False,
            "connection": None, "error": ""}
+    if args.finish_update:
+        # Older installed versions do not save a handoff. Reconnect selected
+        # chats on that first upgrade, keeping their unknown prior run state paused.
+        app["state"].setdefault("update_resume", {
+            "connected": bool(app["state"]["targets"]), "running": False})
     operations = Lock()
     window = None
     repair_registration = args.repair_registration
@@ -763,6 +812,11 @@ def main():
                     raise ValueError("Invalid request size")
                 data = json.loads(self.rfile.read(size))
                 if self.path == "/api/codex-setup":
+                    if args.finish_update and "update_resume" in app["state"]:
+                        result = restore_update(app, args.port)
+                        if result["registered"]:
+                            repair_registration = False
+                        return self.reply(result)
                     result = codex_setup(args.port, register=repair_registration or data.get("register") is True)
                     if result["registered"]:
                         repair_registration = False
@@ -778,18 +832,13 @@ def main():
                     release = updates.latest_release()
                     if not release["available"]:
                         return self.reply({"message": "Zenshin is already up to date."})
-                    app["running"] = False
-                    cancel_analysis(app)
-                    set_progress(app, "updating", detail="Downloading the latest Windows installer.")
                     try:
-                        installer = updates.download_installer(release, lambda detail: set_progress(
-                            app, "updating", detail=detail))
-                        updates.launch_installer(installer, INSTALL_ROOT, args.port, args.state.resolve())
+                        install_update(app, release, args.port)
                     except (OSError, RuntimeError, ValueError, KeyError) as error:
                         app["error"] = str(error)
                         set_progress(app, "error", detail=str(error))
                         return self.reply(snapshot(app), 503)
-                    self.reply({"message": "Installing update. Zenshin will close and reopen automatically."})
+                    self.reply({"message": "Installing update. Use Finish update and reconnect Codex on the final installer page."})
                     window.destroy()
                     return
                 if self.path == "/api/check-connection":

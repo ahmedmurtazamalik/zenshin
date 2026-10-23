@@ -21,9 +21,14 @@ WebView2 Runtime first and keep Zenshin-bridge.exe beside Zenshin.exe.
 
 UPDATES
 In Connect to Codex, choose Check for updates, then Install update.
-Zenshin downloads and verifies the installer, pauses monitoring, upgrades
-in place, reopens, and replaces its old Codex tool registration automatically.
-Codex may need an MCP reload or restart to load the updated bridge.
+Zenshin downloads and verifies the installer and pauses monitoring. Leave
+Finish update and reconnect Codex (restarts Codex) selected on the final
+installer page. Finish reopens Zenshin, repairs its tools and guidance,
+restarts Codex, reconnects chat history, and restores monitoring if it was
+running. Running Codex work will be interrupted. No separate MCP reload is
+needed. Refresh failures remain visible and paused. The first upgrade from
+v0.2.16 or earlier stays paused because those versions did not record the
+previous monitoring state; later upgrades restore it automatically.
 No uninstall or terminal commands are needed. To upgrade from an older
 release without this button, close Zenshin and run the new installer once.
 Launch Zenshin from the installer to repair its registration.

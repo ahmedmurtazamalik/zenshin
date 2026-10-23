@@ -4,9 +4,9 @@
 
 Zenshin runs on your computer with a dedicated Windows desktop window (or a browser control page when running from source). You choose what it may do. For Chrome actions, Zenshin identifies controls by meaning, focuses the password field, opens and selects Chrome's generated-password suggestion, or checks the agreement box through Windows accessibility. Codex requests the action and receives a result. The Codex CLI may analyze supplied text or screenshots and return structured decisions; Zenshin captures screenshots and performs every click and text entry through its own native code. Zenshin never delegates computer interaction to ChatGPT/Codex Computer Use or browser-use tools.
 
-## Windows release v0.2.16
+## Windows release v0.2.17
 
-[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.16/Zenshin-Setup-0.2.16-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.16) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.16/SHA256SUMS.txt)
+[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.17/Zenshin-Setup-0.2.17-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.17) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.17/SHA256SUMS.txt)
 
 1. Run the installer. It installs for your Windows account without administrator access and adds a Start Menu shortcut. A desktop shortcut is optional.
 2. Launch **Zenshin** from the Start Menu. The controls open in a dedicated desktop window, without a browser tab or console. Close the window to stop Zenshin.
@@ -15,13 +15,13 @@ Zenshin runs on your computer with a dedicated Windows desktop window (or a brow
 
 Python and accessibility dependencies are bundled. The installer checks for Microsoft WebView2 Runtime and installs it if missing; internet access is needed for that step. Use Windows 10 or later on x64. Codex desktop is required for chat monitoring; the signed-in Codex CLI is required for the Codex connection and AI decisions. Chrome is required for Chrome actions. The installation includes a setup guide with prerequisite, migration, and uninstall instructions.
 
-The default installation is `%LOCALAPPDATA%\Programs\Zenshin`. Settings and the permanent attempt journal live in `.local/state.json` inside that folder. AI decisions and authorized replies are always enabled while monitoring runs. Upgrades preserve your instructions, action switches, and journal. Use **Check for updates → Install update** in Connect to Codex. Zenshin downloads and checksum-verifies the installer, pauses monitoring, upgrades in place, reopens, and replaces an old MCP registration automatically. No uninstall is needed. Codex may need an MCP reload or restart afterward. Updates and uninstall preserve `.local`; uninstall through **Windows Settings → Apps**. To remove the Codex tool registration, run `codex mcp remove zenshin`.
+The default installation is `%LOCALAPPDATA%\Programs\Zenshin`. Settings and the permanent attempt journal live in `.local/state.json` inside that folder. AI decisions and authorized replies are always enabled while monitoring runs. Upgrades preserve your instructions, action switches, and journal. Use **Check for updates → Install update** in Connect to Codex. Zenshin downloads and checksum-verifies the installer and pauses monitoring. Leave **Finish update and reconnect Codex (restarts Codex)** selected on the final installer page. Finish reopens Zenshin, repairs tool registration and guidance, quits and relaunches Codex to refresh its MCP connections, reconnects chat history, and restores monitoring if it was running. Running Codex work will be interrupted by the restart. No separate reconnect or MCP reload is needed. Updates and uninstall preserve `.local`; uninstall through **Windows Settings → Apps**. To remove the Codex tool registration, run `codex mcp remove zenshin`.
 
 To get this updater from v0.2.5 or earlier, close Zenshin and run the v0.2.15 installer once over the existing installation. Launch it from the installer to repair the old tool registration automatically. If updating manually later, re-run the installer; do not uninstall first.
 
 When moving from a portable/source installation, stop it, copy its `.local` folder into the installed folder before launching, choose Connect Zenshin tools to replace the old registration. Do not run both installations together.
 
-The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.16/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
+The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.17/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
 
 This is an unsigned application; Windows may display a publisher warning. It bundles Python bytecode, which can still be extracted or reverse engineered. The repository and release downloads are public. Linux uses the source setup below.
 
@@ -150,7 +150,7 @@ Activity is a history of Chrome-action setup messages, password selections, term
 
 Settings, the latest 100 activity entries, and the permanent attempt journal are stored in `.local/state.json` beside the executable (packaged app) or `app.py` (source mode), unless you supply `--state`. Keep this file private; it can contain chat titles, request text, replies, and standing instructions.
 
-Use **Check for updates → Install update** for an in-place update. Start monitoring again after Zenshin reopens.
+Use **Check for updates → Install update** for an in-place update, then the installer's **Finish update and reconnect Codex** option. Refresh failures stay visible and paused. The first upgrade from v0.2.16 or earlier reconnects selected chats but remains paused because those versions did not record the previous monitoring state; subsequent upgrades preserve it.
 
 - **Installer:** close the desktop window and run the new installer. It preserves `.local` and saved choices in the installation folder.
 - **Portable ZIP:** close the desktop window, extract the new ZIP into a writable folder, and copy `.local` from the old folder before launching.
@@ -198,7 +198,7 @@ git clone https://github.com/ahmedmurtazamalik/zenshin.git
 cd zenshin
 ```
 
-The clone follows the current default branch. To inspect the released source instead, run `git checkout v0.2.16`.
+The clone follows the current default branch. To inspect the released source instead, run `git checkout v0.2.17`.
 
 Install the source prerequisites above, then run the existing behavior tests with `python3 -m unittest -q`, or `.\.venv\Scripts\python.exe -m unittest -q` on Windows. Tests using simulated desktop controls do not replace live UI verification. Read [AGENTS.md](AGENTS.md) before changing code.
 

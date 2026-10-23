@@ -98,6 +98,18 @@ class CodexSetupTests(unittest.TestCase):
             self.assertIn("zenshin_mcp.py", result["command"])
             self.assertIn("8879", result["command"])
 
+    def test_failed_guidance_repair_is_not_reported_as_successful_registration(self):
+        import json
+        import sys
+        entry = {"name": "zenshin", "transport": {"command": sys.executable,
+                 "args": ["-B", str(app.ROOT / "zenshin_mcp.py")]}}
+        self.guidance.side_effect = OSError("Guidance file is not writable")
+        with patch.object(ai_decision, "cli_command", return_value=["codex"]), \
+             patch.object(app.subprocess, "run", return_value=Mock(returncode=0, stdout=json.dumps([entry]))):
+            result = app.codex_setup(8765, register=True)
+        self.assertFalse(result["registered"])
+        self.assertIn("Guidance file is not writable", result["message"])
+
 
 class StateTests(unittest.TestCase):
     def test_migrates_removed_modes_and_preserves_instructions_and_action_history(self):
@@ -114,6 +126,74 @@ class StateTests(unittest.TestCase):
             self.assertEqual(saved["instructions"], "Approve task-related requests.")
             self.assertEqual(saved["activity"], [{"status": "sent"}])
             self.assertEqual(saved["attempts"], {"browser:old": {"status": "sent"}})
+
+
+class UpdateRestoreTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.path = Path(directory.name) / "state.json"
+        state = app.load_state(self.path)
+        state.update(auto_password=True, targets=[{"id": "selected", "name": "Test chat"}])
+        self.monitor = {"path": self.path, "state": state, "running": True,
+                        "connection": object(), "error": ""}
+
+    def test_update_handoff_is_saved_before_launch_and_restores_in_order_once(self):
+        events = []
+        def launch(*_args):
+            self.assertFalse(self.monitor["running"])
+            saved = app.load_state(self.path)
+            self.assertEqual(saved["update_resume"], {"connected": True, "running": True})
+            events.append("launch")
+        with patch.object(app.updates, "download_installer", side_effect=lambda *_args: events.append("download") or Path("setup.exe")), \
+             patch.object(app.updates, "launch_installer", side_effect=launch):
+            app.install_update(self.monitor, {}, 8879)
+        self.monitor.update(state=app.load_state(self.path), connection=None, running=False)
+        connection = {"pending_read": None}
+        with patch.object(app, "codex_setup", side_effect=lambda *_args, **_kwargs: events.append("register") or {"registered": True}) as setup, \
+             patch.object(app.updates, "refresh_codex_mcp", side_effect=lambda: events.append("reload"), create=True), \
+             patch.object(app, "connect", side_effect=lambda: events.append("connect") or connection), \
+             patch.object(app, "verify_desktop_targets", side_effect=lambda *_args: events.append("verify")):
+            result = app.restore_update(self.monitor, 8879)
+        setup.assert_called_once_with(8879, register=True)
+        self.assertEqual(events, ["download", "launch", "register", "reload", "connect", "verify"])
+        self.assertTrue(result["state"]["running"])
+        self.assertTrue(result["state"]["connected"])
+        self.assertNotIn("update_resume", app.load_state(self.path))
+
+    def test_update_preserves_paused_monitoring_and_chrome_only_connection_state(self):
+        for connected, running in ((True, False), (False, True)):
+            with self.subTest(connected=connected, running=running):
+                self.monitor.update(running=False, connection=None)
+                self.monitor["state"].update(targets=[], update_resume={"connected": connected, "running": running})
+                with patch.object(app, "codex_setup", return_value={"registered": True}), \
+                     patch.object(app.updates, "refresh_codex_mcp", create=True), \
+                     patch.object(app, "connect", return_value={"pending_read": None}) as connect:
+                    result = app.restore_update(self.monitor, 8879)
+                self.assertEqual(result["state"]["running"], running)
+                self.assertEqual(result["state"]["connected"], connected)
+                self.assertEqual(connect.call_count, int(connected))
+
+    def test_failed_refresh_consumes_handoff_and_does_not_resume_or_reconnect(self):
+        self.monitor.update(running=False, connection=None)
+        self.monitor["state"]["update_resume"] = {"connected": True, "running": True}
+        with patch.object(app, "codex_setup", return_value={"registered": True}), \
+             patch.object(app.updates, "refresh_codex_mcp", side_effect=RuntimeError("Codex reload failed"), create=True), \
+             patch.object(app, "connect") as connect, patch.object(app, "start_monitoring") as start:
+            result = app.restore_update(self.monitor, 8879)
+        connect.assert_not_called()
+        start.assert_not_called()
+        self.assertFalse(result["state"]["running"])
+        self.assertIn("Codex reload failed", result["state"]["error"])
+        self.assertNotIn("update_resume", app.load_state(self.path))
+
+    def test_failed_installer_launch_removes_resume_handoff(self):
+        with patch.object(app.updates, "download_installer", return_value=Path("setup.exe")), \
+             patch.object(app.updates, "launch_installer", side_effect=OSError("Could not launch")):
+            with self.assertRaisesRegex(OSError, "Could not launch"):
+                app.install_update(self.monitor, {}, 8879)
+        self.assertFalse(self.monitor["running"])
+        self.assertNotIn("update_resume", app.load_state(self.path))
 
 
 class LatestMessageTests(unittest.TestCase):

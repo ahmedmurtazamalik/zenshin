@@ -64,6 +64,8 @@ try {
     if ((Get-Content "$installDir/.local/state.json" -Raw) -ne $state) { throw 'Reinstall changed saved settings' }
     python scripts/smoke_desktop.py "$installDir/Zenshin.exe" $installer
     if ($LASTEXITCODE -ne 0) { throw 'In-place update with loaded MCP bridge failed' }
+    python scripts/smoke_desktop.py "$installDir/Zenshin.exe" $installer --interactive
+    if ($LASTEXITCODE -ne 0) { throw 'Interactive update Finish and reconnect action failed' }
     Assert-ZenshinShortcut
     if ((Get-Content "$installDir/.local/state.json" -Raw) -ne $state) { throw 'Update changed saved settings' }
     $process = Start-Process "$installDir/unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru

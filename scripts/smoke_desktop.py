@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import re
 import socket
 import subprocess
 import sys
@@ -48,7 +49,39 @@ def check_window_icons(window, icon_path):
             source.Dispose()
 
 
-def check(executable, installer=None):
+def finish_interactive_update(process):
+    deadline = time.monotonic() + 60
+    setup = ui.WindowControl(Name="Setup - Zenshin", searchDepth=1)
+    last_controls = []
+    while time.monotonic() < deadline:
+        assert process.poll() is None, "Installer exited before its Finish page was checked"
+        if not setup.Exists(.2, .1):
+            time.sleep(.1)
+            continue
+        controls = [control for control, _ in ui.WalkControl(setup, maxDepth=10)
+                    if control.IsEnabled and not control.IsOffscreen]
+        last_controls = [(control.ControlTypeName, control.Name) for control in controls]
+        buttons = {re.sub(r"[&>\s]", "", control.Name).casefold(): control for control in controls
+                   if control.ControlTypeName == "ButtonControl"}
+        if "finish" in buttons:
+            choices = [control for control in controls
+                       if control.Name.replace("&", "").strip() == "Finish update and reconnect Codex (restarts Codex)"]
+            assert len(choices) == 1, f"Finish reconnect checkbox missing or ambiguous: {last_controls}"
+            toggle = choices[0].GetTogglePattern()
+            checked = toggle.ToggleState == 1 if toggle else bool(choices[0].GetLegacyIAccessiblePattern().State & 0x10)
+            assert checked, "Finish update and reconnect Codex must be selected by default"
+            buttons["finish"].GetInvokePattern().Invoke()
+            print("Installer Finish passed: reconnect Codex checkbox present and selected; Finish invoked.")
+            return
+        for name in ("next", "install"):
+            if name in buttons:
+                buttons[name].GetInvokePattern().Invoke()
+                break
+        time.sleep(.2)
+    raise RuntimeError(f"Interactive installer did not reach Finish within 60 seconds: {last_controls}")
+
+
+def check(executable, installer=None, interactive=False):
     with tempfile.TemporaryDirectory(prefix="zenshin desktop ") as directory:
         with socket.socket() as reservation:
             reservation.bind(("127.0.0.1", 0))
@@ -75,13 +108,17 @@ def check(executable, installer=None):
                                _PYI_APPLICATION_HOME_DIR=str(Path(directory) / "removed-parent-runtime"),
                                _PYI_PARENT_PROCESS_LEVEL="1")
             environment.pop("PYINSTALLER_RESET_ENVIRONMENT", None)
-            process = subprocess.Popen([str(installer), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/SP-",
-                                        "/NORESTART", "/CLOSEAPPLICATIONS", "/FORCECLOSEAPPLICATIONS",
-                                        "/UPDATE=1", f"/DIR={executable.parent}", f"/PORT={port}",
-                                        f"/STATE={state_path}"], env=environment)
+            arguments = [str(installer), "/SUPPRESSMSGBOXES", "/SP-", "/NORESTART",
+                         "/CLOSEAPPLICATIONS", "/FORCECLOSEAPPLICATIONS", "/UPDATE=1",
+                         f"/DIR={executable.parent}", f"/PORT={port}", f"/STATE={state_path}"]
+            if not interactive:
+                arguments.insert(1, "/VERYSILENT")
+            process = subprocess.Popen(arguments, env=environment)
         else:
             process = subprocess.Popen([str(executable), "--port", str(port), "--state", str(state_path)])
         try:
+            if installer and interactive:
+                finish_interactive_update(process)
             deadline = time.monotonic() + 45
             window = ui.WindowControl(Name="Zenshin", searchDepth=1)
             while not window.Exists(.2, .1):
@@ -130,4 +167,5 @@ def check(executable, installer=None):
 
 
 if __name__ == "__main__":
-    check(Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else None)
+    check(Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else None,
+          interactive="--interactive" in sys.argv[3:])

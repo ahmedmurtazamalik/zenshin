@@ -43,9 +43,12 @@ Name: "{autodesktop}\Zenshin"; Filename: "{app}\Zenshin.exe"; WorkingDir: "{app}
 
 [Run]
 Filename: "{app}\Zenshin.exe"; Parameters: "--repair-registration"; Description: "Launch Zenshin and connect Codex tools"; Flags: nowait postinstall skipifsilent; Check: not IsUpdate
-Filename: "{app}\Zenshin.exe"; Parameters: "--repair-registration --port {param:PORT|8765} --state ""{param:STATE|{app}\.local\state.json}"""; Flags: nowait; Check: IsUpdate
+Filename: "{app}\Zenshin.exe"; Parameters: "--repair-registration --finish-update --port {param:PORT|8765} --state ""{param:STATE|{app}\.local\state.json}"""; Description: "Finish update and reconnect Codex (restarts Codex)"; Flags: nowait postinstall; Check: FinishUpdate
 
 [Code]
+var
+  UpdateFinishChoice: Integer;
+
 function SetEnvironmentVariable(Name, Value: String): Boolean;
   external 'SetEnvironmentVariableW@kernel32.dll stdcall';
 
@@ -59,6 +62,18 @@ end;
 function IsUpdate: Boolean;
 begin
   Result := ExpandConstant('{param:UPDATE|0}') = '1';
+end;
+
+function FinishUpdate: Boolean;
+begin
+  Result := IsUpdate;
+  // v0.2.16 launches Setup in silent mode, which has no Finish page.
+  // Keep one visible completion button for that already-shipped updater.
+  if Result and WizardSilent then begin
+    if UpdateFinishChoice = 0 then
+      UpdateFinishChoice := SuppressibleMsgBox('Zenshin is installed. Click OK to finish the update: restart Codex, reconnect Zenshin, and restore its previous monitoring state. Running Codex work will be interrupted.', mbInformation, MB_OKCANCEL, IDOK);
+    Result := UpdateFinishChoice = IDOK;
+  end;
 end;
 
 function WebView2Installed: Boolean;

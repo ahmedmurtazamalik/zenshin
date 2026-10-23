@@ -96,6 +96,99 @@ def document(name):
     return matches[0] if matches else None
 
 
+def codex_windows():
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    callback_type = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+    user32.EnumWindows.argtypes = [callback_type, ctypes.c_void_p]
+    user32.IsWindowVisible.argtypes = [ctypes.c_void_p]
+    user32.GetWindowThreadProcessId.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
+    handles = []
+    def collect(handle, _):
+        handles.append(handle)
+        return True
+    if not user32.EnumWindows(callback_type(collect), None):
+        raise ctypes.WinError(ctypes.get_last_error())
+    for handle in handles:
+        if not user32.IsWindowVisible(handle):
+            continue
+        identity = ctypes.c_ulong()
+        user32.GetWindowThreadProcessId(handle, ctypes.byref(identity))
+        path = process_path(identity.value)
+        lower = path.lower()
+        if lower.endswith("\\codex.exe") or (lower.endswith("\\chatgpt.exe") and "\\openai.codex_" in lower):
+            window = automation().ControlFromHandle(handle)
+            if window is not None:
+                yield window, path, identity.value
+
+
+def restart_codex():
+    api = automation()
+    windows = list(codex_windows())
+    if not windows:
+        try:
+            os.startfile("codex://")
+        except OSError as error:
+            raise RuntimeError("Could not open Codex for automatic reconnect: " + str(error)) from error
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            windows = list(codex_windows())
+            if windows:
+                break
+            time.sleep(.25)
+        if not windows:
+            raise RuntimeError("Codex did not expose a window within 10 seconds; automatic reconnect was not confirmed")
+    identities = {(os.path.normcase(path), identity) for _, path, identity in windows}
+    if len(identities) != 1:
+        raise RuntimeError("Several Codex instances are open; automatic reconnect could not identify one app")
+    window, path, identity = windows[0]
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.restype = ctypes.c_void_p
+    kernel.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+    kernel.WaitForSingleObject.restype = ctypes.c_ulong
+    handle = kernel.OpenProcess(0x100000, False, identity)  # SYNCHRONIZE only.
+    if not handle:
+        raise RuntimeError("Could not watch Codex exit; automatic reconnect stopped")
+    try:
+        window.SetActive(waitTime=.1)
+        window.SwitchToThisWindow(waitTime=.1)
+        if not api.ControlsAreSame(api.GetForegroundControl(), window):
+            raise RuntimeError("Codex could not take focus; no quit shortcut was sent")
+        # Windows File > Quit. Closing its window can leave Codex running.
+        api.SendKeys("{Ctrl}q", waitTime=.1)
+        deadline = time.monotonic() + 30
+        confirmed_quit = False
+        while time.monotonic() < deadline:
+            status = kernel.WaitForSingleObject(ctypes.c_void_p(handle), 0)
+            if status == 0:
+                break
+            if status != 258:  # WAIT_TIMEOUT means the original process is alive.
+                raise RuntimeError("Could not confirm whether Codex exited")
+            foreground = api.GetForegroundControl()
+            if not confirmed_quit and foreground.ClassName == "#32770":
+                dialogs = [candidate for candidate, candidate_path, candidate_id in codex_windows()
+                           if candidate_id == identity and os.path.normcase(candidate_path) == os.path.normcase(path)
+                           and api.ControlsAreSame(candidate, foreground)]
+                buttons = [control for control in nodes(foreground, stop_at_documents=True)
+                           if control.ControlTypeName == "ButtonControl" and control.IsEnabled and not control.IsOffscreen]
+                quit_buttons = [button for button in buttons if button.Name == "Quit"]
+                if dialogs and len(quit_buttons) == 1 and any(button.Name == "Cancel" for button in buttons):
+                    press(quit_buttons[0])
+                    confirmed_quit = True
+            time.sleep(.2)
+        else:
+            raise RuntimeError("Codex did not quit within 30 seconds; it was not forced closed or relaunched")
+    finally:
+        kernel.CloseHandle(ctypes.c_void_p(handle))
+    subprocess.Popen([path])
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        if any(candidate_id != identity and os.path.normcase(candidate_path) == os.path.normcase(path)
+               for _, candidate_path, candidate_id in codex_windows()):
+            return True
+        time.sleep(.25)
+    raise RuntimeError("Codex was reopened but its new window was not confirmed within 30 seconds")
+
+
 def open_chat(thread_id, name, on_open=None):
     doc = document(name)
     if doc is None:

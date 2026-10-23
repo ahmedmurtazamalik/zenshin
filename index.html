@@ -344,6 +344,10 @@
     $('setup-result').textContent = register ? 'Registering Zenshin tools…' : 'Checking registration…';
     try {
       const setup = await request('codex-setup', {register});
+      if (setup.state) {
+        renderState(setup.state);
+        if (setup.state.connected) await loadChats();
+      }
       $('setup-command').textContent = setup.command;
       $('setup-shell').textContent = state?.chrome_password_supported ? 'PowerShell' : 'your terminal';
       $('setup-result').textContent = setup.message;
@@ -365,7 +369,7 @@
     try {
       const release = await request('check-update');
       $('update-result').textContent = release.available
-        ? `Zenshin ${release.version} is available (installed: ${state.version}). Installation preserves settings and repairs the Codex tool registration. Codex may need an MCP reload afterward.`
+        ? `Zenshin ${release.version} is available (installed: ${state.version}). On the installer's final page, leave Finish update and reconnect Codex selected. Finish restarts Codex, reconnects Zenshin, and restores monitoring if it was running. Running Codex work will be interrupted.`
         : `Zenshin ${state.version} is up to date.`;
       $('install-update').hidden = !release.available || !state.updates_supported;
       if (release.available && !state.updates_supported) $('update-result').textContent += ' Download the Windows installer from GitHub Releases to update this source installation.';
@@ -373,7 +377,7 @@
   }, 'check-update', 'Checking for updates...');
   $('install-update').onclick = () => action(async () => {
     $('install-update').disabled = true;
-    $('update-result').textContent = 'Downloading and verifying the update. Monitoring will pause; Zenshin will close and reopen automatically.';
+    $('update-result').textContent = 'Downloading and verifying the update. Complete the installer, then use Finish update and reconnect Codex to refresh everything.';
     try {
       const result = await request('install-update');
       $('update-result').textContent = result.message;
