@@ -2,11 +2,11 @@
 
 **Keep moving forward.** A local companion for Codex that answers authorized desktop requests and performs individual Chrome password and terms actions.
 
-Zenshin runs on your computer with a dedicated Windows desktop window (or a browser control page when running from source). You choose what it may do. For Chrome actions, Zenshin identifies controls by meaning, focuses the password field, opens and selects Chrome's generated-password suggestion, or checks the agreement box through Windows accessibility. Codex requests the action and receives a result; ChatGPT Computer Use is not needed for those interactions.
+Zenshin runs on your computer with a dedicated Windows desktop window (or a browser control page when running from source). You choose what it may do. For Chrome actions, Zenshin identifies controls by meaning, focuses the password field, opens and selects Chrome's generated-password suggestion, or checks the agreement box through Windows accessibility. Codex requests the action and receives a result. The Codex CLI may analyze supplied text or screenshots and return structured decisions; Zenshin captures screenshots and performs every click and text entry through its own native code. Zenshin never delegates computer interaction to ChatGPT/Codex Computer Use or browser-use tools.
 
-## Windows release v0.2.15
+## Windows release v0.2.16
 
-[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.15/Zenshin-Setup-0.2.15-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.15) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.15/SHA256SUMS.txt)
+[Download Windows installer](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.16/Zenshin-Setup-0.2.16-windows-x64.exe) · [Release notes](https://github.com/ahmedmurtazamalik/zenshin/releases/tag/v0.2.16) · [Checksums](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.16/SHA256SUMS.txt)
 
 1. Run the installer. It installs for your Windows account without administrator access and adds a Start Menu shortcut. A desktop shortcut is optional.
 2. Launch **Zenshin** from the Start Menu. The controls open in a dedicated desktop window, without a browser tab or console. Close the window to stop Zenshin.
@@ -21,7 +21,7 @@ To get this updater from v0.2.5 or earlier, close Zenshin and run the v0.2.15 in
 
 When moving from a portable/source installation, stop it, copy its `.local` folder into the installed folder before launching, choose Connect Zenshin tools to replace the old registration. Do not run both installations together.
 
-The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.15/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
+The [portable ZIP](https://github.com/ahmedmurtazamalik/zenshin/releases/download/v0.2.16/zenshin-windows-x64.zip) remains available: extract all files into a writable folder and launch `Zenshin.exe`. Keep `Zenshin-bridge.exe` beside it. Microsoft WebView2 Runtime must already be installed for portable use. Settings are stored beside the executable.
 
 This is an unsigned application; Windows may display a publisher warning. It bundles Python bytecode, which can still be extracted or reverse engineered. The repository and release downloads are public. Linux uses the source setup below.
 
@@ -114,24 +114,27 @@ The numbered sidebar takes you through the workflow. The welcome tutorial highli
 
 Choose **Connect Zenshin tools** to register this installation's MCP bridge and install a marked Zenshin guidance block in Codex's global instructions. Other instructions and MCP entries are preserved. Reconnecting refreshes the guidance and repairs old registrations.
 
-Reload MCP connections or restart Codex once. New Codex chats receive the guidance automatically; no per-chat prompt is needed. Existing chats may need to be reopened to refresh their instructions. The connected MCP server also supplies usage instructions and tool descriptions.
+Reload MCP connections or restart Codex once to load the registered tools. Global guidance and MCP tool descriptions remain available automatically. While monitoring, Zenshin also sends the current Chrome-action setup directly into each selected chat, so you do not have to paste reminders into existing chats.
 
 **Check connection** checks tool registration and chat-history access separately. Chrome tools do not need the chat-history connection. Manual registration troubleshooting remains available if the CLI cannot be found or registration fails.
 
 ### 2. Chrome actions — Windows
 
-Enable password selection, terms agreement, or both, save, then choose **Start monitoring**. No selected chat is required for Chrome-only use. Start and the switches provide standing authorization for Codex to request those actions while Zenshin runs. **Pause** blocks further Chrome actions and chat checks; saving settings also pauses them.
+Enable password selection, terms agreement, or **Solve CAPTCHAs using Codex AI**, save, then choose **Start monitoring**. No selected chat is required for Chrome-only use. Start and the switches provide standing authorization for Codex to request those actions while Zenshin runs. **Pause** blocks further Chrome actions and chat checks; saving settings also pauses them.
+
+Selected chats receive one setup message naming the currently enabled and disabled Chrome actions. Changing those switches queues an updated message for each selected chat after monitoring starts again, including when all actions are disabled. Zenshin remembers confirmed delivery across restarts and deselecting/reselecting a chat. It waits while a chat is running, an approval or question is pending, or a composer draft is present. Messages are journaled before sending, confirmed from the live chat or its persisted history, and never automatically repeated after an uncertain send. These are instructions to Codex, rather than a technical lock on its tool choice.
 
 - **Password:** Codex supplies the current page URL. Zenshin identifies the new-password field from its label and surrounding text, opens and selects Chrome's native suggestion, and verifies that field stayed filled. Unrelated password fields do not have to be filled. No password values are returned or logged.
 - **Terms:** Codex supplies the current page URL and optionally a wording or intent hint. Zenshin identifies the unchecked agreement box by meaning; an exact label is not required. Terms bundled with marketing consent are allowed. Separate marketing, cookie, CAPTCHA, and age-only boxes are excluded.
+- **CAPTCHA:** When requested, Codex calls `solve_chrome_captcha`. Zenshin sends a cropped screenshot of an identifiable, visible CAPTCHA frame/container to your existing signed-in Codex CLI, applies bounded challenge clicks or answer text, and checks for visible successful verification. No external solver account or API key is required. This uses your Codex model allowance. The switch starts disabled. Invisible risk checks, drag puzzles, and challenges without an identifiable container are unsupported. Attempts stop after 90 seconds or 12 steps; unconfirmed actions are journaled and not repeated. Visible widget success does not guarantee the website's eventual server-side acceptance.
 
-Both actions use your signed-in Codex CLI to interpret labels and nearby static text, including unfamiliar wording or languages. Editable values and native password-suggestion labels are never sent to the classifier. Controls and the site are checked again before activation; ambiguous selections stop without clicking. Classification can take up to 60 seconds.
+Password and terms actions use your signed-in Codex CLI to interpret labels and nearby static text, including unfamiliar wording or languages. Editable values and native password-suggestion labels are never sent to the classifier. Controls and the site are checked again before activation; ambiguous selections stop without clicking. Classification can take up to 60 seconds.
 
-The intended page must already be open in Chrome. These actions do not navigate, submit accounts, solve CAPTCHA, or bypass a safety refusal or URL-policy stop. Confirmed actions are logged immediately without a review step.
+The intended page must already be open in Chrome. These actions do not navigate, submit accounts, or bypass a safety refusal or URL-policy stop. CAPTCHA images are temporary and deleted after the action; answer text is not included in Activity receipts. Confirmed actions are logged immediately without a review step. After updating the source, choose **Connect Zenshin tools** and reload MCP connections to discover the new tool.
 
 ### 3. Chats
 
-Choose **Load Codex chats**, then select the conversations to monitor. Selected chats need unique titles. If a new chat is missing from the list, use **Add a chat by ID**. Chat history reads allow up to 60 seconds and show elapsed time and received data. A failure stays visible without changing the section you selected; load chats again to reconnect.
+Choose **Load Codex chats**, then select the conversations to monitor. **Start monitoring** authorizes Zenshin to send their automatic Chrome-action setup/update messages as well as covered replies. Selected chats need unique titles. If a new chat is missing from the list, use **Add a chat by ID**. Chat history reads allow up to 60 seconds and show elapsed time and received data. A failure stays visible without changing the section you selected; load chats again to reconnect.
 
 ### 4. Authorization
 
@@ -141,7 +144,7 @@ Keep the control window open for its five-second checks. Chat replies require a 
 
 ### 5. Activity
 
-Activity is a history of password selections, terms agreements, chat replies, and failed or skipped attempts. It has no approval or review controls. The journal records attempts before desktop interaction and prevents the same request from being sent twice. An unconfirmed result is recorded and is not repeated; independent later requests can continue without clearing a review gate.
+Activity is a history of Chrome-action setup messages, password selections, terms agreements, chat replies, and failed or skipped attempts. It has no approval or review controls. The journal records attempts before desktop interaction and prevents the same request from being sent twice. An unconfirmed result is recorded and is not repeated; independent later requests can continue without clearing a review gate.
 
 ## Settings, updates, and troubleshooting
 
@@ -176,6 +179,7 @@ On Windows, replace `python3` with `.\.venv\Scripts\python.exe` and use a Window
 
 ## Verified scope and limitations
 
+- For v0.2.16 on 23 October 2026, all 100 behavior tests passed in 4.4 seconds. Automatic selected-chat setup, settings updates, restart/reselection persistence, draft protection, and delivery confirmation were tested with simulated native controls. CAPTCHA behavior also has simulated-control tests; real public CAPTCHA solving and live delivery of the automatic setup message still need user verification.
 - For v0.2.15 on 22 October 2026, all 83 behavior tests passed in 3.9 seconds. Five native Chrome actions passed on four public sites: password filling on Overleaf and LOA Portal, offscreen terms on OpusGo and LOA Portal, and bundled terms plus email/WhatsApp/SMS consent on PrivateCircle. Separate marketing boxes stayed unchecked. No accounts were submitted or password values read. The live checks used the updated source through Zenshin MCP; release packaging has separate Windows smoke checks.
 - On 20 October 2026, all 72 Windows behavior tests passed in about 4 seconds. The v0.2.13 release workflow checks portable/installed-app startup, bundled assets, settings persistence, MCP discovery/transport, desktop-window rendering and normal close, update restart, old bridge process and pipe closure, fresh bridge startup, icons, reinstall, and uninstall. These packaging checks do not exercise live Codex or Chrome actions.
 - Five planned live Chrome cases passed both password and terms actions through Zenshin MCP on the first attempt: 10 actions with no retries in 71 seconds. Password actions took 7.0–8.4 seconds and terms actions took 3.4–4.5 seconds. Both password fields stayed filled and matched; terms stayed checked and marketing stayed unchecked. These results cover the disposable local form used for testing.
@@ -194,7 +198,7 @@ git clone https://github.com/ahmedmurtazamalik/zenshin.git
 cd zenshin
 ```
 
-The clone follows the current default branch. To inspect the released source instead, run `git checkout v0.2.15`.
+The clone follows the current default branch. To inspect the released source instead, run `git checkout v0.2.16`.
 
 Install the source prerequisites above, then run the existing behavior tests with `python3 -m unittest -q`, or `.\.venv\Scripts\python.exe -m unittest -q` on Windows. Tests using simulated desktop controls do not replace live UI verification. Read [AGENTS.md](AGENTS.md) before changing code.
 

@@ -216,28 +216,49 @@ def answer(name, question, response, next_question=None, on_progress=None):
     raise RuntimeError("Delivery was not confirmed; inspect the chat before taking further action")
 
 
-def conversation_pending(name, text):
+def _chat_setup_pending(name, text):
     doc = document(name)
-    return bool(doc and matching(doc, "static", text)
+    return bool(doc and (not text or matching(doc, "static", text))
                 and not matching(doc, "push button", "Stop")
                 and not matching(doc, "push button", "Answer question")
                 and not answer_entries(doc)
                 and not matching(doc, "push button", "Allow once"))
 
 
+def conversation_pending(name, text):
+    return bool(text and _chat_setup_pending(name, text))
+
+
+def chat_setup_ready(name, text):
+    if not _chat_setup_pending(name, text):
+        return False
+    entries = matching(document(name), "entry", "Work with Codex")
+    return bool(len(entries) == 1 and entries[0].get_state_set().contains(atspi().StateType.ENABLED)
+                and not entry_text(entries[0]).strip())
+
+
 def reply(name, text, response, on_progress=None):
-    if not conversation_pending(name, text):
+    _send_reply(name, text, response, conversation_pending, on_progress)
+
+
+def send_chat_setup(name, text, response, on_progress=None):
+    _send_reply(name, text, response, _chat_setup_pending, on_progress)
+
+
+def _send_reply(name, text, response, is_pending, on_progress):
+    if not is_pending(name, text):
         raise RuntimeError("The chat is running or its latest message is not visible")
     doc = document(name)
     entries = matching(doc, "entry", "Work with Codex")
-    if len(entries) != 1 or entry_text(entries[0]).strip():
+    if (len(entries) != 1 or not entries[0].get_state_set().contains(atspi().StateType.ENABLED)
+            or entry_text(entries[0]).strip()):
         raise RuntimeError("The composer contains a draft; reply manually")
     prior = len(matching(doc, "static", response))
     write_text(name, entries[0], response)
     doc = document(name)
     entries = matching(doc, "entry", "Work with Codex")
     buttons = matching(entries[0].get_parent(), "push button", "Send") if len(entries) == 1 else []
-    if (not conversation_pending(name, text) or len(entries) != 1
+    if (not is_pending(name, text) or len(entries) != 1
             or entry_text(entries[0]) != response or len(buttons) != 1
             or not buttons[0].get_state_set().contains(atspi().StateType.ENABLED)):
         raise RuntimeError("Composer changed before Send; inspect its draft manually")

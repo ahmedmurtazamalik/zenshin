@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent
 INSTALL_ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else ROOT
 DEFAULT_INSTRUCTIONS = ("Approve permission and continuation requests needed to complete my current task. "
                         "Tell Codex to proceed with its recommended option when a choice is needed. "
-                        "Use Zenshin for enabled Chrome password and terms actions. "
+                        "Use Zenshin for enabled Chrome password, terms, and CAPTCHA actions. "
                         "Do not invent missing facts or credentials.")
 
 
@@ -73,7 +73,7 @@ def codex_setup(port, register=False):
         result["message"] = ("Registered for this installation. Automatic Zenshin guidance is installed for new Codex chats. Reload MCP connections or restart Codex to refresh existing chats."
             if register and result["registered"] else "Registered for this installation. Connect again to install or refresh automatic guidance, then reload Codex's MCP connections."
             if result["registered"] else "An old or disabled Zenshin registration exists. Connect Zenshin tools to replace it."
-            if result["conflict"] else "Not registered yet. Connect once to make the two tools available to Codex.")
+            if result["conflict"] else "Not registered yet. Connect once to make the Chrome tools available to Codex.")
     except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
         result["message"] = "Could not check or register Zenshin: " + str(error) + ". Use manual setup below."
     return result
@@ -92,6 +92,7 @@ def load_state(path):
     state.setdefault("ai_decisions", {})
     state.setdefault("auto_password", False)
     state.setdefault("auto_terms", False)
+    state.setdefault("auto_captcha", False)
     return state
 
 
@@ -339,7 +340,7 @@ def poll(app):
     else:
         progress = app.get("progress", {})
         set_progress(app, "waiting", progress.get("chat", ""),
-                     progress.get("detail", "") if progress.get("stage") == "done" else "Check complete.")
+                     progress.get("detail", "") if progress.get("stage") in {"done", "setup_waiting"} else "Check complete.")
 
 
 def check_chats(app):
@@ -408,6 +409,8 @@ def check_desktop(app, ui):
             app["running"] = False
             raise
         set_progress(app, "inspecting", target["name"])
+        if send_chrome_setup(app, ui, target, thread):
+            return
         requests = list(reversed(questions(thread)))
         for card in ui.approval_cards(target["name"]):
             turns = thread.get("turns", [])
@@ -491,12 +494,70 @@ def check_desktop(app, ui):
             return
 
 
+def send_chrome_setup(app, ui, target, thread):
+    state = app["state"]
+    actions = {key: bool(state.get(key)) for key in ("auto_password", "auto_terms", "auto_captcha")}
+    setups = state.setdefault("chrome_setups", {})
+    previous = setups.get(target["id"])
+    if previous and previous["actions"] == actions:
+        return False
+    turns = thread.get("turns", [])
+    turn_id = turns[-1]["id"] if turns else None
+    latest_text = ""
+    for item in reversed(turns[-1].get("items", []) if turns else []):
+        if item["type"] == "agentMessage" and item.get("text"):
+            latest_text = item["text"]
+            break
+        if item["type"] == "userMessage":
+            latest_text = "\n".join(part.get("text", "") for part in item.get("content", []))
+            break
+    if (not app["running"] or app.get("analysis")
+            or (turns and turns[-1].get("status") == "inProgress")
+            or not ui.chat_setup_ready(target["name"], latest_text)):
+        set_progress(app, "setup_waiting", target["name"],
+                     "Chrome setup is waiting for this chat to be idle with an empty composer.")
+        return False
+    revision = previous["revision"] + 1 if previous else 1
+    key = f"chrome-setup:{target['id']}:{revision}"
+    response = zenshin_mcp.chrome_setup_prompt(state)
+    attempt = {"kind": "chrome_setup", "thread_id": target["id"], "name": target["name"],
+               "text": "Update Chrome-action setup" if previous else "Set up Chrome actions",
+               "response": response, "time": int(time.time()), "status": "sending"}
+    # Persist the settings and attempt together before typing or clicking Send.
+    setups[target["id"]] = {"actions": actions, "revision": revision}
+    state["attempts"][key] = attempt
+    save_state(app["path"], state)
+    detail = "Sending Chrome-action setup."
+    set_progress(app, "sending", target["name"], detail)
+    try:
+        ui.send_chat_setup(target["name"], latest_text, response,
+                           on_progress=lambda stage: set_progress(app, stage, target["name"], detail))
+    except Exception as error:
+        try:
+            confirmed = persisted_reply(app["connection"], target["id"],
+                                        turn_id, response)
+        except (OSError, RuntimeError):
+            confirmed = False
+        if confirmed:
+            attempt.update(status="sent", reply_confirmed_by="app_server")
+        else:
+            attempt.update(status="uncertain", error=str(error))
+    else:
+        attempt["status"] = "sent"
+    set_progress(app, "done", target["name"], "Chrome-action setup delivered." if attempt["status"] == "sent"
+                 else "Chrome setup delivery was not confirmed; duplicate send skipped. See Activity.")
+    state["activity"].append(dict(attempt))
+    state["activity"] = state["activity"][-100:]
+    save_state(app["path"], state)
+    return True
+
+
 def browser_action(app, data):
     if os.name != "nt":
         raise ValueError("Individual Chrome actions currently require Windows; Codex approvals and forms also support Linux")
     action = data.get("action")
-    if action not in {"password", "terms"}:
-        raise ValueError("Choose one password or terms action")
+    if action not in {"password", "terms", "captcha"}:
+        raise ValueError("Choose one password, terms, or CAPTCHA action")
     if not app["running"] or not app["state"].get("auto_" + action):
         raise ValueError("Enable this Chrome action, save, and Start monitoring in Zenshin first")
     site, request_id, label = data.get("site"), data.get("request_id"), data.get("label", "")
@@ -515,7 +576,9 @@ def browser_action(app, data):
         if prior["status"] == "sent":
             return {**prior["result"], "replayed": True}
         raise RuntimeError("This action was already attempted without confirmation; duplicate action skipped")
-    description = "Select Chrome's suggested password" if action == "password" else "Check terms: " + (label or "agreement checkbox")
+    description = ("Select Chrome's suggested password" if action == "password" else
+                   "Solve CAPTCHA using Codex AI" if action == "captcha" else
+                   "Check terms: " + (label or "agreement checkbox"))
     attempt = {"kind": "browser_action", "thread_id": "", "name": "Chrome",
                "request": identity, "text": description + " on " + origin,
                "time": int(time.time()), "status": "sending"}
@@ -525,6 +588,10 @@ def browser_action(app, data):
         def perform():
             set_progress(app, "opening", "Chrome", "Checking the requested Chrome page.")
             windows_ui.prepare_chrome_site(site, open_site=False)
+            if action == "captcha":
+                set_progress(app, "inspecting", "Chrome", "Solving the visible CAPTCHA with Codex AI and verifying the result.")
+                windows_ui.solve_chrome_captcha(site)
+                return ""
             field = None
             if action == "password":
                 set_progress(app, "inspecting", "Chrome", "Identifying the new-password field and opening Chrome's native suggestion.")
@@ -562,7 +629,8 @@ def browser_action(app, data):
 def persisted_reply(connection, thread_id, turn_id, response):
     fresh = rpc(connection, "thread/read", {"threadId": thread_id, "includeTurns": True})["thread"]
     turns = fresh.get("turns", [])
-    original = next((index for index, turn in enumerate(turns) if turn["id"] == turn_id), None)
+    original = (-1 if turn_id is None else
+                next((index for index, turn in enumerate(turns) if turn["id"] == turn_id), None))
     if original is None:
         return False
     # Codex's composer linkifies bare URLs and appends a newline on Send.
@@ -582,6 +650,7 @@ def snapshot(app):
             "chrome_password_supported": os.name == "nt",
             "auto_password": app["state"].get("auto_password", False),
             "auto_terms": app["state"].get("auto_terms", False),
+            "auto_captcha": app["state"].get("auto_captcha", False),
             "activity": app["state"]["activity"],
             "progress": progress_snapshot(app),
             "error": app["error"]}
@@ -609,7 +678,7 @@ def start_monitoring(app):
         if not state["instructions"].strip():
             raise ValueError("Write your standing instructions before starting")
         verify_desktop_targets(app)
-    elif not (state.get("auto_password") or state.get("auto_terms")):
+    elif not (state.get("auto_password") or state.get("auto_terms") or state.get("auto_captcha")):
         raise ValueError("Select a chat or enable a Chrome action first")
     app["running"] = True
 
@@ -752,7 +821,7 @@ def main():
                     return self.reply({"id": thread["id"], "name": thread["name"]})
                 elif self.path == "/api/settings":
                     targets, instructions = validate_settings(data)
-                    browser = {key: data.get(key, False) for key in ("auto_password", "auto_terms")}
+                    browser = {key: data.get(key, False) for key in ("auto_password", "auto_terms", "auto_captcha")}
                     if any(type(value) is not bool for value in browser.values()):
                         raise ValueError("Browser automation toggles must be on or off")
                     if os.name != "nt" and any(browser.values()):

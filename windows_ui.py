@@ -3,8 +3,10 @@
 from concurrent.futures import ThreadPoolExecutor
 import ctypes
 import os
+from pathlib import Path
 import re
 import subprocess
+import tempfile
 import time
 from urllib.parse import quote, urlsplit
 
@@ -269,7 +271,7 @@ def prepare_chrome_site(address, open_site=True):
                      and bool(buttons & {"Reload", "Reload this page"})
                      and not buttons & {"Stop", "Stop loading"})
             if ready and stable_url == current_url:
-                return {"message": f"Chrome is on {origin} and has finished loading. You can start a fresh computer-use attempt."}
+                return {"message": f"Chrome is on {origin} and has finished loading. Zenshin can perform the requested native action."}
             stable_url = current_url if ready else None
         elif open_site and not opened:
             chrome = ""
@@ -524,6 +526,132 @@ def perform_chrome_signup_request(origin, request):
     raise RuntimeError("Terms checkbox selection was not confirmed; inspect Chrome before trying again")
 
 
+def chrome_captcha_region(browser, origin):
+    controls = list(chrome_page_controls(browser, origin))
+    regions = []
+    for control in controls[1:]:  # Never treat the whole account page as a puzzle.
+        if (control.ControlTypeName not in {"DocumentControl", "PaneControl", "GroupControl"}
+                or control.IsOffscreen or not control.IsEnabled):
+            continue
+        label = control.Name.casefold()
+        if control.ControlTypeName == "DocumentControl":
+            value = control.GetPattern(automation().PatternId.ValuePattern)
+            label += " " + (value.Value if value else "").casefold()
+        if re.search(r"captcha|challenges\.cloudflare\.com|arkoselabs|funcaptcha|human verification", label):
+            rectangle = control.BoundingRectangle
+            if rectangle.width() > 0 and rectangle.height() > 0:
+                regions.append(control)
+    if not regions:
+        raise RuntimeError("No visible CAPTCHA frame or container is available; invisible checks are unsupported")
+    # An open image challenge is larger than its checkbox widget. Drop nested
+    # duplicates, but do not choose between unrelated challenges on the page.
+    outer = [control for control in regions if not any(
+        not automation().ControlsAreSame(control, other)
+        and any(automation().ControlsAreSame(control, child) for child in nodes(other))
+        for other in regions)]
+    if len(outer) > 1:
+        outer.sort(key=lambda control: control.BoundingRectangle.width() * control.BoundingRectangle.height(), reverse=True)
+        if outer[0].BoundingRectangle.height() <= 150 or outer[1].BoundingRectangle.height() > 150:
+            raise RuntimeError("Several CAPTCHA challenges are visible; the target is ambiguous")
+    return outer[0]
+
+
+def chrome_captcha_snapshot(browser, region, path):
+    api = automation()
+    if not api.ControlsAreSame(api.GetForegroundControl(), browser):
+        raise RuntimeError("Chrome is not the foreground window; CAPTCHA action stopped")
+    rectangle, window = region.BoundingRectangle, browser.BoundingRectangle
+    left, top, right, bottom = rectangle.left, rectangle.top, rectangle.right, rectangle.bottom
+    if (region.IsOffscreen or not region.IsEnabled or right <= left or bottom <= top
+            or left < window.left or top < window.top or right > window.right or bottom > window.bottom):
+        raise RuntimeError("The complete CAPTCHA must be visible inside Chrome")
+    controls = [control for control in nodes(region) if not control.IsOffscreen and control.IsEnabled]
+    for control in controls:
+        if (control.ControlTypeName == "EditControl" and (control.IsPassword or re.search(
+                r"\b(e-?mail|phone|address|name|password|login|username)\b", control.Name.casefold()))
+                or control.ControlTypeName in {"ButtonControl", "HyperlinkControl"} and re.search(
+                    r"register|sign.?up|create.*account|place.*order|checkout|payment", control.Name.casefold())):
+            raise RuntimeError("The CAPTCHA region includes account controls; nothing was captured")
+    if not region.CaptureToImage(str(path)):
+        raise RuntimeError("Could not capture the visible CAPTCHA")
+    descriptions = [{"name": control.Name, "role": control.ControlTypeName}
+                    for control in controls]
+    return (left, top, right, bottom), controls, descriptions
+
+
+def solve_chrome_captcha(address):
+    origin = site_origin(address)
+    browser, _ = chrome_password_suggestion(origin)
+    if browser is None:
+        raise RuntimeError("The requested Chrome page is not available")
+    api = automation()
+    browser.SetActive(waitTime=.1)
+    deadline = time.monotonic() + 90
+    with tempfile.TemporaryDirectory(prefix="zenshin-captcha-") as directory:
+        image = Path(directory) / "challenge.png"
+        for _ in range(12):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            current_browser, _ = chrome_password_suggestion(origin)
+            if not api.ControlsAreSame(browser, current_browser):
+                raise RuntimeError("Chrome's site changed; CAPTCHA action stopped")
+            region = chrome_captcha_region(browser, origin)
+            bounds, controls, descriptions = chrome_captcha_snapshot(browser, region, image)
+            pixels = image.read_bytes()
+            step = ai_decision.captcha_step(image, descriptions, bounds[2] - bounds[0],
+                                            bounds[3] - bounds[1], remaining)
+            # A CLI round trip can take time. Never use coordinates from an old
+            # image, another page, or an overlay that has taken keyboard focus.
+            prepare_chrome_site(address, open_site=False)
+            current_browser, _ = chrome_password_suggestion(origin)
+            if (time.monotonic() >= deadline or not api.ControlsAreSame(browser, current_browser)
+                    or not api.ControlsAreSame(region, chrome_captcha_region(browser, origin))):
+                raise RuntimeError("Chrome's CAPTCHA changed during analysis; action stopped")
+            fresh_bounds, fresh_controls, _ = chrome_captcha_snapshot(browser, region, image)
+            if step["action"] == "wait":
+                time.sleep(.5)
+                continue
+            if step["action"] == "verified":
+                time.sleep(.3)
+                if not api.ControlsAreSame(browser, chrome_password_suggestion(origin)[0]):
+                    raise RuntimeError("Chrome's site changed before CAPTCHA confirmation")
+                stable_bounds, stable_controls, _ = chrome_captcha_snapshot(browser, region, image)
+                checked = any(control.ControlTypeName == "CheckBoxControl"
+                              and re.search(r"captcha|human|not a robot", control.Name.casefold())
+                              and (toggle := control.GetPattern(api.PatternId.TogglePattern))
+                              and toggle.ToggleState == 1 for control in stable_controls)
+                if stable_bounds == bounds and (checked or image.read_bytes() == pixels):
+                    return {"message": "The CAPTCHA widget visibly confirmed successful verification."}
+                continue
+            if fresh_bounds != bounds or image.read_bytes() != pixels:
+                continue
+            if step["action"] == "type":
+                field = controls[step["control"]]
+                if (field.ControlTypeName != "EditControl" or field.IsPassword
+                        or not any(api.ControlsAreSame(field, control) for control in fresh_controls)):
+                    raise RuntimeError("The CAPTCHA answer field changed; nothing was entered")
+                value = field.GetPattern(api.PatternId.ValuePattern)
+                if not value or value.IsReadOnly:
+                    raise RuntimeError("The CAPTCHA answer field does not support text entry")
+                value.SetValue(step["text"])
+            else:
+                for x, y in step["points"]:
+                    current_browser, _ = chrome_password_suggestion(origin)
+                    if (not api.ControlsAreSame(browser, current_browser)
+                            or not api.ControlsAreSame(api.GetForegroundControl(), browser)):
+                        raise RuntimeError("Chrome changed before a CAPTCHA click; action stopped")
+                    rectangle = region.BoundingRectangle
+                    if (rectangle.left, rectangle.top, rectangle.right, rectangle.bottom) != bounds:
+                        break  # Reobserve a layout change before the next click.
+                    hit = api.ControlFromPoint(bounds[0] + x, bounds[1] + y)
+                    if not any(api.ControlsAreSame(hit, control) for control in nodes(region)):
+                        raise RuntimeError("The CAPTCHA click target is no longer inside the challenge")
+                    api.Click(bounds[0] + x, bounds[1] + y, waitTime=.2)
+            time.sleep(.5)
+    raise RuntimeError("CAPTCHA verification was not confirmed within 90 seconds or 12 steps; do not retry this action")
+
+
 def entry_text(entry):
     api = automation()
     value = entry.GetPattern(api.PatternId.ValuePattern)
@@ -620,28 +748,49 @@ def message_matches(doc, text):
     return matches
 
 
-def conversation_pending(name, text):
+def _chat_setup_pending(name, text):
     doc = document(name)
-    return bool(doc and any(not control.IsOffscreen for control in message_matches(doc, text))
+    return bool(doc and (not text or any(not control.IsOffscreen for control in message_matches(doc, text)))
                 and not matching(doc, "ButtonControl", "Stop")
                 and not matching(doc, "ButtonControl", "Answer question")
                 and not answer_entries(doc)
                 and not matching(doc, "ButtonControl", "Allow once"))
 
 
+def conversation_pending(name, text):
+    return bool(text and _chat_setup_pending(name, text))
+
+
+def chat_setup_ready(name, text):
+    if not _chat_setup_pending(name, text):
+        return False
+    entries = matching(document(name), "EditControl", "Work with Codex")
+    return bool(len(entries) == 1 and entries[0].IsEnabled and not entries[0].IsOffscreen
+                and not entry_text(entries[0]).strip())
+
+
 def reply(name, text, response, on_progress=None):
-    if not conversation_pending(name, text):
+    _send_reply(name, text, response, conversation_pending, on_progress)
+
+
+def send_chat_setup(name, text, response, on_progress=None):
+    _send_reply(name, text, response, _chat_setup_pending, on_progress)
+
+
+def _send_reply(name, text, response, is_pending, on_progress):
+    if not is_pending(name, text):
         raise RuntimeError("The chat is running or its latest message is not visible")
     doc = document(name)
     entries = matching(doc, "EditControl", "Work with Codex")
-    if len(entries) != 1 or entry_text(entries[0]).strip():
+    if (len(entries) != 1 or not entries[0].IsEnabled or entries[0].IsOffscreen
+            or entry_text(entries[0]).strip()):
         raise RuntimeError("The composer contains a draft; reply manually")
     prior = len(message_matches(doc, response))
     write_text(name, entries[0], response)
     doc = document(name)
     entries = matching(doc, "EditControl", "Work with Codex")
     buttons = matching(entries[0].GetParentControl(), "ButtonControl", "Send") if len(entries) == 1 else []
-    if not conversation_pending(name, text) or len(entries) != 1 or entry_text(entries[0]) != response or len(buttons) != 1:
+    if not is_pending(name, text) or len(entries) != 1 or entry_text(entries[0]) != response or len(buttons) != 1:
         raise RuntimeError("Composer changed before Send; inspect its draft manually")
     press(buttons[0])
     if on_progress:

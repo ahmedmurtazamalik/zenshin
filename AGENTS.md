@@ -4,6 +4,14 @@ This project is a small MVP for a handful of trusted users. Optimize for a worki
 
 These instructions apply to planning, implementation, review, refactoring, and testing. If another project document proposes a more elaborate design, treat it as historical context unless the user explicitly asks to preserve it.
 
+## Zenshin owns computer interaction
+
+Codex requests actions from Zenshin. Zenshin performs all computer interaction through its own native automation code, including screenshots, clicks, typing, password selection, terms agreement, and CAPTCHA interaction.
+
+The existing Codex CLI may analyze supplied text or screenshots and return structured decisions. It must not be asked to operate the computer or invoke tools on Zenshin's behalf. Keep analysis separate from Zenshin's validated native execution.
+
+Never make Zenshin depend on or call ChatGPT/Codex Computer Use tools, browser-use tools, or an assistant session to carry out an action. A coding agent may independently use its available tools for development or verification; those tools must never become a runtime dependency or delegated execution path in Zenshin.
+
 ## Governing rule
 
 Implement the smallest clear change that satisfies the user's stated outcome. Every added file, dependency, abstraction, configuration option, validation branch, and test must be justified by a current requirement or a reproduced failure.

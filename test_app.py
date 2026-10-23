@@ -178,6 +178,9 @@ class DesktopTests(unittest.TestCase):
         cards = patch.object(linux_ui, "approval_cards", return_value=[])
         cards.start()
         self.addCleanup(cards.stop)
+        setup = patch.object(linux_ui, "chat_setup_ready", return_value=False)
+        setup.start()
+        self.addCleanup(setup.stop)
 
     def test_selected_chats_are_opened_in_order_before_inspection(self):
         state = app.load_state(self.empty_state)
@@ -310,6 +313,7 @@ class DesktopTests(unittest.TestCase):
             ui = Mock()
             ui.approval_cards.return_value = []
             ui.conversation_pending.return_value = True
+            ui.chat_setup_ready.return_value = False
             def delivered_then_error(*args, **kwargs):
                 data["turns"].append({"id": "continued", "items": [{"type": "userMessage", "content": [
                     {"text": "Open [https://jobs.example.com/register](https://jobs.example.com/register)\\\nContinue.\n"}]}]})
@@ -550,6 +554,9 @@ class AIDecisionTests(unittest.TestCase):
         cards = patch.object(linux_ui, "approval_cards", return_value=[])
         cards.start()
         self.addCleanup(cards.stop)
+        setup = patch.object(linux_ui, "chat_setup_ready", return_value=False)
+        setup.start()
+        self.addCleanup(setup.stop)
 
     def monitor(self, path):
         state = app.load_state(path)

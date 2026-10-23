@@ -21,7 +21,7 @@ class BrowserActionTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.path = Path(directory.name) / "state.json"
         self.state = app.load_state(self.path)
-        self.state.update(auto_password=True, auto_terms=True)
+        self.state.update(auto_password=True, auto_terms=True, auto_captcha=True)
         self.monitor = {"path": self.path, "state": self.state, "running": True, "connection": None}
         platform = Mock(wraps=app.os)
         platform.name = "nt"
@@ -29,6 +29,7 @@ class BrowserActionTests(unittest.TestCase):
                      patch.object(ui, "run", side_effect=lambda operation: operation()),
                      patch.object(ui, "prepare_chrome_site"),
                      patch.object(ui, "open_chrome_password_suggestion"),
+                     patch.object(ui, "solve_chrome_captcha", create=True),
                      patch.object(ui, "chrome_signup_request", side_effect=lambda origin, password, terms, label:
                                   {"kind": "password" if password else "terms", "label": label or "Chrome suggested password"}),
                      patch.object(ui, "perform_chrome_signup_request"), patch.object(ui, "reply"),
@@ -105,6 +106,43 @@ class BrowserActionTests(unittest.TestCase):
             app.browser_action(self.monitor, {**self.request, "action": "terms", "label": "Other terms"})
         ui.perform_chrome_signup_request.assert_not_called()
 
+    def test_captcha_requires_enabled_switch_and_records_success_or_uncertainty_once(self):
+        self.assertFalse(app.load_state(self.path)["auto_captcha"])
+        self.state.update(auto_password=False, auto_terms=False, auto_captcha=True)
+        self.monitor["running"] = False
+        data = {**self.request, "action": "captcha", "request_id": "captcha-1"}
+        with self.assertRaisesRegex(ValueError, "Start monitoring"):
+            app.browser_action(self.monitor, data)
+        app.start_monitoring(self.monitor)
+        self.state["auto_captcha"] = False
+        with self.assertRaisesRegex(ValueError, "Enable"):
+            app.browser_action(self.monitor, data)
+        ui.solve_chrome_captcha.assert_not_called()
+        self.state["auto_captcha"] = True
+        def solve(site):
+            self.assertEqual(site, data["site"])
+            saved = app.load_state(self.path)
+            self.assertEqual(saved["attempts"]["browser:captcha-1"]["status"], "sending")
+        ui.solve_chrome_captcha.side_effect = solve
+        receipt = app.browser_action(self.monitor, data)
+        self.assertTrue(receipt["confirmed"])
+        self.assertEqual(receipt["action"], "captcha")
+        self.monitor["state"] = app.load_state(self.path)
+        self.assertTrue(app.snapshot({**self.monitor, "error": ""})["auto_captcha"])
+        self.assertTrue(app.browser_action(self.monitor, data)["replayed"])
+        ui.solve_chrome_captcha.assert_called_once_with(data["site"])
+        ui.chrome_signup_request.assert_not_called()
+        ui.perform_chrome_signup_request.assert_not_called()
+        ui.solve_chrome_captcha.side_effect = RuntimeError("Challenge was not confirmed")
+        uncertain = {**data, "request_id": "captcha-2"}
+        with self.assertRaisesRegex(RuntimeError, "do not retry"):
+            app.browser_action(self.monitor, uncertain)
+        self.monitor["state"] = app.load_state(self.path)
+        with self.assertRaisesRegex(RuntimeError, "already"):
+            app.browser_action(self.monitor, uncertain)
+        self.assertEqual(ui.solve_chrome_captcha.call_count, 2)
+        self.assertEqual(self.monitor["state"]["attempts"]["browser:captcha-2"]["status"], "uncertain")
+
     def test_monitor_does_not_interpret_password_refusals_as_browser_requests(self):
         self.state["targets"] = [{"id": "chat", "name": "Job search"}]
         thread = {"name": "Job search", "id": "chat", "turns": [{"id": "turn", "status": "completed", "items": [
@@ -112,6 +150,7 @@ class BrowserActionTests(unittest.TestCase):
         desktop = Mock()
         desktop.approval_cards.return_value = []
         desktop.conversation_pending.return_value = False
+        desktop.chat_setup_ready.return_value = False
         with patch.object(app, "rpc", return_value={"thread": thread}), \
              patch.object(app, "analyze_request") as analyze:
             app.check_desktop(self.monitor, desktop)
@@ -142,6 +181,8 @@ class BrowserActionTests(unittest.TestCase):
                 "site": self.request["site"], "request_id": "missing-label"}}},
             {"id": 6, "method": "tools/call", "params": {"name": "check_chrome_terms", "arguments": {
                 "site": self.request["site"], "request_id": "absent-terms", "label": "Absent terms"}}},
+            {"id": 7, "method": "tools/call", "params": {"name": "solve_chrome_captcha", "arguments": {
+                "site": self.request["site"], "request_id": "mcp-captcha"}}},
         ]
         available = ui.chrome_signup_request.side_effect
         ui.chrome_signup_request.side_effect = lambda origin, password, terms, label: (
@@ -153,6 +194,11 @@ class BrowserActionTests(unittest.TestCase):
             worker.start()
             try:
                 self.assertTrue(ready.wait(2))
+                settings = {"targets": [], "instructions": self.state["instructions"],
+                            "auto_password": True, "auto_terms": True, "auto_captcha": True}
+                with urlopen(Request(f"http://127.0.0.1:{port}/api/settings", data=json.dumps(settings).encode(),
+                                     headers={"Content-Type": "application/json"}), timeout=2) as response:
+                    self.assertTrue(json.load(response)["auto_captcha"])
                 with urlopen(Request(f"http://127.0.0.1:{port}/api/start", data=b"{}",
                                      headers={"Content-Type": "application/json"}), timeout=2) as response:
                     self.assertTrue(json.load(response)["running"])
@@ -163,15 +209,17 @@ class BrowserActionTests(unittest.TestCase):
                 replies = {reply["id"]: reply["result"] for reply in map(json.loads, process.stdout.splitlines())}
                 self.assertIn("Use Zenshin automatically", replies[1]["instructions"])
                 self.assertIn("standing authorization", replies[1]["instructions"])
-                self.assertEqual(len(replies[2]["tools"]), 2)
-                for identity in (3, 4):
+                self.assertEqual({tool["name"] for tool in replies[2]["tools"]},
+                                 {"select_chrome_password", "check_chrome_terms", "solve_chrome_captcha"})
+                for identity in (3, 4, 7):
                     self.assertFalse(replies[identity]["isError"])
                     self.assertTrue(replies[identity]["structuredContent"]["confirmed"])
                 self.assertFalse(replies[5]["isError"])
                 self.assertTrue(replies[6]["isError"])
                 self.assertIn("do not retry", replies[6]["content"][0]["text"])
                 self.assertEqual(ui.perform_chrome_signup_request.call_count, 3)
-                self.assertEqual(len(app.load_state(self.path)["attempts"]), 4)
+                ui.solve_chrome_captcha.assert_called_once_with(self.request["site"])
+                self.assertEqual(len(app.load_state(self.path)["attempts"]), 5)
                 # A client can time out after the native action has completed.
                 end_headers = app.BaseHTTPRequestHandler.end_headers
                 def disconnected_headers(handler):

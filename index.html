@@ -232,7 +232,7 @@
         <ol>
           <li>Install the Codex CLI, sign in with <code>codex login</code>, and keep Zenshin running. Chrome actions require Windows; chat monitoring also works on Linux.</li>
           <li>Connect once using the button below. This registers Zenshin tools and adds guidance to your Codex instructions so new chats know when to use them. Other tools and approval settings stay unchanged.</li>
-          <li>Reload MCP connections or restart Codex once. New chats receive the guidance automatically; reopen existing chats to refresh it. Then enable your actions and Start monitoring.</li>
+          <li>Reload MCP connections or restart Codex once. Enable your actions, select any chats that should receive automatic setup, then Start monitoring. Zenshin sends each selected chat its setup prompt when idle and updates it when your enabled Chrome actions change.</li>
         </ol>
         <div class="toolbar"><button id="register-codex" class="primary">Connect Zenshin tools</button><button id="check-codex">Check connection</button></div>
         <p id="setup-chat-result" class="muted" role="status">Check connection to verify chat access and tool registration separately.</p>
@@ -245,21 +245,23 @@
           <p>If Codex is missing, install its CLI and sign in, then restart Zenshin so it can find the CLI. If an old or disabled <code>zenshin</code> entry conflicts, inspect it with <code>codex mcp get zenshin</code>. Choose Connect Zenshin tools to replace the old entry automatically.</p>
           <p>Registration confirms configuration only. Your working Codex chat must also load the tools. If tools are missing, reload its MCP connections or restart Codex. Keep Zenshin running at this address; reconnect after moving the app or changing its port.</p>
         </details>
-        <p class="muted help">Connect Zenshin tools installs usage guidance for new Codex chats automatically. Reload MCP connections or restart Codex once to update existing connections. Choose Chrome actions or chats, then select Start monitoring to enable them.</p>
+        <p class="muted help">Connect Zenshin tools installs global usage guidance automatically. Reload MCP connections or restart Codex once to load the tools. Start monitoring also sends the current Chrome-action setup directly to each selected chat, so no manual per-chat reminder is needed.</p>
       </section>
       <section id="chrome-password-panel" aria-labelledby="chrome-password-heading" hidden>
         <div class="section-head"><h2 id="chrome-password-heading">Individual Chrome actions</h2><span class="eyebrow">Windows</span></div>
         <label><input id="auto-password" type="checkbox"> Allow Zenshin to select Chrome's suggested password</label>
         <label><input id="auto-terms" type="checkbox"> Allow Zenshin to check a terms agreement box</label>
+        <label><input id="auto-captcha" type="checkbox"> Allow Zenshin to solve CAPTCHAs using Codex AI</label>
         <p class="muted help">Codex requests the action through the connected Zenshin tools; Zenshin performs it in Chrome and returns confirmation. Zenshin identifies password fields and agreement boxes from their meaning and nearby text. It opens and selects Chrome's native password suggestion; Chrome generates and fills the password. An exact checkbox label is not required.</p>
-        <p class="muted help">The connected tools tell Codex to use Zenshin automatically for these actions. Codex supplies the current page URL with each request. Chrome must already show the intended page.</p>
+        <p class="muted help">CAPTCHA solving uses your signed-in Codex CLI to interpret the visible challenge and verify the result. It uses your Codex account's model usage; no external CAPTCHA solver service is needed. Unsupported challenges or unconfirmed results are logged as failures.</p>
+        <p class="muted help">The connected tools tell Codex to use Zenshin automatically for these actions. While monitoring, each selected chat also receives one setup prompt and an update whenever these saved switches change. Zenshin waits for an idle chat with an empty draft. Codex supplies the current page URL with each request; Chrome must already show the intended page.</p>
         <p class="muted help">Choose the actions you authorize, then select Start monitoring. Actions run immediately and are logged in Activity. Pause disables Chrome actions and chat monitoring. Saving settings also pauses them. Terms bundled with marketing consent are allowed; separate marketing boxes are left alone. No account is submitted.</p>
       </section>
       <section id="chats-panel" aria-labelledby="chats-heading" hidden>
         <div class="section-head"><h2 id="chats-heading">Chats</h2><span class="eyebrow">Chat monitoring</span></div>
       <div class="toolbar"><button id="connect">Load Codex chats</button><button class="quiet" id="refresh" disabled>Refresh</button><button id="check-chat-connection">Check connection</button></div>
       <p id="chat-connection-result" class="muted" role="status"></p>
-      <small>Connect here to monitor chat requests. Chrome tools use their separate registration.</small>
+      <small>Selected chats receive automatic Chrome-action setup messages while monitoring. Start monitoring authorizes these messages and chat replies; Zenshin waits for idle chats and preserves drafts. Chrome tools use their separate registration.</small>
       <input type="text" id="chat-search" aria-label="Filter chats" placeholder="Find a chat…">
       <p class="muted" id="selection">No chats selected.</p>
       <div id="threads"><p class="muted">Use Load Codex chats to see your chats.</p></div>
@@ -283,7 +285,7 @@
       </section>
       <section id="activity-panel" aria-labelledby="activity-heading" hidden>
         <div class="section-head"><h2 id="activity-heading">Activity</h2><span class="eyebrow">Local history</span></div>
-        <p class="muted">Password selections, terms agreements, and chat replies appear here after they run. Failed or skipped actions are recorded here too; there is no review queue.</p>
+        <p class="muted">Chrome-action setup messages, password selections, terms agreements, and chat replies appear here after they run. Failed or skipped actions are recorded here too; there is no review queue.</p>
         <div id="activity"></div>
       </section>
     </div>
@@ -432,12 +434,12 @@
     tourFocus = document.activeElement; rememberTour(); $('welcome').close();
     tourSteps = [
       ['#register-codex', 'Connect your Codex once', 'Use Connect Zenshin tools to register this installation and install guidance automatically for new Codex chats. Reload MCP connections or restart Codex once. Reconnect / repair guidance restores the setup if needed.'],
-      ...(state?.chrome_password_supported ? [['#auto-password', 'Choose your Chrome actions', 'In Chrome actions, enable password selection, terms agreement, or both. Zenshin identifies controls by meaning and opens and selects the native password suggestion itself. Terms bundled with marketing are allowed; separate marketing boxes are left alone. Codex delegates these actions without using Computer Use. These actions never submit an account.']] : []),
-      ['#connect', 'Monitor chat requests', 'Load Codex chats to monitor questions and continuation requests. This is separate from registering the Chrome tools. Select chats with unique titles; desktop monitoring visits each selected chat in turn.'],
+      ...(state?.chrome_password_supported ? [['#auto-password', 'Choose your Chrome actions', 'In Chrome actions, enable password selection, terms agreement, or CAPTCHA solving using Codex AI. Zenshin identifies controls by meaning and opens and selects the native password suggestion itself. Terms bundled with marketing are allowed; separate marketing boxes are left alone. CAPTCHA solving uses your signed-in Codex CLI. These actions never submit an account.']] : []),
+      ['#connect', 'Set up selected chats', 'Load Codex chats and select those to monitor. Start monitoring authorizes one Chrome-action setup message in each selected chat and updates when enabled actions change. Zenshin sends only when the chat is idle with an empty draft. Select chats with unique titles; monitoring visits them in turn.'],
       ['#authorization-panel', 'Set your standing instructions', 'Choose a prefilled prompt and edit it to say what Zenshin may approve. While monitoring runs, AI answers covered requests automatically using your Codex account. Requests missing required facts are logged as skipped.'],
-      ['#start', 'Start when ready', 'Start monitoring saves your choices and enables selected Chrome actions and chat replies. Chrome actions need no selected chats. Keep this page open for five-second chat checks. Saving settings pauses all actions.'],
+      ['#start', 'Start when ready', 'Start monitoring saves your choices, enables selected Chrome actions and chat replies, and sends pending setup messages to selected idle chats. Chrome actions need no selected chats. Keep this page open for five-second chat checks. Saving settings pauses all actions.'],
       ['#pause', 'Pause all actions', 'Pause stops future chat checks after the current check and disables Chrome actions. Start monitoring enables them again.'],
-      ['#activity-panel', 'See what happened', 'Activity logs completed password selections, terms agreements, and replies, along with any failures or skipped requests. Actions run without a review queue. You can replay this guide anytime from Take the tour.']
+      ['#activity-panel', 'See what happened', 'Activity logs completed password selections, terms agreements, CAPTCHA solves, and replies, along with any failures or skipped requests. Actions run without a review queue. You can replay this guide anytime from Take the tour.']
     ];
     tourIndex = 0; $('tutorial').showModal(); showTourStep(); $('tour-next').focus();
   }
@@ -535,7 +537,7 @@
   function updateSelection() {
     $('selection').textContent = selected.size ? `${selected.size} chat${selected.size === 1 ? '' : 's'} selected` : 'Select one or more chats to monitor.';
     const chatReady = state?.connected && selected.size > 0 && !!$('instructions').value.trim();
-    const chromeReady = !selected.size && state?.chrome_password_supported && ($('auto-password').checked || $('auto-terms').checked);
+    const chromeReady = !selected.size && state?.chrome_password_supported && ($('auto-password').checked || $('auto-terms').checked || $('auto-captcha').checked);
     $('start').disabled = busy || state?.running || !(chatReady || chromeReady);
     $('pause').disabled = !state?.running;
     $('next-step').textContent = state?.running ? 'Monitoring active · Keep this window open'
@@ -546,9 +548,9 @@
   }
   function markChanged() { $('saved').textContent = 'Unsaved changes'; updateSelection(); }
   const instructionPresets = {
-    approve: 'Approve permission and continuation requests needed to complete my current task. Tell Codex to proceed with its recommended option when a choice is needed. Use Zenshin for enabled Chrome password and terms actions. Do not invent missing facts or credentials.',
-    recommended: 'Approve all requests needed to complete my current task. When Codex offers options, choose its recommended option and tell it to continue without asking again. Use Zenshin for enabled Chrome password and terms actions. Do not invent missing facts or credentials.',
-    continue: 'Keep Codex working through the existing plan automatically. Approve permission requests and tell it to continue whenever it asks to proceed. Use Zenshin for enabled Chrome password and terms actions. Do not invent missing facts or credentials.'
+    approve: 'Approve permission and continuation requests needed to complete my current task. Tell Codex to proceed with its recommended option when a choice is needed. Use Zenshin for enabled Chrome password, terms, and CAPTCHA actions. Do not invent missing facts or credentials.',
+    recommended: 'Approve all requests needed to complete my current task. When Codex offers options, choose its recommended option and tell it to continue without asking again. Use Zenshin for enabled Chrome password, terms, and CAPTCHA actions. Do not invent missing facts or credentials.',
+    continue: 'Keep Codex working through the existing plan automatically. Approve permission requests and tell it to continue whenever it asks to proceed. Use Zenshin for enabled Chrome password, terms, and CAPTCHA actions. Do not invent missing facts or credentials.'
   };
   $('instruction-preset').onchange = () => { $('instructions').value = instructionPresets[$('instruction-preset').value]; markChanged(); };
   function renderEntries(id, entries, empty) {
@@ -603,7 +605,8 @@
   }
   async function save() {
     renderState(await request('settings', {targets: [...selected.values()], instructions: $('instructions').value,
-      auto_password: $('auto-password').checked, auto_terms: $('auto-terms').checked}));
+      auto_password: $('auto-password').checked, auto_terms: $('auto-terms').checked,
+      auto_captcha: $('auto-captcha').checked}));
     $('saved').textContent = 'Settings saved.';
   }
   async function action(work, control, message = 'Checking selected chats · AI analysis may take a moment…') {
@@ -638,6 +641,7 @@
   $('instructions').addEventListener('input', () => { $('instruction-preset').value = ''; markChanged(); });
   $('auto-password').onchange = markChanged;
   $('auto-terms').onchange = markChanged;
+  $('auto-captcha').onchange = markChanged;
   $('save').onclick = () => action(save, 'save', 'Saving your settings…');
   $('start').onclick = () => action(async () => { await save(); renderState(await request('start')); $('progress-text').textContent = 'Checking selected chats · AI analysis may take a moment…'; renderState(await request('poll')); }, 'start', 'Starting monitoring…');
   $('pause').onclick = () => {
@@ -650,7 +654,8 @@
     const result = await response.json();
     selected = new Map(result.targets.map(target => [target.id, target]));
     drawChats(); $('instructions').value = result.instructions; renderState(result);
-    $('auto-password').checked = result.auto_password; $('auto-terms').checked = result.auto_terms; updateSelection();
+    $('auto-password').checked = result.auto_password; $('auto-terms').checked = result.auto_terms;
+    $('auto-captcha').checked = result.auto_captcha; updateSelection();
     if (result.connected) await loadChats();
   }, null, 'Loading your saved settings…').then(() => {
     loadSetup();

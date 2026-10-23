@@ -2,6 +2,14 @@
 
 Status: the direct individual-action MCP integration is implemented.
 
+## Mandatory routing requirement — 23 October 2026
+
+For every Zenshin user, enabled password and terms actions must run through Zenshin without per-chat reminders. Global instructions alone do not establish enforced routing. Codex CLI analysis remains allowed; Zenshin owns every computer interaction.
+
+The existing MCP integration does not force Codex's choice of executor. Supported `PreToolUse` hooks can block some direct tool calls, but cannot replace the tool name, miss some tool paths, and can fail without blocking. These limitations are documented in the [official hooks reference](https://learn.chatgpt.com/docs/hooks). Do not describe hooks or stronger prompts as a universal routing guarantee.
+
+The chosen approach is automatic setup messages in selected chats. While monitoring, Zenshin sends the current enabled/disabled Chrome-action instructions once to each selected idle chat with an empty draft. A saved action-switch change queues an update, including disabling all actions. Confirmed delivery survives restarts and reselection; uncertain sends are not automatically repeated. This supplies direct model instructions rather than guaranteed technical routing. No browser interception, global hooks, or separate browser execution workflow is added.
+
 ## Scope to preserve
 
 Keep Codex chat monitoring, exact rules, AI standing instructions, question-form answers, ordinary replies, Allow once cards, saved settings, Pause, draft protection, and the durable attempt journal. Keep the existing native Chrome password/terms helpers, site checks, and persistent Windows MTA worker.

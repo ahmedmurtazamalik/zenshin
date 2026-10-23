@@ -79,7 +79,8 @@ def check(executable, copy=True):
         assert result.returncode == 0, result.stderr
         replies = [json.loads(line) for line in result.stdout.splitlines()]
         assert replies[0]["result"]["serverInfo"]["name"] == "zenshin"
-        assert len(replies[1]["result"]["tools"]) == 2
+        assert {tool["name"] for tool in replies[1]["result"]["tools"]} == {
+            "select_chrome_password", "check_chrome_terms", "solve_chrome_captcha"}
         # The server is stopped: the tool must report unavailability without attempting desktop actions.
         assert replies[2]["result"]["isError"]
         assert "Zenshin is unavailable" in replies[2]["result"]["content"][0]["text"]
