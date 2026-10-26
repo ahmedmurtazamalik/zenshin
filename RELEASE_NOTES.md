@@ -1,3 +1,10 @@
+# Zenshin v0.2.20 — Reopen Codex after updates
+
+- Continue waiting for Codex to exit when its desktop controls disappear during shutdown, then reopen it through Windows. The quit shortcut and confirmation are not repeated.
+- Distinguish a completed Zenshin update from a failed Codex reconnect, provide manual recovery instructions, and clear the old setup failure after a successful chat reconnect.
+
+Verification: 119 behavior tests passed in 5.6 seconds, including the reproduced shutdown race and its timeout boundary. JavaScript checks verified that a successful reconnect clears the old failure while unrelated registration messages remain. The local Windows installer compiled successfully; the packaged app passed startup, bundled assets, settings persistence, and MCP discovery/transport checks. A live Codex restart has not been performed in this active chat.
+
 # Zenshin v0.2.15 — Reliable Chrome focus and offscreen agreements
 
 - Activate the matched Chrome window and wait briefly for Windows keyboard focus before opening the generated-password suggestion. Public forms no longer fail merely because focus has not updated immediately.

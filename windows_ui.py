@@ -163,17 +163,22 @@ def restart_codex():
                 break
             if status != 258:  # WAIT_TIMEOUT means the original process is alive.
                 raise RuntimeError("Could not confirm whether Codex exited")
-            foreground = api.GetForegroundControl()
-            if not confirmed_quit and foreground is not None and foreground.ClassName == "#32770":
-                dialogs = [candidate for candidate, candidate_path, candidate_id in codex_windows()
-                           if candidate_id == identity and os.path.normcase(candidate_path) == os.path.normcase(path)
-                           and api.ControlsAreSame(candidate, foreground)]
-                buttons = [control for control in nodes(foreground, stop_at_documents=True)
-                           if control.ControlTypeName == "ButtonControl" and control.IsEnabled and not control.IsOffscreen]
-                quit_buttons = [button for button in buttons if button.Name == "Quit"]
-                if dialogs and len(quit_buttons) == 1 and any(button.Name == "Cancel" for button in buttons):
-                    press(quit_buttons[0])
-                    confirmed_quit = True
+            try:
+                foreground = api.GetForegroundControl()
+                if not confirmed_quit and foreground is not None and foreground.ClassName == "#32770":
+                    dialogs = [candidate for candidate, candidate_path, candidate_id in codex_windows()
+                               if candidate_id == identity and os.path.normcase(candidate_path) == os.path.normcase(path)
+                               and api.ControlsAreSame(candidate, foreground)]
+                    buttons = [control for control in nodes(foreground, stop_at_documents=True)
+                               if control.ControlTypeName == "ButtonControl" and control.IsEnabled and not control.IsOffscreen]
+                    quit_buttons = [button for button in buttons if button.Name == "Quit"]
+                    if dialogs and len(quit_buttons) == 1 and any(button.Name == "Cancel" for button in buttons):
+                        confirmed_quit = True
+                        press(quit_buttons[0])
+            except api.comtypes.COMError:
+                # Quit can destroy these controls before the process exits.
+                # Its process handle, not UIA availability, confirms shutdown.
+                pass
             time.sleep(.2)
         else:
             raise RuntimeError("Codex did not quit within 30 seconds; it was not forced closed or relaunched")

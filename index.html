@@ -578,8 +578,11 @@
   }
   function renderState(result) {
     const previousConnection = state?.connected;
+    const previousError = state?.error;
     state = result;
     if (previousConnection !== state.connected) {
+      if (state.connected && previousError && $('setup-result').textContent === previousError)
+        $('setup-result').textContent = 'Codex chat connection restored.';
       for (const id of ['setup-chat-result', 'chat-connection-result']) $(id).textContent = state.connected
         ? 'Chat connection: connected. Use Check connection to verify.'
         : 'Chat connection: not connected. Open Chats and choose Load Codex chats.';

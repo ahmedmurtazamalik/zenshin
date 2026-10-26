@@ -1,7 +1,7 @@
 from contextlib import ExitStack
 from itertools import chain, count, repeat
 import unittest
-from unittest.mock import Mock, call, patch
+from unittest.mock import Mock, PropertyMock, call, patch
 
 import windows_ui as ui
 
@@ -79,6 +79,8 @@ class CodexRestartTests(unittest.TestCase):
 
     def test_quit_timeout_does_not_force_close_or_relaunch(self):
         self.kernel.WaitForSingleObject.return_value = 258
+        self.api.comtypes.COMError = OSError
+        self.api.GetForegroundControl.side_effect = [self.old] + [OSError("Window closed")] * 30
         with self.native([[(self.old, self.path, 21)]]):
             with self.assertRaisesRegex(RuntimeError, "not forced closed or relaunched"):
                 ui.restart_codex()
@@ -95,6 +97,21 @@ class CodexRestartTests(unittest.TestCase):
             self.assertTrue(ui.restart_codex())
         self.open_app.assert_called_once_with("codex://")
         self.launch.assert_not_called()
+
+    def test_app_reopens_when_foreground_controls_expire_during_quit(self):
+        self.api.comtypes.COMError = OSError
+        stale = window()
+        type(stale).ClassName = PropertyMock(side_effect=OSError("Window closed"))
+        for foreground in (OSError("Window closed"), stale):
+            with self.subTest(foreground=foreground):
+                self.kernel.WaitForSingleObject.side_effect = [258, 0]
+                self.api.GetForegroundControl.side_effect = [self.old, foreground]
+                self.api.SendKeys.reset_mock()
+                with self.native([[(self.old, self.path, 21)], [(self.new, self.path, 22)]]):
+                    self.assertTrue(ui.restart_codex())
+                self.api.SendKeys.assert_called_once_with("{Ctrl}q", waitTime=.1)
+                self.open_app.assert_called_once_with("codex://")
+                self.launch.assert_not_called()
 
     def test_background_app_is_restored_before_native_restart(self):
         with self.native([[], [(self.old, self.path, 21)], [(self.new, self.path, 22)]]):

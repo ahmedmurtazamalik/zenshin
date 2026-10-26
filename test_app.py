@@ -185,6 +185,8 @@ class UpdateRestoreTests(unittest.TestCase):
         start.assert_not_called()
         self.assertFalse(result["state"]["running"])
         self.assertIn("Codex reload failed", result["state"]["error"])
+        self.assertIn("Zenshin was updated", result["message"])
+        self.assertIn("Open Codex manually", result["message"])
         self.assertNotIn("update_resume", app.load_state(self.path))
 
     def test_failed_installer_launch_removes_resume_handoff(self):

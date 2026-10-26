@@ -735,7 +735,8 @@ def restore_update(app, port):
         app["running"] = False
         close_connection(app["connection"])
         app["connection"] = None
-        app["error"] = "Update refresh failed: " + str(error)
+        app["error"] = ("Zenshin was updated, but Codex reconnect failed: " + str(error)
+                        + ". Open Codex manually, then choose Load Codex chats to reconnect. Monitoring remains paused.")
         result["message"] = app["error"]
     return {**result, "state": snapshot(app)}
 
