@@ -172,6 +172,25 @@ class ChromeServerTests(unittest.TestCase):
              patch.object(ui.time, "monotonic", side_effect=count()), patch.object(ui.time, "sleep"):
             self.assertIn("finished loading", ui.prepare_chrome_site("https://jobs.example.com/register")["message"])
 
+    def test_chrome_preparation_uses_active_page_among_native_documents(self):
+        from itertools import count
+        api, window, address_bar, webpage, _ = self.chrome_form()
+        webpage.Name = "Registration"
+        window.Name = "Registration - Google Chrome"
+        other = node("DocumentControl", "Another page")
+        other.GetPattern.return_value.Value = "https://other.example.com/"
+        window.GetChildren.return_value = [address_bar, webpage, other, node("ButtonControl", "Reload")]
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui.subprocess, "Popen") as launch, \
+             patch.object(ui.time, "monotonic", side_effect=count()), patch.object(ui.time, "sleep"):
+            self.assertIn("finished loading", ui.prepare_chrome_site(
+                "https://jobs.example.com/register", open_site=False)["message"])
+            window.Name = "Another page - Google Chrome"
+            self.assertEqual(ui.chrome_password_suggestion("https://jobs.example.com"), (None, None))
+            launch.assert_not_called()
+        webpage.GetChildren.assert_not_called()
+        other.GetChildren.assert_not_called()
+
     def test_chrome_preparation_opens_requested_path_instead_of_accepting_other_page(self):
         from itertools import count
         api, window, _, webpage, _ = self.chrome_form("https://jobs.example.com/other")

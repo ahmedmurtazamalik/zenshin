@@ -298,6 +298,20 @@ def chrome_windows():
                 yield window
 
 
+def chrome_page_document(browser, native):
+    documents = [control for control in native
+                 if control.ControlTypeName == "DocumentControl" and not control.IsOffscreen
+                 and (value := control.GetPattern(automation().PatternId.ValuePattern))
+                 and value.Value.startswith(("http://", "https://"))]
+    if len(documents) > 1:
+        # Chrome can expose other native documents alongside its active page.
+        # Select by the native window title, never by the requested site's URL.
+        documents = [control for control in documents
+                     if control.Name and browser.Name == control.Name + " - Google Chrome"]
+    return documents[0] if len(documents) == 1 else None
+
+
+
 def chrome_password_suggestion(origin):
     matches, browsers = [], []
     api = automation()
@@ -312,14 +326,8 @@ def chrome_password_suggestion(origin):
             continue
         # The omnibox omits schemes and sometimes "www". Read only the native
         # document URL, without traversing webpage controls or password fields.
-        origins = []
-        for node in native:
-            if node.ControlTypeName != "DocumentControl" or node.IsOffscreen:
-                continue
-            value = node.GetPattern(api.PatternId.ValuePattern)
-            if value and value.Value.startswith(("http://", "https://")):
-                origins.append(site_origin(value.Value))
-        if origins != [origin]:
+        document = chrome_page_document(window, native)
+        if document is None or site_origin(document.GetPattern(api.PatternId.ValuePattern).Value) != origin:
             continue
         browsers.append(window)
         for node in native:
@@ -352,14 +360,8 @@ def prepare_chrome_site(address, open_site=True):
             # Chrome can replace its accessibility elements while a page opens.
             time.sleep(.25)
             continue
-        documents = [control for control in native
-                     if control.ControlTypeName == "DocumentControl" and not control.IsOffscreen]
-        # Chrome's native WebView containers also report DocumentControl, but
-        # expose no URL. Count only actual HTTP(S) page documents.
-        documents = [control for control in documents
-                     if (pattern := control.GetPattern(automation().PatternId.ValuePattern))
-                     and pattern.Value.startswith(("http://", "https://"))]
-        value = documents[0].GetPattern(automation().PatternId.ValuePattern) if len(documents) == 1 else None
+        document = chrome_page_document(browser, native) if browser else None
+        value = document.GetPattern(automation().PatternId.ValuePattern) if document else None
         current_url = value.Value if value else ""
         current = urlsplit(current_url)
         same_page = opened or (requested.path in {"", "/"} and not requested.query) or (
@@ -368,7 +370,7 @@ def prepare_chrome_site(address, open_site=True):
             buttons = {control.Name for control in native if control.ControlTypeName == "ButtonControl"
                        and control.IsEnabled and not control.IsOffscreen}
             ready = (current_url.startswith(("http://", "https://")) and site_origin(current_url) == origin
-                     and documents[0].IsEnabled
+                     and document is not None and document.IsEnabled
                      and bool(buttons & {"Reload", "Reload this page"})
                      and not buttons & {"Stop", "Stop loading"})
             if ready and stable_url == current_url:
@@ -403,9 +405,8 @@ def prepare_chrome_site(address, open_site=True):
 
 def chrome_page_controls(browser, origin):
     api = automation()
-    for doc in nodes(browser, stop_at_documents=True):
-        if doc.ControlTypeName != "DocumentControl" or doc.IsOffscreen:
-            continue
+    doc = chrome_page_document(browser, list(nodes(browser, stop_at_documents=True)))
+    if doc is not None:
         value = doc.GetPattern(api.PatternId.ValuePattern)
         if value and value.Value.startswith(("http://", "https://")) and site_origin(value.Value) == origin:
             yield from nodes(doc)
