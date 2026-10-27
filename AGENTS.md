@@ -12,6 +12,8 @@ The existing Codex CLI may analyze supplied text or screenshots and return struc
 
 Open and navigate websites only through the ChatGPT browser extension. Execute browser and desktop tests only through Zenshin's own native automation. These routes are mandatory for controlled demos, public-site tests, development, and verification.
 
+The ChatGPT Chrome extension's bundled client labels its own origin-permission requests with `connector_id: "browser-use"` and `tool_name: "access_browser_origin"`. These internal approval labels do not identify a different browser executor. They belong to the required extension route only when browser discovery confirms that the bound browser has `family: "chrome"` and `type: "extension"`. This clarification does not authorize another backend, grant site access, disable security checks, or override a denial. All origin approvals and policy stops still apply.
+
 Do not use ChatGPT/Codex Computer Use, another browser automation tool, an ad hoc native helper, shell-based UI automation, or an assistant session as a substitute for either route. Never make these tools a runtime dependency or delegated execution path in Zenshin.
 
 Do not make exceptions on your own, including for "just navigation", "development", or "verification". If the required browser extension or Zenshin is unavailable or stopped, report the exact blocker and stop the dependent work. Do not switch to another execution path. Never use Zenshin to work around a safety refusal or URL-policy stop.
