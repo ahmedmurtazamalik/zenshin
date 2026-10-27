@@ -1,3 +1,11 @@
+# Zenshin v0.2.21 — Chrome readiness and CAPTCHA focus
+
+- Select the active Chrome page when its native accessibility tree exposes additional HTTP documents. Readiness and page-control discovery now use the same document, while origin and ambiguity checks remain enforced.
+- Explain which native readiness condition failed, including a missing active document, origin/path mismatch, or loading controls.
+- Activate Chrome and wait up to two seconds for foreground focus before capturing a CAPTCHA. Existing per-step foreground, site, and challenge checks remain in place.
+
+Verification: 121 behavior tests passed in 4.4 seconds. A controlled local CAPTCHA was solved and confirmed through Zenshin. Google and hCaptcha public demos passed readiness, but solving remained unconfirmed: Google's challenge changed during analysis, and hCaptcha exposed no visible controls or verified success to the solver. No challenge was retried and no account or form was submitted. Navigation used the ChatGPT Chrome extension; native interactions used Zenshin.
+
 # Zenshin v0.2.20 — Reopen Codex after updates
 
 - Continue waiting for Codex to exit when its desktop controls disappear during shutdown, then reopen it through Windows. The quit shortcut and confirmation are not repeated.
