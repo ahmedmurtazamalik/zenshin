@@ -10,7 +10,11 @@ Codex requests actions from Zenshin. Zenshin performs all computer interaction t
 
 The existing Codex CLI may analyze supplied text or screenshots and return structured decisions. It must not be asked to operate the computer or invoke tools on Zenshin's behalf. Keep analysis separate from Zenshin's validated native execution.
 
-Never make Zenshin depend on or call ChatGPT/Codex Computer Use tools, browser-use tools, or an assistant session to carry out an action. A coding agent may independently use its available tools for development or verification; those tools must never become a runtime dependency or delegated execution path in Zenshin.
+Open and navigate websites only through the ChatGPT browser extension. Execute browser and desktop tests only through Zenshin's own native automation. These routes are mandatory for controlled demos, public-site tests, development, and verification.
+
+Do not use ChatGPT/Codex Computer Use, another browser automation tool, an ad hoc native helper, shell-based UI automation, or an assistant session as a substitute for either route. Never make these tools a runtime dependency or delegated execution path in Zenshin.
+
+Do not make exceptions on your own, including for "just navigation", "development", or "verification". If the required browser extension or Zenshin is unavailable or stopped, report the exact blocker and stop the dependent work. Do not switch to another execution path. Never use Zenshin to work around a safety refusal or URL-policy stop.
 
 ## Governing rule
 
