@@ -157,7 +157,7 @@ class ChromeServerTests(unittest.TestCase):
             launch.assert_not_called()
             suggestion.GetPattern.return_value.Invoke.assert_not_called()
             window.GetChildren.return_value.append(node("ButtonControl", "Stop loading"))
-            with self.assertRaisesRegex(RuntimeError, "not ready"):
+            with self.assertRaisesRegex(RuntimeError, "Chrome site is not ready:.*stop present: True"):
                 ui.prepare_chrome_site("https://jobs.example.com/register", open_site=False)
             launch.assert_not_called()
         webpage.GetChildren.assert_not_called()

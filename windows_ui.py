@@ -298,36 +298,45 @@ def chrome_windows():
                 yield window
 
 
-def chrome_page_document(browser, native):
+def chrome_page_document(browser, native, diagnostics=None):
     documents = [control for control in native
                  if control.ControlTypeName == "DocumentControl" and not control.IsOffscreen
                  and (value := control.GetPattern(automation().PatternId.ValuePattern))
                  and value.Value.startswith(("http://", "https://"))]
+    http_documents = len(documents)
     if len(documents) > 1:
         # Chrome can expose other native documents alongside its active page.
         # Select by the native window title, never by the requested site's URL.
         documents = [control for control in documents
                      if control.Name and browser.Name == control.Name + " - Google Chrome"]
+    if diagnostics is not None:
+        diagnostics["reason"] = f"HTTP documents: {http_documents}; active page candidates: {len(documents)}"
     return documents[0] if len(documents) == 1 else None
 
 
-
-def chrome_password_suggestion(origin):
+def chrome_password_suggestion(origin, diagnostics=None):
     matches, browsers = [], []
+    details = diagnostics if diagnostics is not None else {}
+    details["reason"] = "no visible native Chrome window"
     api = automation()
     for window in chrome_windows():
         if window.IsOffscreen:
+            details["reason"] = "Chrome window is offscreen"
             continue
         # Browser chrome only: never inspect webpage controls or password fields.
         native = list(nodes(window, stop_at_documents=True))
         addresses = [node for node in native if node.ControlTypeName == "EditControl"
                      and node.Name == "Address and search bar"]
         if len(addresses) != 1:
+            details["reason"] = f"native Chrome address bars found: {len(addresses)}"
             continue
         # The omnibox omits schemes and sometimes "www". Read only the native
         # document URL, without traversing webpage controls or password fields.
-        document = chrome_page_document(window, native)
-        if document is None or site_origin(document.GetPattern(api.PatternId.ValuePattern).Value) != origin:
+        document = chrome_page_document(window, native, details)
+        if document is None:
+            continue
+        if site_origin(document.GetPattern(api.PatternId.ValuePattern).Value) != origin:
+            details["reason"] = "active native document does not match the requested origin"
             continue
         browsers.append(window)
         for node in native:
@@ -351,13 +360,16 @@ def prepare_chrome_site(address, open_site=True):
         address = "https://" + address
     requested = urlsplit(address)
     opened, stable_url = False, None
+    diagnostics = {}
+    reason = "native controls not yet available"
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
         try:
-            browser, _ = chrome_password_suggestion(origin)
+            browser, _ = chrome_password_suggestion(origin, diagnostics=diagnostics)
             native = list(nodes(browser, stop_at_documents=True)) if browser else []
         except automation().comtypes.COMError:
             # Chrome can replace its accessibility elements while a page opens.
+            reason = "native controls are changing"
             time.sleep(.25)
             continue
         document = chrome_page_document(browser, native) if browser else None
@@ -366,6 +378,9 @@ def prepare_chrome_site(address, open_site=True):
         current = urlsplit(current_url)
         same_page = opened or (requested.path in {"", "/"} and not requested.query) or (
             current.path == requested.path and current.query == requested.query)
+        reason = diagnostics.get("reason", reason)
+        if browser:
+            reason = "requested path or query does not match the native page"
         if browser and same_page:
             buttons = {control.Name for control in native if control.ControlTypeName == "ButtonControl"
                        and control.IsEnabled and not control.IsOffscreen}
@@ -373,6 +388,10 @@ def prepare_chrome_site(address, open_site=True):
                      and document is not None and document.IsEnabled
                      and bool(buttons & {"Reload", "Reload this page"})
                      and not buttons & {"Stop", "Stop loading"})
+            reason = (f"active HTTP document present: {document is not None}; "
+                      f"page enabled: {bool(document and document.IsEnabled)}; "
+                      f"reload present: {bool(buttons & {'Reload', 'Reload this page'})}; "
+                      f"stop present: {bool(buttons & {'Stop', 'Stop loading'})}")
             if ready and stable_url == current_url:
                 return {"message": f"Chrome is on {origin} and has finished loading. Zenshin can perform the requested native action."}
             stable_url = current_url if ready else None
@@ -400,7 +419,7 @@ def prepare_chrome_site(address, open_site=True):
         else:
             stable_url = None
         time.sleep(.25)
-    raise RuntimeError("Chrome site is not ready: check the address, loading indicator, and any redirects before trying again")
+    raise RuntimeError("Chrome site is not ready: " + reason)
 
 
 def chrome_page_controls(browser, origin):
