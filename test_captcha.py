@@ -1,4 +1,5 @@
 import json
+from itertools import chain, repeat
 from pathlib import Path
 import tempfile
 import unittest
@@ -135,6 +136,16 @@ class NativeCaptchaTests(unittest.TestCase):
             ui.solve_chrome_captcha("https://signup.example.com/register")
         self.assertEqual(analyze.call_count, 3)
         self.api.Click.assert_called_once_with(130, 240, waitTime=.2)
+
+    def test_waits_for_native_chrome_activation_before_capturing(self):
+        self.browser.BoundingRectangle = Mock(left=0, top=0, right=1000, bottom=800)
+        self.api.GetForegroundControl.side_effect = chain([None], repeat(self.browser))
+        self.region.CaptureToImage.side_effect = lambda path: Path(path).write_bytes(self.pixels)
+        ui.chrome_captcha_snapshot.side_effect = self.capture
+        self.api.Click.side_effect = lambda *args, **kwargs: setattr(self, "pixels", b"verified widget")
+        with patch.object(ai_decision, "captcha_step", side_effect=[
+                {"action": "click", "points": [[10, 20]]}, {"action": "verified"}]):
+            self.assertIn("confirmed", ui.solve_chrome_captcha("https://signup.example.com/register")["message"])
 
     def test_site_overlay_missing_widget_or_password_target_never_receives_input(self):
         for failure in ("site", "overlay", "missing", "disappeared", "password"):

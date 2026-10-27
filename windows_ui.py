@@ -707,6 +707,12 @@ def solve_chrome_captcha(address):
         raise RuntimeError("The requested Chrome page is not available")
     api = automation()
     browser.SetActive(waitTime=.1)
+    browser.SwitchToThisWindow(waitTime=.1)
+    focus_deadline = time.monotonic() + 2
+    while (foreground := api.GetForegroundControl()) is None or not api.ControlsAreSame(foreground, browser):
+        if time.monotonic() >= focus_deadline:
+            raise RuntimeError("Chrome did not take foreground focus; CAPTCHA action stopped")
+        time.sleep(.1)
     deadline = time.monotonic() + 90
     with tempfile.TemporaryDirectory(prefix="zenshin-captcha-") as directory:
         image = Path(directory) / "challenge.png"
