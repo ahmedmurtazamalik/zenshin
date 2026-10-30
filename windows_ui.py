@@ -299,8 +299,9 @@ def chrome_windows():
 
 
 def chrome_page_document(browser, native, diagnostics=None):
-    documents = [control for control in native
-                 if control.ControlTypeName == "DocumentControl" and not control.IsOffscreen
+    native_documents = [control for control in native if control.ControlTypeName == "DocumentControl"]
+    documents = [control for control in native_documents
+                 if not control.IsOffscreen
                  and (value := control.GetPattern(automation().PatternId.ValuePattern))
                  and value.Value.startswith(("http://", "https://"))]
     http_documents = len(documents)
@@ -310,7 +311,8 @@ def chrome_page_document(browser, native, diagnostics=None):
         documents = [control for control in documents
                      if control.Name and browser.Name == control.Name + " - Google Chrome"]
     if diagnostics is not None:
-        diagnostics["reason"] = f"HTTP documents: {http_documents}; active page candidates: {len(documents)}"
+        diagnostics["reason"] = (f"native documents: {len(native_documents)}; HTTP documents: {http_documents}; "
+                                 f"active page candidates: {len(documents)}")
     return documents[0] if len(documents) == 1 else None
 
 

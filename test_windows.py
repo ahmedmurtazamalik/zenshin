@@ -98,6 +98,16 @@ class AutomationLifetimeTests(unittest.TestCase):
 
 
 class ChromeServerTests(unittest.TestCase):
+    def test_readiness_distinguishes_missing_documents_from_documents_without_urls(self):
+        blank = node("DocumentControl")
+        blank.GetPattern.return_value = None
+        for documents in ([], [blank]):
+            with self.subTest(document_count=len(documents)), patch.object(ui, "automation", return_value=Mock()):
+                diagnostics = {}
+                self.assertIsNone(ui.chrome_page_document(node("WindowControl"), documents, diagnostics))
+                self.assertEqual(diagnostics["reason"],
+                                 f"native documents: {len(documents)}; HTTP documents: 0; active page candidates: 0")
+
     def setUp(self):
         selection = patch.object(ui.ai_decision, "select_browser_control", return_value=0)
         self.select = selection.start()
