@@ -50,6 +50,26 @@ class CaptchaDecisionTests(unittest.TestCase):
                     ai_decision.captcha_step(Path("challenge.png"), controls, 100, 50, 10)
 
 
+class CaptchaRegionTests(unittest.TestCase):
+    def test_sample_form_is_never_used_in_place_of_its_captcha_frame(self):
+        api = Mock()
+        api.ControlsAreSame.side_effect = lambda first, second: first is second
+        page = node("DocumentControl", "hCAPTCHA Demo")
+        widget = node("DocumentControl", "hCaptcha security challenge")
+        widget.GetPattern.return_value.Value = "https://newassets.hcaptcha.com/captcha/checkbox"
+        widget.BoundingRectangle = Mock(width=lambda: 300, height=lambda: 80)
+        form = node("GroupControl", "Sample Form with hCAPTCHA", [widget])
+        form.BoundingRectangle = Mock(width=lambda: 420, height=lambda: 290)
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "chrome_page_controls", return_value=[page, form, widget]):
+            self.assertIs(ui.chrome_captcha_region(node("WindowControl"), "https://accounts.hcaptcha.com"), widget)
+        form.GetChildren.return_value = []
+        with patch.object(ui, "automation", return_value=api), \
+             patch.object(ui, "chrome_page_controls", return_value=[page, form]):
+            with self.assertRaisesRegex(RuntimeError, "No visible CAPTCHA frame"):
+                ui.chrome_captcha_region(node("WindowControl"), "https://accounts.hcaptcha.com")
+
+
 class NativeCaptchaTests(unittest.TestCase):
     def test_capture_rejects_account_controls_before_creating_an_image(self):
         api = Mock()

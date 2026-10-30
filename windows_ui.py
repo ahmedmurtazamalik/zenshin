@@ -657,6 +657,8 @@ def chrome_captcha_region(browser, origin):
                 or control.IsOffscreen or not control.IsEnabled):
             continue
         label = control.Name.casefold()
+        if control.ControlTypeName != "DocumentControl" and re.search(r"\bform\b", label):
+            continue  # A form mentioning CAPTCHA is not the challenge itself.
         if control.ControlTypeName == "DocumentControl":
             value = control.GetPattern(automation().PatternId.ValuePattern)
             label += " " + (value.Value if value else "").casefold()
