@@ -726,15 +726,20 @@ def solve_chrome_captcha(address):
             region = chrome_captcha_region(browser, origin)
             bounds, controls, descriptions = chrome_captcha_snapshot(browser, region, image)
             pixels = image.read_bytes()
+            analysis_started = time.monotonic()
             step = ai_decision.captcha_step(image, descriptions, bounds[2] - bounds[0],
                                             bounds[3] - bounds[1], remaining)
+            analysis_time = time.monotonic() - analysis_started
             # A CLI round trip can take time. Never use coordinates from an old
             # image, another page, or an overlay that has taken keyboard focus.
             prepare_chrome_site(address, open_site=False)
             current_browser, _ = chrome_password_suggestion(origin)
-            if (time.monotonic() >= deadline or not api.ControlsAreSame(browser, current_browser)
-                    or not api.ControlsAreSame(region, chrome_captcha_region(browser, origin))):
-                raise RuntimeError("Chrome's CAPTCHA changed during analysis; action stopped")
+            if time.monotonic() >= deadline:
+                raise RuntimeError(f"CAPTCHA deadline expired during analysis; action stopped (AI analysis: {analysis_time:.1f}s)")
+            if not api.ControlsAreSame(browser, current_browser):
+                raise RuntimeError(f"Chrome's browser changed during CAPTCHA analysis; action stopped (AI analysis: {analysis_time:.1f}s)")
+            if not api.ControlsAreSame(region, chrome_captcha_region(browser, origin)):
+                raise RuntimeError(f"Chrome's CAPTCHA region changed during analysis; action stopped (AI analysis: {analysis_time:.1f}s)")
             fresh_bounds, fresh_controls, _ = chrome_captcha_snapshot(browser, region, image)
             if step["action"] == "wait":
                 time.sleep(.5)

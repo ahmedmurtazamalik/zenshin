@@ -137,6 +137,30 @@ class NativeCaptchaTests(unittest.TestCase):
         self.assertEqual(analyze.call_count, 3)
         self.api.Click.assert_called_once_with(130, 240, waitTime=.2)
 
+    def test_analysis_stop_reports_deadline_browser_or_region_change_without_input(self):
+        for failure, message in (("deadline", "deadline expired"),
+                                 ("browser", "browser changed"),
+                                 ("region", "region changed")):
+            with self.subTest(failure=failure):
+                clock = [0.0]
+                def analyze(*args):
+                    clock[0] = 91.0 if failure == "deadline" else 2.5
+                    return {"action": "click", "points": [[10, 20]]}
+                ui.chrome_password_suggestion.side_effect = (
+                    [(self.browser, None), (self.browser, None), (None, None)]
+                    if failure == "browser" else None)
+                ui.chrome_captcha_region.side_effect = (
+                    [self.region, node("GroupControl", "Replacement CAPTCHA")]
+                    if failure == "region" else None)
+                with patch.object(ui.time, "monotonic", side_effect=lambda: clock[0]), \
+                     patch.object(ai_decision, "captcha_step", side_effect=analyze):
+                    with self.assertRaisesRegex(RuntimeError, message) as stopped:
+                        ui.solve_chrome_captcha("https://signup.example.com/register")
+                self.assertIn("AI analysis: " + ("91.0s" if failure == "deadline" else "2.5s"),
+                              str(stopped.exception))
+                self.api.Click.assert_not_called()
+                self.answer.GetPattern.return_value.SetValue.assert_not_called()
+
     def test_waits_for_native_chrome_activation_before_capturing(self):
         self.browser.BoundingRectangle = Mock(left=0, top=0, right=1000, bottom=800)
         self.api.GetForegroundControl.side_effect = chain([None], repeat(self.browser))
